@@ -32,11 +32,17 @@
 
   <!-- ================= CHAT ================= -->
   <section class="view active" id="view-chat">
+    <div id="voiceBar" class="voice-bar" hidden>
+      <span class="wave"><i></i><i></i><i></i><i></i></span>
+      <span id="voiceState">dinliyorum</span>
+      <span id="voiceHeard" class="heard"></span>
+    </div>
     <div id="chatLog" class="chat-log" aria-live="polite"></div>
     <div class="composer">
       <div class="composer-row">
         <textarea id="input" rows="1" placeholder="Görevini yaz… (ör. yarın 15:00 fatura öde görevi ekle)" autocomplete="off"></textarea>
-        <button class="icon-btn mic" id="btnMic" title="Sesle yaz">🎙</button>
+        <button class="icon-btn mic" id="btnMic" title="Bas-konuş">🎙</button>
+        <button class="icon-btn hands" id="btnHands" title="Eller serbest (sadece sesle kullan)">🎧</button>
         <button class="send-btn" id="btnSend" title="Gönder">➤</button>
       </div>
       <div class="composer-hint" id="composerHint"></div>
@@ -103,6 +109,21 @@
       <label class="check"><input type="checkbox" id="setAutoApprove"> Riskli araçları sormadan çalıştır</label>
       <label class="check"><input type="checkbox" id="setStream"> Yanıtları akışlı (streaming) al</label>
       <label class="check"><input type="checkbox" id="setTTS"> Cevapları sesli oku</label>
+
+      <h3>Sesle kontrol</h3>
+      <p class="muted small">
+        Eller serbest modda telefona dokunman gerekmez: adını söyle, isteğini söyle,
+        cevabı dinle. Onay ve sorular da sesle cevaplanır.
+      </p>
+      <label class="check"><input type="checkbox" id="setHandsFree"> Açılışta eller serbest modu başlat</label>
+      <label class="check"><input type="checkbox" id="setRequireWake"> Uyandırma kelimesi iste (kapatırsan her söylediğin komut sayılır)</label>
+      <label>Uyandırma kelimesi
+        <input id="setWakeWord" placeholder="nexus">
+      </label>
+      <label class="check"><input type="checkbox" id="setBargeIn"> Konuşurken de dinle (sözünü kesebilirsin — hoparlör sesini komut sanabilir)</label>
+      <label>Konuşma hızı
+        <input id="setVoiceRate" type="number" min="0.5" max="2" step="0.05">
+      </label>
       <label>Konuşma dili (ses tanıma)
         <input id="setLang" placeholder="tr-TR">
       </label>

@@ -23,7 +23,8 @@ Tarayıcıda açılır, ana ekrana eklenince yerli uygulama gibi çalışır.
   Ollama, LM Studio ve OpenAI-uyumlu **her** özel endpoint.
 - **Yedekli çalışır.** Bağlantıları sıraya dizersin; ilki hata verirse (kota doldu,
   anahtar bozuk, servis çöktü) otomatik olarak bir alttakine geçer.
-- **Sesle çalışır.** Mikrofona bas, konuş; istersen cevabı sesli okur.
+- **Tamamen sesle kullanılır.** Eller serbest modda telefona hiç dokunmazsın: adını
+  söyle, isteğini söyle, cevabı dinle. Onay pencereleri de sesle cevaplanır.
 - **Çevrimdışı açılır.** Service worker sayesinde uygulama kabuğu önbellekte;
   görevlerin ve notların internetsiz de elinin altında (yalnızca model çağrısı ağ ister).
 
@@ -63,6 +64,53 @@ Birden fazla bağlantı ekleyip **▲ ▼** ile sıraya diz: üstteki asıl, alt
 | Google Gemini | https://aistudio.google.com/apikey |
 | Groq | https://console.groq.com/keys |
 | OpenRouter | https://openrouter.ai/keys |
+
+## Sadece sesle kullanım (eller serbest)
+
+Sohbet ekranındaki **🎧** düğmesine bir kez bas — sonrası tamamen sesle:
+
+```
+sen:    Nexus
+nexus:  Efendim?
+sen:    yarın öğlen anneme çiçek göndermeyi göreve ekle
+nexus:  (planını söyler, görevi ekler)  Tamamdır, yarın 12:00 için ekledim.
+        ↑ ardından kendiliğinden yeniden dinlemeye döner
+```
+
+Tek cümlede de olur: *"Nexus, yarın öğlen anneme çiçek göndermeyi göreve ekle."*
+
+**Riskli işlerde onay da sesle.** Silme, konum alma gibi bir araç çalışmadan önce
+sorar: *"geolocate aracını çalıştırayım mı? Evet mi, hayır mı?"* — "evet"/"hayır"
+dersin, yeter. Anlamazsa bir kez daha sorar, yine anlamazsa ekrana bırakır.
+Asistan bir bilgi eksik bulursa (`ask_user`) onu da sesli sorar; seçenek sunduysa
+"İzmir olsun" gibi serbest konuşman en yakın seçeneğe eşlenir.
+
+### Sesli kontrol komutları
+
+Bunlar modele gitmez, anında çalışır:
+
+| Dersen | Olur |
+|---|---|
+| `dur` / `sus` / `kes` | Konuşmayı ve çalışan işi durdurur |
+| `tekrarla` / `ne dedin` | Son cevabı yeniden okur |
+| `yeni sohbet` | Geçmişi temizler |
+| `ne yapabilirsin` | Yeteneklerini sayar |
+| `uyu` / `dinlemeyi kapat` | Eller serbest modu kapatır |
+
+### Ayarlar (Ayarlar → Sesle kontrol)
+
+- **Uyandırma kelimesi** — varsayılan `nexus`. Ses tanıma bunu sık yanlış duyduğu için
+  yakın okunuşlar (`neksüs`, `neksus`…) da kabul edilir. İstediğin kelimeyi yazabilirsin.
+- **Uyandırma kelimesi iste** — kapatırsan her söylediğin doğrudan komut olur (sessiz
+  ortamda pratik, kalabalıkta değil).
+- **Konuşurken de dinle** — sözünü kesebilmen için. Varsayılan kapalı: açıkken hoparlörden
+  çıkan kendi sesini komut sanabilir.
+- **Açılışta eller serbest başlat** — açtığında uygulama hazır bekler; tarayıcılar mikrofonu
+  ancak bir dokunuştan sonra açtığı için ekrana bir kez dokunman istenir (bu tarayıcı
+  kuralı, aşılamıyor).
+
+Mod açıkken ekran kilidi (`wakeLock`) alınır, telefon uyumaz. Cevap okunurken mikrofon
+kısa süre duraklatılır ki kendi sesini dinlemesin.
 
 ## Araçlar
 
@@ -107,6 +155,8 @@ js/providers.js  → 4 tür API'yi tek arayüze indirger (openai · gemini · an
 js/tools.js      → araç kayıt defteri
 js/agent.js      → plan/çalıştır döngüsü ve sistem mesajı
 js/store.js      → localStorage kalıcılığı
+js/voice.js      → eller serbest durum makinesi (uyandırma, sesli onay, yerel komutlar)
+js/speech.js     → ses tanıma ve okuma ilkelleri
 js/ui.js         → balonlar, kartlar, modallar
 js/app.js        → ekranların kablolaması
 ```
@@ -120,14 +170,18 @@ npm install      # yalnızca playwright (dev bağımlılığı)
 npm test         # gerçek Chromium'da, mobil ekran boyutunda koşar
 ```
 
-İki paket:
+Üç paket:
 
 - `tests/smoke.test.mjs` — açılış, sekmeler, uçtan uca ajan döngüsü (plan kartı → araç
   kartları → sonuç), kalıcılık, yeniden yükleme, riskli araç onayı, API hata yolu, konsol temizliği
 - `tests/providers.test.mjs` — dört adaptörün (openai · gemini · anthropic · ollama) istek
   gövdesi, kimlik başlıkları, akış çözümlemesi, model listeleme ve yedeğe geçiş davranışı
+- `tests/voice.test.mjs` — eller serbest döngüsü: uyandırma kelimesi kapısı, sesli komut →
+  ajan → sesli cevap → tekrar dinleme, sesle onay ve soru cevaplama, yerel komutlar
 
 Sağlayıcılar sahte (mock) yanıtlarla taklit edilir; test için API anahtarı gerekmez.
+Ses testlerinde `SpeechRecognition` ve `speechSynthesis` de sahte sürümlerle değiştirilir,
+böylece mikrofon olmadan tüm konuşma akışı doğrulanabilir.
 
 ## Ayarlar
 
@@ -158,7 +212,11 @@ Ortak kullanılan bir cihazda kullanma — `localStorage` şifreli değildir.
   doğrudan çağrıya izin verir; sıradan siteler vermez. Proxy ayarı bunun içindir.
 - **Hatırlatmalar** uygulama açıkken (veya arka planda canlıyken) çalışır; kapalı
   uygulamada sunucu gerektiren push bildirimi yoktur.
-- **Ses tanıma** Chrome/Edge/Safari'de var, Firefox'ta yok.
+- **Ses tanıma** Chrome/Edge/Safari'de var, Firefox'ta yok — eller serbest mod da bu
+  tarayıcılara bağlı. Ayrıca ses tanıma internet ister ve tanıma için sesin Google/Apple
+  sunucularına gider (tarayıcının kendi davranışı).
+- **Eller serbest mod sekme ön plandayken** çalışır; ekranı kapatırsan tarayıcı mikrofonu
+  bırakır.
 - **Anahtarlar tarayıcıda** durduğundan, cihazına erişen biri onları görebilir.
 
 ## Lisans

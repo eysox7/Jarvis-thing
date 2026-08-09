@@ -25,10 +25,15 @@ export function openModal({ title, render, onClose }) {
   return close;
 }
 
-export function confirmDialog(message, { okText = 'Onayla', cancelText = 'Reddet', danger = false } = {}) {
+/**
+ * @param {object} opts
+ *   external — sesle cevaplama kancası: {start(done), cancel()}. Pencere açık kalır,
+ *   hangisi önce cevaplarsa (dokunuş ya da ses) o kazanır.
+ */
+export function confirmDialog(message, { okText = 'Onayla', cancelText = 'Reddet', danger = false, external } = {}) {
   return new Promise((resolve) => {
     let settled = false;
-    const done = (v) => { if (settled) return; settled = true; close(); resolve(v); };
+    const done = (v) => { if (settled) return; settled = true; external?.cancel?.(); close(); resolve(v); };
     const close = openModal({
       title: 'Onay gerekiyor',
       render: () => el('div', {},
@@ -40,13 +45,14 @@ export function confirmDialog(message, { okText = 'Onayla', cancelText = 'Reddet
       ),
       onClose: () => done(false),
     });
+    external?.start?.(done);
   });
 }
 
-export function askDialog(question, options = []) {
+export function askDialog(question, options = [], external) {
   return new Promise((resolve) => {
     let settled = false;
-    const done = (v) => { if (settled) return; settled = true; close(); resolve(v); };
+    const done = (v) => { if (settled) return; settled = true; external?.cancel?.(); close(); resolve(v); };
     const close = openModal({
       title: 'N.E.X.U.S. soruyor',
       render: () => {
@@ -69,6 +75,7 @@ export function askDialog(question, options = []) {
       },
       onClose: () => done('(kullanıcı pencereyi kapattı)'),
     });
+    external?.start?.(done);
   });
 }
 

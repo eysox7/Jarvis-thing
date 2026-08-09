@@ -5,6 +5,7 @@ import * as UI from './ui.js';
 import * as Speech from './speech.js';
 import { PRESETS, listModels, testProfile, kindOf } from './providers.js';
 import { runAgent } from './agent.js';
+import { Voice } from './voice.js';
 
 const VERSION = '1.0.0';
 let busy = false;
@@ -36,6 +37,80 @@ function refreshHeader() {
   setStatus(p ? 'ok' : 'err');
 }
 
+/* ============================ eller serbest ses ============================ */
+const voiceBar = $('#voiceBar');
+
+const voice = new Voice({
+  getSettings: () => S.settings(),
+  onState: (state, label) => {
+    const on = state !== 'off';
+    voiceBar.hidden = !on;
+    voiceBar.className = 'voice-bar ' + (on ? state : '');
+    $('#voiceState').textContent = label;
+    if (state !== 'command' && state !== 'asking') $('#voiceHeard').textContent = '';
+    $('#btnHands').classList.toggle('on', on);
+    $('#btnMic').style.display = on || !Speech.sttSupported ? 'none' : '';
+  },
+  onPartial: (t) => { $('#voiceHeard').textContent = t; },
+  onCommand: (t) => { $('#voiceHeard').textContent = ''; send(t); },
+  onLocal: (id) => handleVoiceCommand(id),
+  onError: (e, soft) => {
+    UI.toast(e.message, 'err');
+    if (!soft) UI.addMessage('sys', '🎧 ' + e.message);
+  },
+});
+
+function handleVoiceCommand(id) {
+  switch (id) {
+    case 'stop':
+      Speech.stopSpeaking();
+      abortCtrl?.abort();
+      voice._backToIdle();
+      break;
+    case 'sleep':
+      // Sesle kapatmak da kalıcı olsun; yoksa uygulama bir sonraki açılışta
+      // kullanıcı istemediği hâlde yeniden dinlemeye başlar.
+      voice.stop();
+      S.setSetting('handsFree', false);
+      break;
+    case 'repeat':
+      voice.repeatLast();
+      break;
+    case 'newchat':
+      S.clearChat();
+      restoreChat();
+      voice.say('Yeni sohbet başlattım.');
+      break;
+    case 'help':
+      UI.addMessage('sys', '🎧 ' + voice.helpText());
+      voice.say(voice.helpText());
+      break;
+  }
+}
+
+/** Sesli modda onay/soru pencerelerini sesle cevaplanabilir hâle getirir. */
+function voiceHook(question, opts = {}) {
+  if (!voice.active) return undefined;
+  return {
+    start: (done) => {
+      voice.captureAnswer(question, opts).then((ans) => {
+        if (ans === null) return;                 // ses karar veremedi, ekran açık kalsın
+        done(opts.yesNo ? ans === 'evet' : ans);
+      });
+    },
+    cancel: () => voice.cancelCapture(),
+  };
+}
+
+$('#btnHands').addEventListener('click', async () => {
+  if (voice.active) { voice.stop(); S.setSetting('handsFree', false); return; }
+  const started = await voice.start();
+  if (started) {
+    S.setSetting('handsFree', true);
+    UI.addMessage('sys', '🎧 Eller serbest açık. ' + voice.helpText());
+  }
+});
+
 /* ============================ bildirim & hatırlatıcı ============================ */
 async function notify(title, body) {
   try {
@@ -66,7 +141,8 @@ function checkReminders() {
     S.updateReminder(r.id, { fired: true });
     notify('⏰ Hatırlatma', r.message);
     UI.addMessage('sys', `⏰ ${r.message}`);
-    if (S.settings().tts) Speech.speak(r.message, S.settings().lang);
+    if (voice.active) voice.say('Hatırlatma: ' + r.message);
+    else if (S.settings().tts) Speech.speak(r.message, { lang: S.settings().lang });
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   }
 }
@@ -96,6 +172,7 @@ async function send(text) {
 
   if (!S.db().profiles.filter((p) => p.enabled).length) {
     UI.toast('Önce bir API bağlantısı ekle', 'err');
+    if (voice.active) voice.say('Önce bir API bağlantısı eklemelisin. Ekrandaki API sekmesinden ekleyebilirsin.');
     showView('conn');
     return;
   }
@@ -112,8 +189,10 @@ async function send(text) {
   const typing = UI.addTyping();
 
   let firstReply = true;
+  let lastReply = '';
   let liveBubble = null;
   const dropLive = () => { liveBubble?.remove(); liveBubble = null; };
+  if (voice.active) voice.agentStart();
 
   try {
     const res = await runAgent(text, {
@@ -132,7 +211,13 @@ async function send(text) {
         dropLive();
         UI.addMessage('bot', t, { html: true });
         S.pushChat({ role: 'assistant', content: t });
-        if (firstReply && S.settings().tts) { Speech.speak(t, S.settings().lang); firstReply = false; }
+        lastReply = t;
+        // Eller serbest moddayken okuma işini ses denetleyicisi üstlenir
+        // (mikrofonu duraklatması gerekiyor), burada okursak üst üste biner.
+        if (!voice.active && firstReply && S.settings().tts) {
+          Speech.speak(t, { lang: S.settings().lang, rate: S.settings().voiceRate });
+          firstReply = false;
+        }
       },
       onToolStart: (name, args) => { typing.remove(); dropLive(); return UI.addToolCard(name, args); },
       onToolEnd: (handle, out) => UI.finishToolCard(handle, out),
@@ -142,19 +227,21 @@ async function send(text) {
         }
       },
       onRefresh: () => { renderTasks(); renderNotes(); },
-      confirm: (m) => UI.confirmDialog(m, { danger: true }),
-      ask: (q, o) => UI.askDialog(q, o),
+      confirm: (m) => UI.confirmDialog(m, { danger: true, external: voiceHook(m, { yesNo: true }) }),
+      ask: (q, o) => UI.askDialog(q, o, voiceHook(q, { options: o || [] })),
       notify,
-      speak: (t) => Speech.speak(t, S.settings().lang),
+      speak: (t) => (voice.active ? voice.say(t) : Speech.speak(t, { lang: S.settings().lang })),
       scheduleReminders,
     });
-    if (res?.aborted) UI.addMessage('sys', 'Durduruldu.');
+    if (res?.aborted) { UI.addMessage('sys', 'Durduruldu.'); lastReply = ''; }
   } catch (e) {
     console.error(e);
     typing.remove();
     dropLive();
-    UI.addMessage('err', '⚠ ' + (e?.message || 'Bilinmeyen hata'));
-    S.pushChat({ role: 'system', content: '⚠ ' + (e?.message || 'hata') });
+    const msg = e?.message || 'Bilinmeyen hata';
+    UI.addMessage('err', '⚠ ' + msg);
+    S.pushChat({ role: 'system', content: '⚠ ' + msg });
+    lastReply = 'Bir sorun çıktı. ' + msg;
   } finally {
     typing.remove();
     dropLive();
@@ -165,6 +252,9 @@ async function send(text) {
     setStatus(S.activeProfile() ? 'ok' : 'err', '');
     renderTasks();
     UI.scrollChat();
+    // Cevabı oku, sonra tekrar dinlemeye dön. Beklemiyoruz: kullanıcı
+    // okuma sırasında yazmaya devam edebilsin.
+    if (voice.active) voice.agentEnd(lastReply);
   }
 }
 
@@ -182,17 +272,18 @@ $('#input').addEventListener('keydown', (e) => {
   }
 });
 $('#btnSend').addEventListener('click', () => send());
-$('#btnStop').addEventListener('click', () => { abortCtrl?.abort(); Speech.stopSpeaking(); });
+$('#btnStop').addEventListener('click', () => { abortCtrl?.abort(); Speech.stopSpeaking(); voice._backToIdle(); });
 $('#btnNewChat').addEventListener('click', async () => {
   if (S.db().chat.length && !(await UI.confirmDialog('Sohbet geçmişi silinsin mi? Görevler ve notlar kalır.', { okText: 'Sil', danger: true }))) return;
   S.clearChat();
   restoreChat();
 });
 
-/* ---- mikrofon ---- */
+/* ---- bas-konuş mikrofonu (eller serbest kapalıyken) ---- */
 $('#btnMic').addEventListener('click', () => {
   const btn = $('#btnMic');
-  const started = Speech.toggleListen({
+  if (Speech.isListening()) { Speech.stopListen(); btn.classList.remove('rec'); return; }
+  const started = Speech.listenOnce({
     lang: S.settings().lang || 'tr-TR',
     onPartial: (t) => { $('#input').value = t; autoGrow(); },
     onFinal: (t) => { $('#input').value = t; autoGrow(); setTimeout(() => send(), 250); },
@@ -201,7 +292,7 @@ $('#btnMic').addEventListener('click', () => {
   });
   btn.classList.toggle('rec', started);
 });
-if (!Speech.sttSupported) $('#btnMic').style.display = 'none';
+if (!Speech.sttSupported) { $('#btnMic').style.display = 'none'; $('#btnHands').style.display = 'none'; }
 
 /* ============================ görevler ============================ */
 let taskFilter = 'open';
@@ -489,6 +580,11 @@ const SETTING_FIELDS = [
   ['setAutoApprove', 'autoApprove', 'checked'],
   ['setStream', 'stream', 'checked'],
   ['setTTS', 'tts', 'checked'],
+  ['setHandsFree', 'handsFree', 'checked'],
+  ['setRequireWake', 'requireWake', 'checked'],
+  ['setWakeWord', 'wakeWord', 'value'],
+  ['setBargeIn', 'bargeIn', 'checked'],
+  ['setVoiceRate', 'voiceRate', 'number'],
   ['setLang', 'lang', 'value'],
   ['setProxy', 'proxy', 'value'],
   ['setSearchProvider', 'searchProvider', 'value'],
@@ -575,6 +671,18 @@ function boot() {
   // Bekleyen hatırlatma varsa bildirim iznini önden iste.
   if (S.db().reminders.some((r) => !r.fired) && 'Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission().catch(() => {});
+  }
+
+  // Eller serbest kalıcı olarak açıksa geri yükle. Tarayıcılar mikrofonu ve sesi
+  // ancak bir kullanıcı hareketinden sonra başlatır; ilk dokunuşu bekliyoruz.
+  if (S.settings().handsFree && Speech.sttSupported) {
+    $('#composerHint').textContent = '🎧 Eller serbest hazır — başlatmak için ekrana bir kez dokun';
+    const resume = async () => {
+      document.removeEventListener('pointerdown', resume);
+      $('#composerHint').textContent = '';
+      if (!voice.active) await voice.start();
+    };
+    document.addEventListener('pointerdown', resume, { once: true });
   }
 }
 boot();

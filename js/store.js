@@ -14,6 +14,11 @@ const DEFAULTS = {
     stream: true,
     tts: false,
     lang: 'tr-TR',
+    handsFree: false,      // açılışta eller serbest modu başlat
+    requireWake: true,     // uyandırma kelimesi şart mı
+    wakeWord: 'nexus',
+    bargeIn: false,        // konuşurken de dinle
+    voiceRate: 1.05,
     proxy: '',
     searchProvider: '',
     searchKey: '',
