@@ -1,0 +1,18 @@
+{
+  "name": "N.E.X.U.S. — Neural EXecution & Utility System",
+  "short_name": "NEXUS",
+  "description": "Mobil, sağlayıcıdan bağımsız kişisel yapay zeka asistanı. Görevlerini yönetir, ne yapacağını önce açıklar.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14",
+  "lang": "tr",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

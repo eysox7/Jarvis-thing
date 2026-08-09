@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<meta name="theme-color" content="#0b0f14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="N.E.X.U.S. — Neural EXecution & Utility System. Mobil, sağlayıcıdan bağımsız kişisel yapay zeka asistanı.">
+<title>N.E.X.U.S.</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="dot" id="statusDot" title="bağlantı durumu"></span>
+    <strong>N.E.X.U.S.</strong>
+    <small id="activeProfileLabel">bağlantı yok</small>
+  </div>
+  <div class="topbar-actions">
+    <button class="icon-btn" id="btnStop" title="Durdur" hidden>■</button>
+    <button class="icon-btn" id="btnNewChat" title="Yeni sohbet">✚</button>
+  </div>
+</header>
+
+<main id="views">
+
+  <!-- ================= CHAT ================= -->
+  <section class="view active" id="view-chat">
+    <div id="chatLog" class="chat-log" aria-live="polite"></div>
+    <div class="composer">
+      <div class="composer-row">
+        <textarea id="input" rows="1" placeholder="Görevini yaz… (ör. yarın 15:00 fatura öde görevi ekle)" autocomplete="off"></textarea>
+        <button class="icon-btn mic" id="btnMic" title="Sesle yaz">🎙</button>
+        <button class="send-btn" id="btnSend" title="Gönder">➤</button>
+      </div>
+      <div class="composer-hint" id="composerHint"></div>
+    </div>
+  </section>
+
+  <!-- ================= TASKS ================= -->
+  <section class="view" id="view-tasks">
+    <div class="pad">
+      <div class="row gap">
+        <input id="taskTitle" placeholder="Yeni görev…">
+        <button class="btn" id="btnTaskAdd">Ekle</button>
+      </div>
+      <div class="seg" id="taskFilter">
+        <button data-f="open" class="active">Açık</button>
+        <button data-f="done">Biten</button>
+        <button data-f="all">Hepsi</button>
+      </div>
+      <div id="taskList" class="list"></div>
+    </div>
+  </section>
+
+  <!-- ================= NOTES ================= -->
+  <section class="view" id="view-notes">
+    <div class="pad">
+      <div class="row gap">
+        <input id="noteSearch" placeholder="Notlarda ara…">
+        <button class="btn" id="btnNoteAdd">Yeni</button>
+      </div>
+      <div id="noteList" class="list"></div>
+    </div>
+  </section>
+
+  <!-- ================= CONNECTIONS ================= -->
+  <section class="view" id="view-conn">
+    <div class="pad">
+      <p class="muted small">
+        Bağlantılar sırayla denenir: en üstteki çalışmazsa bir alttaki devreye girer.
+        Anahtarlar yalnızca bu cihazın tarayıcı belleğinde (localStorage) tutulur, hiçbir yere gönderilmez.
+      </p>
+      <button class="btn primary wide" id="btnConnAdd">+ Bağlantı ekle</button>
+      <div id="connList" class="list"></div>
+    </div>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section class="view" id="view-settings">
+    <div class="pad">
+      <h3>Kişiselleştirme</h3>
+      <label>Sana nasıl hitap edeyim?
+        <input id="setUserName" placeholder="Efendim / adın">
+      </label>
+      <label>Karakter / ek talimat
+        <textarea id="setPersona" rows="4" placeholder="Kısa ve net konuş. Türkçe cevap ver."></textarea>
+      </label>
+
+      <h3>Ajan</h3>
+      <label>Adım limiti (tek istekte en fazla araç turu)
+        <input id="setMaxSteps" type="number" min="1" max="20" step="1">
+      </label>
+      <label>Sıcaklık (yaratıcılık)
+        <input id="setTemp" type="number" min="0" max="2" step="0.1">
+      </label>
+      <label class="check"><input type="checkbox" id="setAutoApprove"> Riskli araçları sormadan çalıştır</label>
+      <label class="check"><input type="checkbox" id="setStream"> Yanıtları akışlı (streaming) al</label>
+      <label class="check"><input type="checkbox" id="setTTS"> Cevapları sesli oku</label>
+      <label>Konuşma dili (ses tanıma)
+        <input id="setLang" placeholder="tr-TR">
+      </label>
+
+      <h3>Ağ</h3>
+      <label>CORS/proxy ön eki (opsiyonel)
+        <input id="setProxy" placeholder="https://benim-proxy.workers.dev/?url=">
+      </label>
+      <label>Web arama sağlayıcısı
+        <select id="setSearchProvider">
+          <option value="">(kapalı)</option>
+          <option value="tavily">Tavily</option>
+          <option value="brave">Brave Search</option>
+          <option value="serper">Serper.dev</option>
+        </select>
+      </label>
+      <label>Arama API anahtarı
+        <input id="setSearchKey" type="password" placeholder="opsiyonel">
+      </label>
+
+      <h3>Veri</h3>
+      <div class="row gap wrap">
+        <button class="btn" id="btnExport">Dışa aktar</button>
+        <button class="btn" id="btnImport">İçe aktar</button>
+        <button class="btn danger" id="btnWipe">Her şeyi sil</button>
+      </div>
+      <p class="muted small" id="storageInfo"></p>
+      <p class="muted small">N.E.X.U.S. — Neural EXecution &amp; Utility System · sürüm <span id="verLabel"></span></p>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabbar" id="tabbar">
+  <button data-view="chat" class="active"><span>💬</span>Sohbet</button>
+  <button data-view="tasks"><span>✔</span>Görevler</button>
+  <button data-view="notes"><span>📝</span>Notlar</button>
+  <button data-view="conn"><span>🔌</span>API</button>
+  <button data-view="settings"><span>⚙</span>Ayarlar</button>
+</nav>
+
+<!-- modal host -->
+<div class="modal-host" id="modalHost" hidden></div>
+<div class="toast-host" id="toastHost"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
