@@ -21,6 +21,12 @@ Tarayıcıda açılır, ana ekrana eklenince yerli uygulama gibi çalışır.
 - **Her API servisine bağlanır.** Gemini, Groq, OpenAI, Anthropic, OpenRouter,
   Mistral, DeepSeek, xAI, Together, Cerebras, Fireworks, Perplexity, NVIDIA NIM,
   Ollama, LM Studio ve OpenAI-uyumlu **her** özel endpoint.
+- **Skiller alır.** Bir işi nasıl yapacağını bir kez yazarsın (uzmanlık paketi);
+  etkin skiller her sohbette beynine yüklenir. Asistan öğrendiği bir prosedürü kendisi de
+  kaydedebilir.
+- **MCP sunucularına bağlanır.** Kendi cihazında çalıştırdığın MCP sunucularının araçlarını
+  (dosya, takvim, Google, kabuk, ev otomasyonu…) alıp kendi araçlarıymış gibi kullanır.
+  Böylece asistanın gerçek sistem erişimi bu sunucular üzerinden genişler.
 - **Yedekli çalışır.** Bağlantıları sıraya dizersin; ilki hata verirse (kota doldu,
   anahtar bozuk, servis çöktü) otomatik olarak bir alttakine geçer.
 - **Tamamen sesle kullanılır.** Eller serbest modda telefona hiç dokunmazsın: adını
@@ -126,9 +132,45 @@ Model bu araçları kendi kararıyla çağırır. `[onay]` işaretliler izin ist
 | Web | `web_search`, `http_fetch` `[onay]`, `open_url` `[onay]` |
 | Cihaz | `device_info`, `geolocate` `[onay]`, `clipboard_write`, `share` `[onay]`, `notify`, `speak`, `vibrate` |
 | Etkileşim | `ask_user` — bilgi eksikse uydurmaz, sorar |
+| Skiller | `skill_save`, `skill_list`, `skill_delete` `[onay]` |
+| Dış araçlar | `mcp__<sunucu>__<araç>` — bağlı MCP sunucularından, dinamik `[onay]` |
 
 Yeni araç eklemek: `js/tools.js` içinde bir `def({name, desc, params, run})` bloğu.
 Sistem mesajındaki katalog otomatik güncellenir, başka hiçbir yere dokunmak gerekmez.
+
+## Skiller (uzmanlık paketleri)
+
+Bir skil, "şu işi şöyle yap" kalıbıdır: bir **ad**, **ne zaman devreye gireceği** ve
+**adım adım talimatlar**. **Beyin** sekmesinden elle ekleyebilir, açıp kapatabilirsin;
+etkin skiller her sohbette sistem mesajına gömülür. Asistan da öğrendiği tekrarlı bir
+prosedürü `skill_save` aracıyla kendisi kaydedebilir — bir dahaki sefere hatırlar.
+
+Örnek — *"Toplantı notu"*: "Kullanıcı toplantı özeti istediğinde önce katılımcıları,
+sonra kararları, sonra aksiyon maddelerini (sorumlu + tarih) başlıklar hâlinde çıkar ve
+her aksiyonu görev olarak ekle."
+
+## MCP sunucuları (gerçek sistem erişimi)
+
+Bir tarayıcı uygulaması telefonun/bilgisayarın **tamamına** doğrudan erişemez — bu bir
+tarayıcı güvenlik sınırıdır. Erişimi genişletmenin doğru yolu **MCP (Model Context
+Protocol) sunucularıdır**: dosya sistemi, takvim, Google servisleri, kabuk, ev otomasyonu
+gibi yetenekleri araç olarak sunan küçük sunucular. Bunları **kendi cihazında/makinende**
+çalıştırırsın; N.E.X.U.S. HTTP üzerinden bağlanır ve o araçları kendi araçlarıymış gibi
+kullanır (`mcp__<sunucu>__<araç>` adıyla).
+
+**Beyin** sekmesi → **+ MCP sunucusu ekle**:
+
+1. Bir **ad** ver, sunucunun **Streamable HTTP** uç noktasını gir (ör. `https://…/mcp`).
+2. Gerekiyorsa **ek başlıklar** (JSON) ekle — ör. `{"Authorization":"Bearer …"}`.
+3. **⚡ Bağlan ve araçları çek** → araç listesi gelir → **Kaydet**.
+
+> **Neden HTTP?** Tarayıcı yalnızca ağ üzerinden konuşabilir; yerel `stdio` MCP süreçlerini
+> başlatamaz. `stdio` tabanlı bir sunucun varsa onu bir HTTP köprüsüyle (`mcp-proxy` vb.)
+> ya da sunucunun kendi HTTP kipiyle yayına almalısın. CORS'a takılırsan Ayarlar'daki
+> proxy ön eki devreye girer.
+
+Dış araçlar (MCP) **her zaman onay ister** — dış sisteme dokundukları için (Ayarlar >
+riskli araçları sormadan çalıştır ile kapatılabilir).
 
 ## Nasıl çalışıyor
 
@@ -152,8 +194,9 @@ metin cevap olarak gösterilir — kırılmaz, sadece araçsız çalışır.
 
 ```
 js/providers.js  → 4 tür API'yi tek arayüze indirger (openai · gemini · anthropic · ollama)
-js/tools.js      → araç kayıt defteri
-js/agent.js      → plan/çalıştır döngüsü ve sistem mesajı
+js/tools.js      → araç kayıt defteri (yerleşik araçlar + skill araçları + MCP yönlendirme)
+js/mcp.js        → MCP istemcisi (Streamable HTTP): dış sunuculara bağlanır, araçlarını çeker/çağırır
+js/agent.js      → plan/çalıştır döngüsü, sistem mesajı (araç kataloğu + skiller)
 js/store.js      → localStorage kalıcılığı
 js/voice.js      → eller serbest durum makinesi (uyandırma, sesli onay, yerel komutlar)
 js/speech.js     → ses tanıma ve okuma ilkelleri
@@ -170,7 +213,7 @@ npm install      # yalnızca playwright (dev bağımlılığı)
 npm test         # gerçek Chromium'da, mobil ekran boyutunda koşar
 ```
 
-Üç paket:
+Dört paket:
 
 - `tests/smoke.test.mjs` — açılış, sekmeler, uçtan uca ajan döngüsü (plan kartı → araç
   kartları → sonuç), kalıcılık, yeniden yükleme, riskli araç onayı, API hata yolu, konsol temizliği
@@ -178,6 +221,9 @@ npm test         # gerçek Chromium'da, mobil ekran boyutunda koşar
   gövdesi, kimlik başlıkları, akış çözümlemesi, model listeleme ve yedeğe geçiş davranışı
 - `tests/voice.test.mjs` — eller serbest döngüsü: uyandırma kelimesi kapısı, sesli komut →
   ajan → sesli cevap → tekrar dinleme, sesle onay ve soru cevaplama, yerel komutlar
+- `tests/brain.test.mjs` — skiller sistem mesajına yükleniyor mu, MCP sunucusuna bağlanıp
+  araçları çekiliyor mu, ajan `mcp__…` aracını onayla çağırıp sonucu işliyor mu (MCP sunucusu
+  sahte JSON-RPC yanıtlarıyla taklit edilir)
 
 Sağlayıcılar sahte (mock) yanıtlarla taklit edilir; test için API anahtarı gerekmez.
 Ses testlerinde `SpeechRecognition` ve `speechSynthesis` de sahte sürümlerle değiştirilir,

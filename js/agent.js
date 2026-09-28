@@ -3,7 +3,7 @@
 // kullanılır; böylece her servis (native tool desteği olmayanlar dahil) çalışır.
 
 import * as S from './store.js';
-import { toolCatalog, runTool, getTool } from './tools.js';
+import { toolCatalog, runTool, isDangerTool } from './tools.js';
 import { chatWithFallback } from './providers.js';
 import { extractJson, truncate, partialReply } from './util.js';
 
@@ -35,6 +35,7 @@ export function buildSystemPrompt() {
   const now = new Date();
   const openTasks = db.tasks.filter((t) => t.status === 'open').slice(0, 15);
   const mem = Object.entries(db.memory || {});
+  const skills = S.enabledSkills();
 
   return [
     `Sen N.E.X.U.S.'sın (Neural EXecution & Utility System) — ${st.userName || 'kullanıcının'} kişisel mobil asistanı.`,
@@ -45,6 +46,11 @@ export function buildSystemPrompt() {
     ``,
     `KULLANABİLECEĞİN ARAÇLAR:`,
     toolCatalog(),
+    ``,
+    skills.length
+      ? `SKİLLER (uzmanlık paketlerin — ilgili durumda talimatlarına uy):\n`
+        + skills.map((s) => `▸ ${s.name}${s.when ? ` (ne zaman: ${s.when})` : ''}\n${s.instructions}`).join('\n\n')
+      : '',
     ``,
     mem.length ? `KALICI HAFIZA:\n${mem.map(([k, v]) => `- ${k}: ${v}`).join('\n')}` : '',
     openTasks.length
@@ -157,9 +163,8 @@ export async function runAgent(userText, io) {
     for (const act of actions) {
       const name = String(act.tool);
       const args = act.args && typeof act.args === 'object' ? act.args : {};
-      const tool = getTool(name);
 
-      if (tool?.danger && !st.autoApprove) {
+      if (isDangerTool(name) && !st.autoApprove) {
         io.onStatus?.('onay bekleniyor…');
         const argPreview = truncate(JSON.stringify(args), 300);
         const ok = await io.confirm(`"${name}" aracını çalıştırayım mı?\n${argPreview}`);

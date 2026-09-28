@@ -30,6 +30,8 @@ const DEFAULTS = {
   memory: {},     // {anahtar: değer}
   reminders: [],  // {id,at,message,fired}
   chat: [],       // {role,content,ts}
+  skills: [],     // {id,name,when,instructions,enabled} — beyne yüklenen uzmanlık paketleri
+  mcpServers: [], // {id,name,url,headers,enabled,tools:[],status,lastError} — dış araç sunucuları
 };
 
 let state = load();
@@ -194,3 +196,35 @@ export function pushChat(m) {
   save();
 }
 export function clearChat() { state.chat = []; save(); }
+
+/* ---------------- skiller (uzmanlık paketleri) ---------------- */
+export function addSkill(s) {
+  const skill = { id: uid(), name: '', when: '', instructions: '', enabled: true, ...s };
+  state.skills.push(skill);
+  save();
+  return skill;
+}
+export function updateSkill(id, patch) {
+  const s = state.skills.find((x) => x.id === id);
+  if (s) Object.assign(s, patch);
+  save();
+  return s;
+}
+export function removeSkill(id) { state.skills = state.skills.filter((x) => x.id !== id); save(); }
+export function enabledSkills() { return state.skills.filter((s) => s.enabled); }
+
+/* ---------------- MCP sunucuları ---------------- */
+export function addMcpServer(m) {
+  const srv = { id: uid(), name: '', url: '', headers: {}, enabled: true, tools: [], status: 'idle', lastError: '', ...m };
+  state.mcpServers.push(srv);
+  save();
+  return srv;
+}
+export function updateMcpServer(id, patch) {
+  const m = state.mcpServers.find((x) => x.id === id);
+  if (m) Object.assign(m, patch);
+  save();
+  return m;
+}
+export function removeMcpServer(id) { state.mcpServers = state.mcpServers.filter((x) => x.id !== id); save(); }
+export function enabledMcpServers() { return state.mcpServers.filter((m) => m.enabled); }

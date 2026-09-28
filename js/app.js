@@ -6,8 +6,9 @@ import * as Speech from './speech.js';
 import { PRESETS, listModels, testProfile, kindOf } from './providers.js';
 import { runAgent } from './agent.js';
 import { Voice } from './voice.js';
+import * as MCP from './mcp.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 let busy = false;
 let abortCtrl = null;
 
@@ -18,6 +19,7 @@ function showView(name) {
   if (name === 'tasks') renderTasks();
   if (name === 'notes') renderNotes();
   if (name === 'conn') renderConnections();
+  if (name === 'brain') { renderSkills(); renderMcp(); }
   if (name === 'settings') renderSettings();
 }
 $('#tabbar').addEventListener('click', (e) => {
@@ -571,6 +573,180 @@ function renderConnections() {
   });
 }
 
+/* ============================ beyin: skiller ============================ */
+$('#btnSkillAdd').addEventListener('click', () => skillEditor(null));
+
+function skillEditor(existing) {
+  UI.promptDialog(existing ? 'Skili düzenle' : 'Yeni skill', [
+    { key: 'name', label: 'Ad', value: existing?.name || '' },
+    { key: 'when', label: 'Ne zaman devreye girsin?', placeholder: 'ör. kullanıcı toplantı özeti isteyince', value: existing?.when || '' },
+    { key: 'instructions', label: 'Talimatlar (adım adım nasıl yapılacağı)', type: 'textarea', rows: 8, value: existing?.instructions || '' },
+  ], (v) => {
+    if (!v.name.trim() || !v.instructions.trim()) { UI.toast('Ad ve talimatlar gerekli', 'err'); return false; }
+    if (existing) S.updateSkill(existing.id, { name: v.name.trim(), when: v.when.trim(), instructions: v.instructions });
+    else S.addSkill({ name: v.name.trim(), when: v.when.trim(), instructions: v.instructions });
+    renderSkills();
+  });
+}
+
+function renderSkills() {
+  const host = $('#skillList');
+  if (!host) return;
+  host.innerHTML = '';
+  const skills = S.db().skills;
+  if (!skills.length) {
+    host.append(el('div', { class: 'empty', text: 'Henüz skill yok. Örn: “Toplantı notu” — ne zaman toplantı özeti istersem başlıkları şu sırayla çıkar…' }));
+    return;
+  }
+  for (const s of skills) {
+    host.append(el('div', { class: 'item' + (s.enabled ? '' : ' done') },
+      el('div', { class: 'top' },
+        el('div', { class: 'title' },
+          el('strong', { text: s.name }),
+          !s.enabled ? el('span', { class: 'badge', style: 'margin-left:8px', text: 'kapalı' }) : null,
+          s.when ? el('div', { class: 'muted small', style: 'margin-top:3px', text: 'ne zaman: ' + s.when }) : null,
+          el('div', { class: 'muted small', style: 'margin-top:4px;white-space:pre-wrap', text: s.instructions.slice(0, 240) }),
+        ),
+      ),
+      el('div', { class: 'row gap wrap', style: 'margin-top:9px' },
+        el('button', { class: 'btn tiny', onclick: () => { S.updateSkill(s.id, { enabled: !s.enabled }); renderSkills(); } }, s.enabled ? 'Kapat' : 'Aç'),
+        el('button', { class: 'btn tiny', onclick: () => skillEditor(s) }, '✎ Düzenle'),
+        el('button', {
+          class: 'btn tiny danger',
+          onclick: async () => { if (await UI.confirmDialog(`"${s.name}" skili silinsin mi?`, { okText: 'Sil', danger: true })) { S.removeSkill(s.id); renderSkills(); } },
+        }, '🗑'),
+      ),
+    ));
+  }
+}
+
+/* ============================ beyin: MCP sunucuları ============================ */
+$('#btnMcpAdd').addEventListener('click', () => mcpEditor(null));
+
+function mcpEditor(existing) {
+  UI.openModal({
+    title: existing ? 'MCP sunucusunu düzenle' : 'Yeni MCP sunucusu',
+    render: (close) => {
+      const nameIn = el('input', { placeholder: 'Sunucu adı (ör. Dosyalarım)', value: existing?.name || '' });
+      const urlIn = el('input', { placeholder: 'https://…/mcp', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', value: existing?.url || '' });
+      const headIn = el('textarea', { rows: 3, placeholder: '{"Authorization":"Bearer …"}  (opsiyonel, JSON)', spellcheck: 'false' });
+      headIn.value = existing?.headers && Object.keys(existing.headers).length ? JSON.stringify(existing.headers, null, 2) : '';
+      const status = el('div', { class: 'muted small', style: 'margin-top:8px;white-space:pre-wrap' });
+
+      const collect = () => {
+        let headers = {};
+        const raw = headIn.value.trim();
+        if (raw) { try { headers = JSON.parse(raw); } catch { throw new Error('Başlıklar geçerli JSON değil'); } }
+        const url = urlIn.value.trim();
+        if (!/^https?:\/\//i.test(url)) throw new Error('Geçerli bir http(s) adresi gir');
+        return { name: nameIn.value.trim() || 'MCP', url, headers };
+      };
+
+      const wrap = el('div', {},
+        el('label', {}, 'Ad', nameIn),
+        el('label', {}, 'Sunucu adresi (Streamable HTTP uç noktası)', urlIn),
+        el('label', {}, 'Ek başlıklar', headIn),
+        el('div', { class: 'row gap wrap', style: 'margin-top:10px' },
+          el('button', {
+            class: 'btn tiny',
+            onclick: async (e) => {
+              const b = e.currentTarget; b.disabled = true; status.textContent = 'bağlanılıyor…';
+              try {
+                const cfg = collect();
+                const info = await MCP.connect({ id: existing?.id || 'probe', ...cfg }, S.settings().proxy);
+                status.textContent = `✔ bağlandı — ${info.tools.length} araç: ${info.tools.map((t) => t.name).slice(0, 8).join(', ')}${info.tools.length > 8 ? '…' : ''}`;
+              } catch (err) { status.textContent = '✖ ' + err.message; }
+              b.disabled = false;
+            },
+          }, '⚡ Bağlan ve araçları çek'),
+        ),
+        status,
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn', onclick: () => close() }, 'Vazgeç'),
+          el('button', {
+            class: 'btn primary',
+            onclick: async (e) => {
+              let cfg;
+              try { cfg = collect(); } catch (err) { status.textContent = '✖ ' + err.message; return; }
+              const b = e.currentTarget; b.disabled = true; status.textContent = 'bağlanılıyor…';
+              try {
+                const srv = existing || S.addMcpServer(cfg);
+                if (existing) { S.updateMcpServer(existing.id, cfg); MCP.forget(existing.id); }
+                const info = await MCP.connect(srv, S.settings().proxy);
+                S.updateMcpServer(srv.id, { tools: info.tools, status: 'ready', lastError: '' });
+                close(); renderMcp();
+                UI.toast(`MCP sunucusu kaydedildi — ${info.tools.length} araç`);
+              } catch (err) {
+                // Kaydet ama hatayı işaretle; kullanıcı sonra tekrar deneyebilir.
+                status.textContent = '✖ ' + err.message + '\n(yine de kaydedildi; “Yenile” ile tekrar deneyebilirsin)';
+                if (!existing) { /* addMcpServer zaten yaptı */ }
+                const srv = existing || S.db().mcpServers[S.db().mcpServers.length - 1];
+                if (srv) S.updateMcpServer(srv.id, { status: 'error', lastError: err.message });
+                b.disabled = false;
+                renderMcp();
+              }
+            },
+          }, 'Kaydet'),
+        ),
+      );
+      setTimeout(() => nameIn.focus(), 60);
+      return wrap;
+    },
+  });
+}
+
+async function reconnectMcp(id) {
+  const srv = S.db().mcpServers.find((x) => x.id === id);
+  if (!srv) return;
+  S.updateMcpServer(id, { status: 'connecting' }); renderMcp();
+  try {
+    MCP.forget(id);
+    const info = await MCP.connect(srv, S.settings().proxy);
+    S.updateMcpServer(id, { tools: info.tools, status: 'ready', lastError: '' });
+    UI.toast(`${srv.name}: ${info.tools.length} araç hazır`);
+  } catch (e) {
+    S.updateMcpServer(id, { status: 'error', lastError: e.message });
+    UI.toast(srv.name + ': ' + e.message, 'err');
+  }
+  renderMcp();
+}
+
+function renderMcp() {
+  const host = $('#mcpList');
+  if (!host) return;
+  host.innerHTML = '';
+  const servers = S.db().mcpServers;
+  if (!servers.length) {
+    host.append(el('div', { class: 'empty', text: 'Henüz MCP sunucusu yok. Kendi cihazında bir MCP sunucusu çalıştırıp HTTP adresini buraya gir.' }));
+    return;
+  }
+  for (const m of servers) {
+    const badge = m.status === 'ready' ? el('span', { class: 'badge ok', style: 'margin-left:8px', text: `${(m.tools || []).length} araç` })
+      : m.status === 'error' ? el('span', { class: 'badge err', style: 'margin-left:8px', text: 'hata' })
+      : m.status === 'connecting' ? el('span', { class: 'badge run', style: 'margin-left:8px', text: 'bağlanıyor' })
+      : el('span', { class: 'badge', style: 'margin-left:8px', text: 'bekliyor' });
+    host.append(el('div', { class: 'item' + (m.enabled ? '' : ' done') },
+      el('div', { class: 'top' },
+        el('div', { class: 'title' },
+          el('div', {}, el('strong', { text: m.name }), badge, !m.enabled ? el('span', { class: 'badge', style: 'margin-left:6px', text: 'kapalı' }) : null),
+          el('div', { class: 'muted small', style: 'margin-top:3px;word-break:break-all', text: m.url }),
+          (m.tools || []).length ? el('div', { class: 'muted small', style: 'margin-top:4px', text: '🔧 ' + m.tools.map((t) => t.name).join(', ') }) : null,
+          m.status === 'error' && m.lastError ? el('div', { class: 'small', style: 'margin-top:4px;color:#ff9d9d', text: m.lastError }) : null,
+        ),
+      ),
+      el('div', { class: 'row gap wrap', style: 'margin-top:9px' },
+        el('button', { class: 'btn tiny', onclick: () => reconnectMcp(m.id) }, '↻ Yenile'),
+        el('button', { class: 'btn tiny', onclick: () => { S.updateMcpServer(m.id, { enabled: !m.enabled }); renderMcp(); } }, m.enabled ? 'Kapat' : 'Aç'),
+        el('button', { class: 'btn tiny', onclick: () => mcpEditor(m) }, '✎ Düzenle'),
+        el('button', {
+          class: 'btn tiny danger',
+          onclick: async () => { if (await UI.confirmDialog(`"${m.name}" sunucusu silinsin mi?`, { okText: 'Sil', danger: true })) { MCP.forget(m.id); S.removeMcpServer(m.id); renderMcp(); } },
+        }, '🗑'),
+      ),
+    ));
+  }
+}
+
 /* ============================ ayarlar ============================ */
 const SETTING_FIELDS = [
   ['setUserName', 'userName', 'value'],
@@ -602,7 +778,7 @@ function renderSettings() {
   $('#verLabel').textContent = VERSION;
   const bytes = new Blob([localStorage.getItem('nexus.v1') || '']).size;
   $('#storageInfo').textContent =
-    `Yerel veri: ${(bytes / 1024).toFixed(1)} KB · ${S.db().tasks.length} görev · ${S.db().notes.length} not · ${S.db().profiles.length} bağlantı`;
+    `Yerel veri: ${(bytes / 1024).toFixed(1)} KB · ${S.db().tasks.length} görev · ${S.db().notes.length} not · ${S.db().profiles.length} bağlantı · ${S.db().skills.length} skill · ${S.db().mcpServers.length} MCP`;
 }
 
 for (const [id, key, type] of SETTING_FIELDS) {
@@ -634,7 +810,7 @@ $('#btnImport').addEventListener('click', () => {
       if (!(await UI.confirmDialog('Mevcut veriler bu yedekle değiştirilecek. Devam?', { okText: 'Değiştir', danger: true }))) return;
       S.replaceAll(data);
       UI.toast('Yedek yüklendi');
-      restoreChat(); renderTasks(); renderNotes(); renderConnections(); renderSettings(); refreshHeader();
+      restoreChat(); renderTasks(); renderNotes(); renderConnections(); renderSkills(); renderMcp(); renderSettings(); refreshHeader();
     } catch (e) { UI.toast('İçe aktarma başarısız: ' + e.message, 'err'); }
   });
   document.body.append(inp); inp.click(); setTimeout(() => inp.remove(), 1000);
@@ -643,7 +819,7 @@ $('#btnImport').addEventListener('click', () => {
 $('#btnWipe').addEventListener('click', async () => {
   if (!(await UI.confirmDialog('TÜM veriler silinecek: bağlantılar, görevler, notlar, hafıza, sohbet. Geri alınamaz.', { okText: 'Hepsini sil', danger: true }))) return;
   S.wipe();
-  restoreChat(); renderTasks(); renderNotes(); renderConnections(); renderSettings(); refreshHeader();
+  restoreChat(); renderTasks(); renderNotes(); renderConnections(); renderSkills(); renderMcp(); renderSettings(); refreshHeader();
   UI.toast('Her şey silindi');
 });
 
@@ -671,6 +847,14 @@ function boot() {
   // Bekleyen hatırlatma varsa bildirim iznini önden iste.
   if (S.db().reminders.some((r) => !r.fired) && 'Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission().catch(() => {});
+  }
+
+  // Etkin MCP sunucularını arka planda tazele: oturumları yenile, araç listesini güncelle.
+  // (Önbellekteki araç listesi zaten katalogda; bu sadece durumu ve değişiklikleri günceller.)
+  for (const srv of S.enabledMcpServers()) {
+    MCP.connect(srv, S.settings().proxy)
+      .then((info) => S.updateMcpServer(srv.id, { tools: info.tools, status: 'ready', lastError: '' }))
+      .catch((e) => S.updateMcpServer(srv.id, { status: 'error', lastError: e.message }));
   }
 
   // Eller serbest kalıcı olarak açıksa geri yükle. Tarayıcılar mikrofonu ve sesi

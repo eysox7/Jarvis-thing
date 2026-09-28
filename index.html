@@ -88,6 +88,31 @@
     </div>
   </section>
 
+  <!-- ================= BRAIN (skills + MCP) ================= -->
+  <section class="view" id="view-brain">
+    <div class="pad">
+      <h3>Skiller</h3>
+      <p class="muted small">
+        Skil = yeniden kullanılabilir uzmanlık paketi. Bir işi nasıl yapacağını bir kez
+        yazarsın, etkinleştirdiğin skiller her sohbette beynine yüklenir. Asistan da öğrendiği
+        bir prosedürü kendisi kaydedebilir.
+      </p>
+      <button class="btn primary wide" id="btnSkillAdd">+ Skill ekle</button>
+      <div id="skillList" class="list"></div>
+
+      <h3 style="margin-top:22px">MCP Sunucuları</h3>
+      <p class="muted small">
+        MCP sunucuları asistana <strong>gerçek sistem erişimi</strong> verir: dosyalar, takvim,
+        Google, kabuk, ev otomasyonu… Kendi cihazında/makinende çalıştırdığın bir MCP sunucusunun
+        HTTP adresini gir; araçları N.E.X.U.S.'un kendi araçlarıymış gibi kullanılabilir hâle gelir.
+        (Tarayıcı yalnızca ağ üzerinden konuşabildiği için sunucunun "Streamable HTTP" kipinde
+        erişilebilir olması gerekir. Dış araçlar her zaman onay ister.)
+      </p>
+      <button class="btn primary wide" id="btnMcpAdd">+ MCP sunucusu ekle</button>
+      <div id="mcpList" class="list"></div>
+    </div>
+  </section>
+
   <!-- ================= SETTINGS ================= -->
   <section class="view" id="view-settings">
     <div class="pad">
@@ -162,6 +187,7 @@
   <button data-view="tasks"><span>✔</span>Görevler</button>
   <button data-view="notes"><span>📝</span>Notlar</button>
   <button data-view="conn"><span>🔌</span>API</button>
+  <button data-view="brain"><span>🧩</span>Beyin</button>
   <button data-view="settings"><span>⚙</span>Ayarlar</button>
 </nav>
 

@@ -1,6 +1,6 @@
 {
   "name": "nexus-assistant",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "N.E.X.U.S. — Neural EXecution & Utility System. Mobil, sağlayıcıdan bağımsız kişisel yapay zeka asistanı.",
   "private": true,
   "type": "module",

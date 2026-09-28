@@ -4,6 +4,7 @@
 
 import * as S from './store.js';
 import { calcExpression, parseWhen, fmtDate, truncate } from './util.js';
+import * as MCP from './mcp.js';
 
 const T = {};
 const def = (t) => { T[t.name] = t; return t; };
@@ -397,21 +398,139 @@ def({
   },
 });
 
+/* ---------------- skiller (uzmanlık paketleri) ---------------- */
+
+def({
+  name: 'skill_save',
+  desc: 'Yeniden kullanılabilir bir "skill" kaydeder: bir işi nasıl yapacağının kalıbı. '
+      + 'Kullanıcı "şunu şöyle yap, bunu hatırla ve bir daha böyle yap" derse ya da tekrarlanan '
+      + 'bir prosedür öğrendiysen kaydet. Etkin skiller sonraki her sohbette sistem mesajına eklenir.',
+  params: {
+    name: 'string (zorunlu) — kısa ad, ör. "Toplantı notu"',
+    when: 'string (zorunlu) — ne zaman devreye girer, ör. "kullanıcı toplantı özeti isteyince"',
+    instructions: 'string (zorunlu) — adım adım nasıl yapılacağı',
+  },
+  run: (a) => {
+    if (!a.name || !a.instructions) throw new Error('name ve instructions zorunlu');
+    const s = S.addSkill({
+      name: String(a.name),
+      when: String(a.when || ''),
+      instructions: String(a.instructions),
+    });
+    return { id: s.id, name: s.name, saved: true };
+  },
+});
+
+def({
+  name: 'skill_list',
+  desc: 'Kayıtlı skilleri listeler.',
+  params: {},
+  run: () => ({
+    skills: S.db().skills.map((s) => ({ id: s.id, name: s.name, when: s.when, enabled: s.enabled })),
+  }),
+});
+
+def({
+  name: 'skill_delete',
+  desc: 'Bir skili siler.',
+  params: { id: 'string (zorunlu) — skill_list ile öğrenilir' },
+  danger: true,
+  run: (a) => {
+    const s = S.db().skills.find((x) => x.id === a.id);
+    if (!s) throw new Error('skill bulunamadı: ' + a.id);
+    S.removeSkill(a.id);
+    return { deleted: s.name };
+  },
+});
+
 /* ---------------- dışa açılan API ---------------- */
 
 export const tools = T;
 export const getTool = (name) => T[name];
 
-/** Sistem mesajına gömülecek araç kataloğu. */
+/** Yerleşik araçların adları (MCP araçlarından ayırmak için). */
+export const builtinToolNames = () => Object.keys(T);
+
+/** Bağlı MCP sunucularının araçlarını mcp__sunucu__araç adıyla düzleştirir. */
+export function mcpToolList() {
+  const out = [];
+  for (const srv of S.enabledMcpServers()) {
+    const slug = MCP.serverSlug(srv.name);
+    for (const tool of srv.tools || []) {
+      out.push({
+        name: `mcp__${slug}__${tool.name}`,
+        server: srv,
+        tool,
+        desc: tool.description || '',
+        schema: tool.inputSchema || tool.input_schema || null,
+      });
+    }
+  }
+  return out;
+}
+
+/** MCP araçlarının sistem mesajı kataloğu (boşsa boş string). */
+export function mcpCatalog() {
+  const list = mcpToolList();
+  if (!list.length) return '';
+  return list.map((t) => {
+    let params = '';
+    const props = t.schema?.properties;
+    if (props && typeof props === 'object') {
+      const req = new Set(Array.isArray(t.schema.required) ? t.schema.required : []);
+      params = Object.entries(props).map(([k, v]) =>
+        `    - ${k}: ${v?.type || 'any'}${req.has(k) ? ' (zorunlu)' : ''}${v?.description ? ' — ' + v.description : ''}`).join('\n');
+    }
+    return `• ${t.name} [MCP · ${t.server.name}] — ${t.desc}` + (params ? `\n${params}` : '');
+  }).join('\n');
+}
+
+/** Bir MCP araç adının hangi sunucu+araca karşılık geldiğini bulur. */
+function resolveMcpTool(name) {
+  const parsed = MCP.parseToolName(name);
+  if (!parsed) return null;
+  for (const srv of S.enabledMcpServers()) {
+    if (MCP.serverSlug(srv.name) !== parsed.server) continue;
+    const tool = (srv.tools || []).find((t) => t.name === parsed.tool);
+    if (tool) return { srv, tool: parsed.tool };
+  }
+  return null;
+}
+
+/** Sistem mesajına gömülecek araç kataloğu (yerleşik + MCP). */
 export function toolCatalog() {
-  return Object.values(T).map((t) => {
+  const builtin = Object.values(T).map((t) => {
     const p = Object.entries(t.params || {}).map(([k, v]) => `    - ${k}: ${v}`).join('\n');
     return `• ${t.name}${t.danger ? ' [onay gerektirir]' : ''} — ${t.desc}` + (p ? `\n${p}` : '');
   }).join('\n');
+  const mcp = mcpCatalog();
+  return mcp ? `${builtin}\n\nDIŞ ARAÇLAR (MCP sunucularından — onay gerektirir):\n${mcp}` : builtin;
+}
+
+/** Bir araç riskli mi? MCP araçları daima onay ister (dış sisteme dokunurlar). */
+export function isDangerTool(name) {
+  if (MCP.parseToolName(name)) return true;
+  return !!T[name]?.danger;
 }
 
 /** Bir aracı çalıştırır; sonucu daima {ok, result|error} olarak sarar. */
 export async function runTool(name, args, ctx) {
+  // MCP aracı mı?
+  if (MCP.parseToolName(name)) {
+    const hit = resolveMcpTool(name);
+    if (!hit) {
+      const avail = mcpToolList().map((t) => t.name).join(', ') || '(bağlı MCP aracı yok)';
+      return { ok: false, error: `Bilinmeyen MCP aracı: ${name}. Kullanılabilir: ${avail}` };
+    }
+    try {
+      const res = await MCP.callTool(hit.srv, hit.tool, args || {}, ctx?.settings?.proxy || '');
+      if (res.isError) return { ok: false, error: typeof res.content === 'object' ? (res.content.text || JSON.stringify(res.content)) : String(res.content) };
+      return { ok: true, result: res.content };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }
+
   const t = T[name];
   if (!t) return { ok: false, error: `Bilinmeyen araç: ${name}. Kullanılabilir: ${Object.keys(T).join(', ')}` };
   try {
