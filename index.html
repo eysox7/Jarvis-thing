@@ -88,10 +88,30 @@
     </div>
   </section>
 
-  <!-- ================= BRAIN (skills + MCP) ================= -->
+  <!-- ================= BRAIN (google + skills + MCP) ================= -->
   <section class="view" id="view-brain">
     <div class="pad">
-      <h3>Skiller</h3>
+      <h3>Google Hesabı</h3>
+      <p class="muted small">
+        Gmail, Takvim, Classroom ve Drive'a erişim. Kişisel ya da <strong>okul</strong>
+        hesabıyla giriş yapabilirsin. Okul hesaplarında erişim, okulun BT yöneticisinin
+        iznine bağlıdır — yönetici üçüncü taraf uygulamaları kapatmışsa giriş reddedilir.
+      </p>
+      <label>Google OAuth istemci kimliği (Client ID)
+        <input id="setGoogleClientId" placeholder="…apps.googleusercontent.com" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </label>
+      <p class="muted small">
+        Nasıl alınır: <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>
+        → OAuth istemci kimliği (tür: <em>Web uygulaması</em>) oluştur → "Authorized JavaScript
+        origins"e bu uygulamanın adresini ekle. Gmail, Calendar, Classroom ve Drive API'lerini de etkinleştir.
+      </p>
+      <div id="googleStatus" class="muted small" style="margin:6px 0"></div>
+      <div class="row gap wrap">
+        <button class="btn primary" id="btnGoogleSignIn">Giriş yap</button>
+        <button class="btn" id="btnGoogleSignOut">Çıkış</button>
+      </div>
+
+      <h3 style="margin-top:22px">Skiller</h3>
       <p class="muted small">
         Skil = yeniden kullanılabilir uzmanlık paketi. Bir işi nasıl yapacağını bir kez
         yazarsın, etkinleştirdiğin skiller her sohbette beynine yüklenir. Asistan da öğrendiği

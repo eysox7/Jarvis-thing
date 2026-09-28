@@ -23,6 +23,7 @@ const DEFAULTS = {
     searchProvider: '',
     searchKey: '',
     activeProfile: '',
+    googleClientId: '',    // Google OAuth istemci kimliği (Gmail/Takvim/Classroom/Drive için)
   },
   profiles: [],   // {id,name,provider,baseUrl,apiKey,model,extraHeaders,enabled}
   tasks: [],      // {id,title,notes,due,priority,status,createdAt,doneAt}

@@ -5,6 +5,7 @@
 import * as S from './store.js';
 import { calcExpression, parseWhen, fmtDate, truncate } from './util.js';
 import * as MCP from './mcp.js';
+import * as G from './google.js';
 
 const T = {};
 const def = (t) => { T[t.name] = t; return t; };
@@ -442,6 +443,192 @@ def({
     return { deleted: s.name };
   },
 });
+
+/* ---------------- Google (Gmail · Takvim · Classroom · Drive) ---------------- */
+// Not: Okul (Workspace) hesaplarına erişim, okulun yöneticisinin politikasına tabidir.
+// Tümü onay ister (dış hesaba dokunurlar); kimlik doğrulama js/google.js'te.
+
+const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
+const CAL = 'https://www.googleapis.com/calendar/v3/calendars/primary';
+const CLASSROOM = 'https://classroom.googleapis.com/v1';
+const DRIVE = 'https://www.googleapis.com/drive/v3';
+const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+def({
+  name: 'google_status',
+  desc: 'Google bağlantısının durumunu döner (giriş yapılmış mı, hangi yetkiler, kalan süre).',
+  params: {},
+  run: () => G.status(),
+});
+
+def({
+  name: 'gmail_search',
+  desc: 'Gmail\'de e-posta arar (okul veya kişisel hesap). Konu, gönderen, tarih ve özet döner.',
+  params: {
+    query: 'string — Gmail arama söz dizimi, ör. "is:unread from:hoca", boşsa son gelenler',
+    count: 'number — sonuç sayısı (varsayılan 5, en çok 10)',
+  },
+  danger: true,
+  run: async (a) => {
+    const n = Math.min(Number(a.count) || 5, 10);
+    const q = a.query ? `&q=${encodeURIComponent(a.query)}` : '';
+    const list = await G.gfetch(`${GMAIL}/messages?maxResults=${n}${q}`);
+    const ids = (list.messages || []).map((m) => m.id);
+    const msgs = [];
+    for (const id of ids) {
+      const m = await G.gfetch(`${GMAIL}/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`);
+      const h = Object.fromEntries((m.payload?.headers || []).map((x) => [x.name.toLowerCase(), x.value]));
+      msgs.push({ id, from: h.from, subject: h.subject, date: h.date, snippet: truncate(m.snippet || '', 300), unread: (m.labelIds || []).includes('UNREAD') });
+    }
+    return { count: msgs.length, messages: msgs };
+  },
+});
+
+def({
+  name: 'gmail_read',
+  desc: 'Bir e-postanın tam metnini okur (gmail_search ile bulunan id ile).',
+  params: { id: 'string (zorunlu)' },
+  danger: true,
+  run: async (a) => {
+    if (!a.id) throw new Error('id zorunlu');
+    const m = await G.gfetch(`${GMAIL}/messages/${a.id}?format=full`);
+    const h = Object.fromEntries((m.payload?.headers || []).map((x) => [x.name.toLowerCase(), x.value]));
+    const body = extractGmailBody(m.payload) || m.snippet || '';
+    return { from: h.from, to: h.to, subject: h.subject, date: h.date, body: truncate(body, 6000) };
+  },
+});
+
+def({
+  name: 'gmail_send',
+  desc: 'E-posta gönderir. Göndermeden önce içeriği kullanıcıya onaylatır.',
+  params: { to: 'string (zorunlu) — alıcı', subject: 'string (zorunlu)', body: 'string (zorunlu)' },
+  danger: true,
+  run: async (a) => {
+    if (!a.to || !a.subject) throw new Error('to ve subject zorunlu');
+    const subject = `=?UTF-8?B?${G.toBase64Url(String(a.subject)).replace(/-/g, '+').replace(/_/g, '/')}?=`;
+    const raw = G.toBase64Url(
+      `To: ${a.to}\r\nSubject: ${subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${a.body || ''}`,
+    );
+    const res = await G.gfetch(`${GMAIL}/messages/send`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ raw }),
+    });
+    return { sent: true, id: res.id, to: a.to, subject: a.subject };
+  },
+});
+
+def({
+  name: 'calendar_list',
+  desc: 'Google Takvim\'deki yaklaşan etkinlikleri listeler.',
+  params: { count: 'number — (varsayılan 10)', query: 'string — metin araması (opsiyonel)' },
+  danger: true,
+  run: async (a) => {
+    const n = Math.min(Number(a.count) || 10, 25);
+    const q = a.query ? `&q=${encodeURIComponent(a.query)}` : '';
+    const d = await G.gfetch(`${CAL}/events?timeMin=${encodeURIComponent(new Date().toISOString())}&maxResults=${n}&singleEvents=true&orderBy=startTime${q}`);
+    return {
+      events: (d.items || []).map((e) => ({
+        id: e.id, title: e.summary || '(başlıksız)',
+        start: e.start?.dateTime || e.start?.date, end: e.end?.dateTime || e.end?.date,
+        location: e.location, link: e.htmlLink,
+      })),
+    };
+  },
+});
+
+def({
+  name: 'calendar_add',
+  desc: 'Google Takvim\'e etkinlik ekler.',
+  params: {
+    title: 'string (zorunlu)',
+    start: 'string (zorunlu) — "yarın 15:00", "2 saat sonra" veya ISO tarih',
+    end: 'string — bitiş; boşsa başlangıçtan 1 saat sonra',
+    description: 'string', location: 'string',
+  },
+  danger: true,
+  run: async (a) => {
+    if (!a.title) throw new Error('title zorunlu');
+    const startMs = parseWhen(a.start);
+    if (!startMs) throw new Error('başlangıç zamanı anlaşılamadı: ' + a.start);
+    const endMs = a.end ? parseWhen(a.end) : startMs + 3600000;
+    const body = {
+      summary: String(a.title),
+      description: a.description ? String(a.description) : undefined,
+      location: a.location ? String(a.location) : undefined,
+      start: { dateTime: new Date(startMs).toISOString(), timeZone: TZ },
+      end: { dateTime: new Date(endMs || startMs + 3600000).toISOString(), timeZone: TZ },
+    };
+    const e = await G.gfetch(`${CAL}/events`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    return { added: true, id: e.id, title: e.summary, start: e.start?.dateTime, link: e.htmlLink };
+  },
+});
+
+def({
+  name: 'classroom_courses',
+  desc: 'Google Classroom\'daki etkin derslerini listeler.',
+  params: {},
+  danger: true,
+  run: async () => {
+    const d = await G.gfetch(`${CLASSROOM}/courses?courseStates=ACTIVE&pageSize=30`);
+    return { courses: (d.courses || []).map((c) => ({ id: c.id, name: c.name, section: c.section, room: c.room, link: c.alternateLink })) };
+  },
+});
+
+def({
+  name: 'classroom_work',
+  desc: 'Classroom ödev/görevlerini (son teslim tarihiyle) listeler. courseId verilmezse etkin tüm dersleri tarar.',
+  params: { courseId: 'string — classroom_courses ile öğrenilir (opsiyonel)', count: 'number — ders başına (varsayılan 10)' },
+  danger: true,
+  run: async (a) => {
+    const per = Math.min(Number(a.count) || 10, 20);
+    let courses;
+    if (a.courseId) courses = [{ id: String(a.courseId), name: '' }];
+    else {
+      const d = await G.gfetch(`${CLASSROOM}/courses?courseStates=ACTIVE&pageSize=5`);
+      courses = (d.courses || []).map((c) => ({ id: c.id, name: c.name }));
+    }
+    const work = [];
+    for (const c of courses) {
+      const d = await G.gfetch(`${CLASSROOM}/courses/${c.id}/courseWork?pageSize=${per}&orderBy=dueDate%20desc`);
+      for (const w of d.courseWork || []) {
+        const due = w.dueDate ? `${w.dueDate.year}-${String(w.dueDate.month).padStart(2, '0')}-${String(w.dueDate.day).padStart(2, '0')}` : null;
+        work.push({ course: c.name, courseId: c.id, id: w.id, title: w.title, due, link: w.alternateLink, points: w.maxPoints });
+      }
+    }
+    return { count: work.length, work };
+  },
+});
+
+def({
+  name: 'drive_search',
+  desc: 'Google Drive\'da dosya arar.',
+  params: { query: 'string — ad/metin araması', count: 'number — (varsayılan 10)' },
+  danger: true,
+  run: async (a) => {
+    const n = Math.min(Number(a.count) || 10, 25);
+    const q = a.query ? `name contains '${String(a.query).replace(/'/g, "\\'")}' or fullText contains '${String(a.query).replace(/'/g, "\\'")}'` : "trashed=false";
+    const url = `${DRIVE}/files?pageSize=${n}&orderBy=modifiedTime desc&fields=${encodeURIComponent('files(id,name,mimeType,modifiedTime,webViewLink,owners(displayName))')}&q=${encodeURIComponent(q + ' and trashed=false')}`;
+    const d = await G.gfetch(url);
+    return { files: (d.files || []).map((f) => ({ id: f.id, name: f.name, type: f.mimeType, modified: f.modifiedTime, link: f.webViewLink, owner: f.owners?.[0]?.displayName })) };
+  },
+});
+
+/** Gmail gövdesini (text/plain öncelikli) çıkarır. */
+function extractGmailBody(payload) {
+  if (!payload) return '';
+  const decode = (data) => {
+    try {
+      const bin = atob(String(data).replace(/-/g, '+').replace(/_/g, '/'));
+      const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      return new TextDecoder('utf-8').decode(bytes);
+    } catch { return ''; }
+  };
+  if (payload.body?.data && (!payload.mimeType || payload.mimeType.startsWith('text/'))) return decode(payload.body.data);
+  const parts = payload.parts || [];
+  const plain = parts.find((p) => p.mimeType === 'text/plain');
+  if (plain?.body?.data) return decode(plain.body.data);
+  for (const p of parts) { const inner = extractGmailBody(p); if (inner) return inner; }
+  return '';
+}
 
 /* ---------------- dışa açılan API ---------------- */
 

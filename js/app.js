@@ -7,8 +7,9 @@ import { PRESETS, listModels, testProfile, kindOf } from './providers.js';
 import { runAgent } from './agent.js';
 import { Voice } from './voice.js';
 import * as MCP from './mcp.js';
+import * as G from './google.js';
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 let busy = false;
 let abortCtrl = null;
 
@@ -19,7 +20,7 @@ function showView(name) {
   if (name === 'tasks') renderTasks();
   if (name === 'notes') renderNotes();
   if (name === 'conn') renderConnections();
-  if (name === 'brain') { renderSkills(); renderMcp(); }
+  if (name === 'brain') { renderGoogle(); renderSkills(); renderMcp(); }
   if (name === 'settings') renderSettings();
 }
 $('#tabbar').addEventListener('click', (e) => {
@@ -573,6 +574,42 @@ function renderConnections() {
   });
 }
 
+/* ============================ beyin: Google hesabı ============================ */
+$('#setGoogleClientId').addEventListener('change', (e) => { S.setSetting('googleClientId', e.target.value.trim()); renderGoogle(); });
+
+$('#btnGoogleSignIn').addEventListener('click', async (e) => {
+  if (!S.settings().googleClientId?.trim()) { UI.toast('Önce Google istemci kimliğini gir', 'err'); return; }
+  const b = e.currentTarget; b.disabled = true;
+  try {
+    await G.signIn();
+    UI.toast('Google bağlandı');
+  } catch (err) {
+    UI.toast(err.message, 'err');
+    UI.addMessage('sys', '🔐 ' + err.message);
+  }
+  b.disabled = false;
+  renderGoogle();
+});
+
+$('#btnGoogleSignOut').addEventListener('click', () => { G.signOut(); UI.toast('Google çıkışı yapıldı'); renderGoogle(); });
+
+function renderGoogle() {
+  const box = $('#googleStatus');
+  const idInput = $('#setGoogleClientId');
+  if (idInput && document.activeElement !== idInput) idInput.value = S.settings().googleClientId || '';
+  if (!box) return;
+  const st = G.status();
+  if (!st.clientIdSet) { box.textContent = 'İstemci kimliği girilmedi.'; box.style.color = ''; return; }
+  if (st.connected) {
+    box.textContent = `✔ Bağlı — ${st.expiresInMin} dk geçerli · yetkiler: ${st.scopes.map((s) => s.split('/').pop()).join(', ')}`;
+    box.style.color = '#8fe3a0';
+  } else {
+    box.textContent = 'İstemci kimliği hazır ama giriş yapılmadı.';
+    box.style.color = '';
+  }
+  $('#btnGoogleSignIn').textContent = st.connected ? 'Yeniden bağlan' : 'Giriş yap';
+}
+
 /* ============================ beyin: skiller ============================ */
 $('#btnSkillAdd').addEventListener('click', () => skillEditor(null));
 
@@ -810,7 +847,7 @@ $('#btnImport').addEventListener('click', () => {
       if (!(await UI.confirmDialog('Mevcut veriler bu yedekle değiştirilecek. Devam?', { okText: 'Değiştir', danger: true }))) return;
       S.replaceAll(data);
       UI.toast('Yedek yüklendi');
-      restoreChat(); renderTasks(); renderNotes(); renderConnections(); renderSkills(); renderMcp(); renderSettings(); refreshHeader();
+      restoreChat(); renderTasks(); renderNotes(); renderConnections(); renderGoogle(); renderSkills(); renderMcp(); renderSettings(); refreshHeader();
     } catch (e) { UI.toast('İçe aktarma başarısız: ' + e.message, 'err'); }
   });
   document.body.append(inp); inp.click(); setTimeout(() => inp.remove(), 1000);
@@ -819,7 +856,7 @@ $('#btnImport').addEventListener('click', () => {
 $('#btnWipe').addEventListener('click', async () => {
   if (!(await UI.confirmDialog('TÜM veriler silinecek: bağlantılar, görevler, notlar, hafıza, sohbet. Geri alınamaz.', { okText: 'Hepsini sil', danger: true }))) return;
   S.wipe();
-  restoreChat(); renderTasks(); renderNotes(); renderConnections(); renderSkills(); renderMcp(); renderSettings(); refreshHeader();
+  restoreChat(); renderTasks(); renderNotes(); renderConnections(); renderGoogle(); renderSkills(); renderMcp(); renderSettings(); refreshHeader();
   UI.toast('Her şey silindi');
 });
 
@@ -872,4 +909,4 @@ function boot() {
 boot();
 
 // Hata ayıklama için konsoldan erişim.
-window.NEXUS = { store: S, send, version: VERSION };
+window.NEXUS = { store: S, send, version: VERSION, google: G, mcp: MCP };

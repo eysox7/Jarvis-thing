@@ -24,8 +24,11 @@ Tarayıcıda açılır, ana ekrana eklenince yerli uygulama gibi çalışır.
 - **Skiller alır.** Bir işi nasıl yapacağını bir kez yazarsın (uzmanlık paketi);
   etkin skiller her sohbette beynine yüklenir. Asistan öğrendiği bir prosedürü kendisi de
   kaydedebilir.
+- **Google hesabına bağlanır.** Kişisel ya da **okul** hesabıyla giriş yap; Gmail, Takvim,
+  Classroom ve Drive araçları açılır (okuma + takvime ekleme + e-posta gönderme). MCP
+  sunucusu çalıştırmana gerek yok, doğrudan tarayıcıdan.
 - **MCP sunucularına bağlanır.** Kendi cihazında çalıştırdığın MCP sunucularının araçlarını
-  (dosya, takvim, Google, kabuk, ev otomasyonu…) alıp kendi araçlarıymış gibi kullanır.
+  (dosya, kabuk, ev otomasyonu, başka servisler…) alıp kendi araçlarıymış gibi kullanır.
   Böylece asistanın gerçek sistem erişimi bu sunucular üzerinden genişler.
 - **Yedekli çalışır.** Bağlantıları sıraya dizersin; ilki hata verirse (kota doldu,
   anahtar bozuk, servis çöktü) otomatik olarak bir alttakine geçer.
@@ -133,6 +136,7 @@ Model bu araçları kendi kararıyla çağırır. `[onay]` işaretliler izin ist
 | Cihaz | `device_info`, `geolocate` `[onay]`, `clipboard_write`, `share` `[onay]`, `notify`, `speak`, `vibrate` |
 | Etkileşim | `ask_user` — bilgi eksikse uydurmaz, sorar |
 | Skiller | `skill_save`, `skill_list`, `skill_delete` `[onay]` |
+| Google | `google_status`, `gmail_search` `[onay]`, `gmail_read` `[onay]`, `gmail_send` `[onay]`, `calendar_list` `[onay]`, `calendar_add` `[onay]`, `classroom_courses` `[onay]`, `classroom_work` `[onay]`, `drive_search` `[onay]` |
 | Dış araçlar | `mcp__<sunucu>__<araç>` — bağlı MCP sunucularından, dinamik `[onay]` |
 
 Yeni araç eklemek: `js/tools.js` içinde bir `def({name, desc, params, run})` bloğu.
@@ -148,6 +152,35 @@ prosedürü `skill_save` aracıyla kendisi kaydedebilir — bir dahaki sefere ha
 Örnek — *"Toplantı notu"*: "Kullanıcı toplantı özeti istediğinde önce katılımcıları,
 sonra kararları, sonra aksiyon maddelerini (sorumlu + tarih) başlıklar hâlinde çıkar ve
 her aksiyonu görev olarak ekle."
+
+## Google hesabı (Gmail · Takvim · Classroom · Drive)
+
+Kişisel veya **okul** Google hesabına doğrudan tarayıcıdan bağlanır. Kimlik doğrulama
+Google Identity Services (GIS) ile yapılır — istemci gizli anahtarı yoktur, saf tarayıcı
+akışıdır. Erişim jetonu ~1 saat geçerlidir, süresi dolunca sessizce yenilenir.
+
+**Kurulum (bir kez):**
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → yeni proje.
+2. **API'ler**: Gmail, Google Calendar, Google Classroom ve Google Drive API'lerini etkinleştir.
+3. **OAuth onay ekranı**'nı yapılandır, kendini test kullanıcısı olarak ekle.
+4. **Kimlik bilgileri → OAuth istemci kimliği → Web uygulaması**. *Authorized JavaScript
+   origins*'e uygulamanın adresini ekle (ör. `https://kullanici.github.io`).
+5. Çıkan **Client ID**'yi **Beyin** sekmesi → *Google Hesabı* → istemci kimliği alanına yapıştır.
+6. **Giriş yap** → Google penceresi açılır → hesabını seç ve izinleri onayla.
+
+> ### ⚠ Okul hesapları için kritik uyarı
+> Okul (Google Workspace for Education) hesapları okulun **BT yöneticisi** tarafından
+> yönetilir. Bu hesaba herhangi bir üçüncü taraf uygulamanın (bu uygulama dahil, herhangi
+> bir MCP sunucusu dahil) erişip erişemeyeceğini **tamamen okulun politikası belirler**.
+> Yönetici üçüncü taraf OAuth erişimini kapatmışsa giriş `access_denied` /
+> `admin_policy_enforced` ile reddedilir — bu bir yetki sınırıdır, **kodla aşılamaz**.
+> Bu durumda yöneticinin uygulamayı allowlist'e alması gerekir. Çözüm yolları: kişisel
+> hesap kullanmak, ya da okuldan uygulamaya izin istemek.
+
+İstenen yetki alanları (js/google.js içindeki `DEFAULT_SCOPES`): Gmail okuma + gönderme,
+Takvim (okuma/yazma), Classroom (dersler + ödevler, salt-okunur), Drive (salt-okunur).
+Daraltmak/genişletmek için o listeyi düzenle. Tüm Google araçları **onay ister**.
 
 ## MCP sunucuları (gerçek sistem erişimi)
 
@@ -194,7 +227,8 @@ metin cevap olarak gösterilir — kırılmaz, sadece araçsız çalışır.
 
 ```
 js/providers.js  → 4 tür API'yi tek arayüze indirger (openai · gemini · anthropic · ollama)
-js/tools.js      → araç kayıt defteri (yerleşik araçlar + skill araçları + MCP yönlendirme)
+js/tools.js      → araç kayıt defteri (yerleşik + skill + Google araçları + MCP yönlendirme)
+js/google.js     → Google OAuth (GIS) + Gmail/Takvim/Classroom/Drive API yardımcıları
 js/mcp.js        → MCP istemcisi (Streamable HTTP): dış sunuculara bağlanır, araçlarını çeker/çağırır
 js/agent.js      → plan/çalıştır döngüsü, sistem mesajı (araç kataloğu + skiller)
 js/store.js      → localStorage kalıcılığı
@@ -213,7 +247,7 @@ npm install      # yalnızca playwright (dev bağımlılığı)
 npm test         # gerçek Chromium'da, mobil ekran boyutunda koşar
 ```
 
-Dört paket:
+Beş paket:
 
 - `tests/smoke.test.mjs` — açılış, sekmeler, uçtan uca ajan döngüsü (plan kartı → araç
   kartları → sonuç), kalıcılık, yeniden yükleme, riskli araç onayı, API hata yolu, konsol temizliği
@@ -224,6 +258,9 @@ Dört paket:
 - `tests/brain.test.mjs` — skiller sistem mesajına yükleniyor mu, MCP sunucusuna bağlanıp
   araçları çekiliyor mu, ajan `mcp__…` aracını onayla çağırıp sonucu işliyor mu (MCP sunucusu
   sahte JSON-RPC yanıtlarıyla taklit edilir)
+- `tests/google.test.mjs` — jeton enjekte edilince Gmail/Takvim araçları doğru uç noktaları
+  Bearer başlığıyla çağırıyor, yanıtları çözümlüyor ve dış hesap araçları onay istiyor mu
+  (Google API'leri sahte JSON ile taklit edilir; OAuth penceresi atlanır)
 
 Sağlayıcılar sahte (mock) yanıtlarla taklit edilir; test için API anahtarı gerekmez.
 Ses testlerinde `SpeechRecognition` ve `speechSynthesis` de sahte sürümlerle değiştirilir,
