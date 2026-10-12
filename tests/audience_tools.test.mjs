@@ -76,7 +76,30 @@ ok(fb.includes('okuma_eslesme_yuzde') && fb.includes('"katilimci": 4'), 'anket s
 const segMatch = fb.match(/"yas": \{[\s\S]*?\}\s*\}/);
 ok(!!segMatch, 'yaş segmenti döndü');
 
-console.log('\n[4] Konsol');
+console.log('\n[4] Kitle sekmesi');
+await page.click('#tabbar button[data-view="audience"]');
+ok(await page.locator('#view-audience').isVisible(), 'kitle sekmesi açılıyor');
+ok(await page.locator('#audInst option[value="@test_bb"]').count() === 1, 'kayıtlı kurum seçicide');
+await page.fill('#audText', 'Grip aşısı olmazsanız sevdiklerinizi riske atarsınız. Araştırmaya göre %40 daha az hastalanıyorsunuz.');
+await page.selectOption('#audInst', 'kamu_bakanlik');
+await page.click('#audChannels .chip[data-ch="tv"]');
+await page.click('#btnAudPredict');
+await page.waitForSelector('#audPrediction', { timeout: 15000 });
+ok(await page.locator('#audPrediction .kpi').count() === 6, 'altı gösterge kutusu');
+ok(await page.locator('#audPrediction .th-row').count() >= 18, 'tüm kuram katkıları çizildi');
+ok(await page.locator('#audPrediction .hall span').count() === 3, 'Hall okuma çubuğu');
+ok((await page.locator('#audPrediction').textContent()).includes('Sağlık'), 'alan metinden çıkarıldı (Sağlık)');
+ok(await page.locator('#audPrediction .seg-table tr').count() === 7, 'yaş kırılım tablosu (6 grup)');
+if (process.env.SHOT) { await page.screenshot({ path: process.env.SHOT }); await page.locator('#audPrediction').screenshot({ path: process.env.SHOT.replace('.png', '-sonuc.png') }); }
+await page.click('#audLens button[data-l="ana_akim"]');
+await page.click('#btnAudPredict');
+await page.waitForFunction(() => document.querySelector('#audPrediction') && !document.querySelector('#audPrediction .hall'), { timeout: 15000 });
+ok(await page.locator('#audPrediction .th-name.elestirel').count() === 0, 'ana akım mercekte eleştirel kuram yok');
+await page.click('#btnAudOptimize');
+await page.waitForSelector('#audOptimize', { timeout: 30000 });
+ok(await page.locator('#audOptimize .seg-table').count() === 2, 'en iyi / kaçınılacak strateji tabloları');
+
+console.log('\n[5] Konsol');
 ok(errors.length === 0, errors.length ? errors.join(' | ') : 'sayfa hatası yok');
 
 await browser.close();

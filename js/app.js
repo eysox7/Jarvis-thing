@@ -6,6 +6,7 @@ import * as Speech from './speech.js';
 import { PRESETS, listModels, testProfile, kindOf } from './providers.js';
 import { runAgent } from './agent.js';
 import { Voice } from './voice.js';
+import { initAudienceView, renderAudience } from './audienceView.js';
 
 const VERSION = '1.0.0';
 let busy = false;
@@ -17,6 +18,7 @@ function showView(name) {
   $$('#tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   if (name === 'tasks') renderTasks();
   if (name === 'notes') renderNotes();
+  if (name === 'audience') renderAudience();
   if (name === 'conn') renderConnections();
   if (name === 'settings') renderSettings();
 }
@@ -650,6 +652,7 @@ $('#btnWipe').addEventListener('click', async () => {
 /* ============================ açılış ============================ */
 function boot() {
   restoreChat();
+  initAudienceView();
   refreshHeader();
   renderSettings();
   scheduleReminders();

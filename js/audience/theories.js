@@ -73,7 +73,7 @@ export const THEORIES = [
       const dInst = Math.abs(f.ideoloji - inst.ideoloji) / 2;
       const dMsg = Math.abs(f.ideoloji - m.slant) / 2;
       const w = dom.ideological;
-      return { exp: -0.9 * w * dInst, shift: -1.3 * w * (0.5 * dInst + 0.5 * dMsg) + 0.25 * w, cred: -0.5 * w * dInst };
+      return { exp: -0.9 * w * dInst, shift: 1.6 * w * (0.4 - (0.5 * dInst + 0.5 * dMsg)), cred: -0.5 * w * dInst };
     },
   },
   {
@@ -82,7 +82,7 @@ export const THEORIES = [
     apply: ({ f, m, dom }) => {
       const domFit = (dom.frames[m.frame] ?? 1) - 1;
       const fit = domFit + frameFit(m.frame, f);
-      return { shift: 1.6 * fit, att: 0.8 * fit + (m.frame === 'catisma' || m.frame === 'korku' ? 0.3 : 0), share: m.frame === 'catisma' ? 0.4 : m.frame === 'insan_hikayesi' ? 0.25 : 0 };
+      return { shift: 1.0 * fit, att: 0.8 * fit + (m.frame === 'catisma' || m.frame === 'korku' ? 0.3 : 0), share: m.frame === 'catisma' ? 0.4 : m.frame === 'insan_hikayesi' ? 0.25 : 0 };
     },
   },
   {
@@ -115,6 +115,16 @@ export const THEORIES = [
     },
   },
   {
+    id: 'tepkisellik', ad: 'Psikolojik tepkisellik', kurucu: 'J. Brehm (1966); Dillard & Shen (2005)', gelenek: 'ana_akim', asama: 'birey',
+    ozet: 'Özgürlüğü tehdit edilen kişi direnir: baskıcı çerçeve, aşırı tekrar ve güvenilmeyen kaynak ters teper.',
+    apply: ({ f, m, state }) => {
+      const pressure = (m.frame === 'korku' ? 0.7 : m.frame === 'kayip' || m.frame === 'catisma' ? 0.4 : m.frame === 'ahlaki' ? 0.3 : 0)
+        + 0.25 * Math.log(Math.max(1, m.repetition)) + 0.3 * Math.max(0, m.hegemonic);
+      const proneness = 0.5 * (1 - f.kurumsal_guven) + 0.3 * (1 - f.yas) + 0.2 * f.egitim;
+      return { shift: -1.4 * pressure * proneness - 0.6 * Math.max(0, -state.cred) * proneness, share: 0.3 * pressure * proneness };
+    },
+  },
+  {
     id: 'yeniliklerin_yayilmasi', ad: 'Yeniliklerin yayılması', kurucu: 'E. Rogers (1962)', gelenek: 'ana_akim', asama: 'nufus',
     ozet: 'Yenilikçiler ve erken benimseyenler önce, geç çoğunluk sosyal kanıt geldikçe benimser.',
     apply: ({ f, m }) => ({ adopt: 3 * m.novelty * (f.innovativeness - 0.5) - 1.2 * m.novelty }),
@@ -124,7 +134,7 @@ export const THEORIES = [
     id: 'iki_asamali_akis', ad: 'İki aşamalı akış', kurucu: 'Lazarsfeld, Berelson & Gaudet (1944); Katz', gelenek: 'ana_akim', asama: 'nufus',
     ozet: 'Mesaj önce kanaat önderlerine ulaşır, onlar aracılığıyla geri kalana yayılır ve yorumlanır.',
     apply: ({ f }) => (f.leader ? { exp: 0.8, att: 0.5, share: 0.9 } : {}),
-    population: (agg) => ({ f }) => (f.leader ? {} : { exp: 1.6 * agg.leaderShare, shift: 0.9 * agg.leaderAttitude }),
+    population: (agg) => ({ f }) => (f.leader ? {} : { exp: 1.6 * agg.leaderShare, shift: 0.6 * agg.leaderAttitude }),
   },
   {
     id: 'suskunluk_sarmali', ad: 'Suskunluk sarmalı', kurucu: 'E. Noelle-Neumann (1974)', gelenek: 'ana_akim', asama: 'nufus',
@@ -144,8 +154,8 @@ export const THEORIES = [
     apply: ({ f, m, inst }) => {
       // Tercih edilen anlamın egemen ideolojiyle hizası
       const encoded = 0.5 * m.hegemonic + 0.5 * (inst.hegemonik - 0.5) * 2;
-      // Kişinin egemen düzenle hizası
-      const aligned = 0.45 * (f.kurumsal_guven - 0.5) * 2 + 0.35 * (1 - Math.abs(f.ideoloji - inst.ideoloji)) + 0.2 * (f.social_position - 0.5) * 2 - 0.3 * f.marginal;
+      // Kişinin egemen düzenle (göndericiyle değil!) hizası; m.H = egemen bloğun ideolojik konumu
+      const aligned = 0.45 * (f.kurumsal_guven - 0.5) * 2 + 0.35 * (0.75 - Math.abs(f.ideoloji - m.H)) + 0.2 * (f.social_position - 0.5) * 2 - 0.3 * f.marginal;
       const fit = encoded * aligned;              // aynı yönde → egemen okuma
       const dom = 1.8 * fit + 0.4 * (1 - Math.abs(encoded));
       const opp = -1.8 * fit + 0.8 * f.marginal * Math.max(0, encoded) + 0.6 * f.nfc * (1 - f.kurumsal_guven) * Math.abs(encoded);

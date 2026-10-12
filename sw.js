@@ -13,6 +13,7 @@ const SHELL = [
   './js/util.js',
   './js/speech.js',
   './js/voice.js',
+  './js/audienceView.js',
   './js/audience/engine.js',
   './js/audience/personas.js',
   './js/audience/theories.js',

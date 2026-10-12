@@ -38,7 +38,9 @@ export function normalizeMessage(msg = {}) {
     domain, frame, channels, inst, text, extraction: ex.kanit,
     quality: num(msg.quality ?? msg.arguman_kalitesi ?? E.quality, 0.6, 0, 1),
     cues: num(msg.cues ?? msg.cevresel_ipucu ?? E.cues, 0.5, 0, 1),
-    slant: typeof slant === 'string' ? (SLANT[slant] ?? 0) : num(slant, inst.ideoloji * 0.5, -1, 1),
+    slant: typeof slant === 'string' ? (SLANT[slant] ?? 0) : num(slant, inst.ideoloji * 0.7, -1, 1),
+    // Egemen bloğun ideolojik konumu (Hall/Gramsci). Ülke/dönem bağlamına göre kurum değiştirebilir.
+    H: num(msg.egemen_ideoloji ?? msg.H, 0.5, -1, 1),
     hegemonic: typeof stance === 'string' ? (STANCE[stance] ?? 0) : num(stance, 0, -1, 1),
     novelty: num(msg.novelty ?? msg.yenilik ?? E.novelty, 0.3, 0, 1),
     repetition: num(msg.repetition ?? msg.tekrar, 1, 1, 50),
@@ -279,7 +281,7 @@ export function optimize(message, opts = {}, metric = 'ortalama_tutum') {
   for (const frame of frames) {
     for (const channels of chans) {
       const r = predict({ ...message, frame, channels }, { ...opts, n: Math.min(opts.n || 800, 1500), bootstrap: 0 });
-      out.push({ cerceve: frame, kanallar: channels, skor: r.sonuc[metric], erisim: r.sonuc.erisim_yuzde, olumlu: r.sonuc.olumlu_yuzde, karsit_okuma: r.sonuc.hall_okuma_yuzde.karsit });
+      out.push({ cerceve: frame, kanallar: channels, skor: r.sonuc[metric], erisim: r.sonuc.erisim_yuzde, olumlu: r.sonuc.olumlu_yuzde, karsit_okuma: r.sonuc.hall_okuma_yuzde?.karsit ?? null });
     }
   }
   out.sort((a, b) => b.skor - a.skor);

@@ -76,6 +76,48 @@
     </div>
   </section>
 
+  <!-- ================= AUDIENCE ================= -->
+  <section class="view" id="view-audience">
+    <div class="pad">
+      <p class="muted small">
+        Kitle tahmini: mesajını sentetik bir nüfusta (MatrAIx tarzı personalar) ana akım ve eleştirel
+        iletişim kuramlarıyla simüle eder. Hesap cihazda yapılır; kurum verisiyle kalibrasyon için sohbette
+        <code>audience_calibrate</code> kullan.
+      </p>
+      <label>Mesaj metni (opsiyonel — alan, çerçeve, duruş metinden çıkarılır)
+        <textarea id="audText" rows="3" placeholder="ör. Grip aşısı olmazsanız sevdiklerinizi riske atarsınız…"></textarea>
+      </label>
+      <label>Kurum <select id="audInst"></select></label>
+      <div class="row gap">
+        <label class="grow">Alan <select id="audDomain"></select></label>
+        <label class="grow">Çerçeve <select id="audFrame"></select></label>
+      </div>
+      <label>Kanallar (seçilmezse kurumun kanalları)</label>
+      <div class="chips" id="audChannels"></div>
+      <div class="row gap">
+        <label class="grow">Duruş
+          <select id="audStance">
+            <option value="">(metinden / nötr)</option>
+            <option value="egemen">Egemen</option>
+            <option value="notr">Nötr</option>
+            <option value="muhalif">Karşı-hegemonik</option>
+          </select>
+        </label>
+        <label class="grow">Kırılım <select id="audSegment"></select></label>
+      </div>
+      <div class="seg" id="audLens">
+        <button data-l="butunlesik" class="active">Bütünleşik</button>
+        <button data-l="ana_akim">Ana akım</button>
+        <button data-l="elestirel">Eleştirel</button>
+      </div>
+      <div class="row gap">
+        <button class="btn primary grow" id="btnAudPredict">Tahmin et</button>
+        <button class="btn grow" id="btnAudOptimize">En iyi strateji</button>
+      </div>
+      <div id="audResult"></div>
+    </div>
+  </section>
+
   <!-- ================= CONNECTIONS ================= -->
   <section class="view" id="view-conn">
     <div class="pad">
@@ -161,6 +203,7 @@
   <button data-view="chat" class="active"><span>💬</span>Sohbet</button>
   <button data-view="tasks"><span>✔</span>Görevler</button>
   <button data-view="notes"><span>📝</span>Notlar</button>
+  <button data-view="audience"><span>📊</span>Kitle</button>
   <button data-view="conn"><span>🔌</span>API</button>
   <button data-view="settings"><span>⚙</span>Ayarlar</button>
 </nav>

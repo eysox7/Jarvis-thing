@@ -422,6 +422,7 @@ const MSG_PARAMS = {
   tartismali: 'number 0..1 — konunun tartışmalılığı (suskunluk sarmalı)',
   ticari: 'number 0..1 — ticari/reklam niteliği (kültür endüstrisi)',
   temsil: 'number -1..1 — kalıp yargı (-1) … kapsayıcı temsil (1)',
+  egemen_ideoloji: 'number -1..1 — bağlamdaki egemen bloğun ideolojik konumu (varsayılan 0.5)',
 };
 const OPT_PARAMS = {
   hedef: `object — hedef kitle, ör. {"yas":"18-24"} veya {"ideoloji":["sol","merkez"]}. Boyutlar: ${Object.keys(DIMENSIONS).join(', ')}`,
