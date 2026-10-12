@@ -32,7 +32,7 @@ export const SIYASET = {
     lider: '0..1 lider/aday değerlendirmesi (valens)', anket: '0..1 beklenen oy payı (stratejik oy)',
     tur: '"cekimser" → oy kullanmama seçeneği',
   },
-  baglam: { ekonomi_algisi: '-1 (kötü) .. 1 (iyi) genel ekonomik algı (varsayılan -0.2)' },
+  baglam: { ekonomi_algisi: '-1 (kötü) .. 1 (iyi) genel ekonomik algı (varsayılan -0.2)', onceki_paylar: '{seçenek_id|etiket: yüzde} önceki seçim sonucu — personalara geçmiş oy atanır' },
   terimler: [
     { id: 'yakinlik', ad: 'Mekânsal yakınlık', kuram: 'Downs (1957) — mekânsal oy modeli', onsel: 1.6,
       z: (f, p, a) => { if (isAbstain(a)) return 0; const v = politicalPosition(f), q = partyPos(a); return -((v.ekonomi - q.ekonomi) ** 2 + (v.kultur - q.kultur) ** 2); } },
@@ -63,7 +63,7 @@ export const TICARET = {
     yerli: 'boolean', yesil: '0..1 sürdürülebilirlik', mevcut: 'boolean — kişinin şu an kullandığı',
     online: 'boolean — yalnızca çevrimiçi satılıyor', tur: '"disarida" → satın almama seçeneği',
   },
-  baglam: { kategori_yuku: '0..1 kategorinin bütçe yükü (dışarıda kalma eğilimi, varsayılan 0.4)' },
+  baglam: { kategori_yuku: '0..1 kategorinin bütçe yükü (dışarıda kalma eğilimi, varsayılan 0.4)', onceki_paylar: '{seçenek_id: yüzde} mevcut pazar payları — personalara şu anki marka atanır (sadakat)' },
   hazirla: (alts) => {
     const prices = alts.filter((a) => !isOutside(a) && num(a.fiyat) > 0).map((a) => num(a.fiyat)).sort((x, y) => x - y);
     return { fiyat_medyan: prices.length ? prices[Math.floor(prices.length / 2)] : 1 };
@@ -102,7 +102,7 @@ export const GUNDELIK = {
     zorluk: '0..1 uygulama zorluğu', dijital: 'boolean — dijital beceri gerektirir',
     kurum_onerisi: 'boolean — bir otorite/kurum öneriyor',
   },
-  baglam: {},
+  baglam: { onceki_paylar: '{seçenek_id: yüzde} şu anki davranış dağılımı (alışkanlık/sadakat)' },
   terimler: [
     { id: 'fayda', ad: 'Beklenen fayda', kuram: 'Beklenen fayda (von Neumann–Morgenstern)', onsel: 2.2,
       z: (f, p, a) => num(a.fayda, 0.5) - 0.5 },
@@ -131,6 +131,16 @@ export const DECISION_DOMAINS = { siyaset: SIYASET, ticaret: TICARET, gundelik: 
 export const ILETISIM = {
   id: 'iletisim', ad: 'İletişim/kampanya etkisi', kuram: 'Kitle motoru (20 iletişim kuramı)', onsel: 1.5,
   z: (f, p, a, ctx, i) => (ctx.iletisim && ctx.iletisim[a.id] ? ctx.iletisim[a.id][i] || 0 : 0),
+};
+
+/**
+ * Geçmiş davranış (durum bağımlılığı): önceki oy / marka / davranış en güçlü tek yordayıcıdır
+ * (Heckman 1981; seçmen sadakati, marka sadakati). p.onceki = önceki seçimin kimliği.
+ * Öğrenilen modelde 'onceki=X' demografik anahtarı ayrıca seçenekler arası GEÇİŞ matrisini öğrenir.
+ */
+export const GECMIS = {
+  id: 'gecmis', ad: 'Geçmiş davranış / sadakat', kuram: 'Durum bağımlılığı (Heckman 1981); alışkanlık', onsel: 2.0,
+  z: (f, p, a) => (p.onceki !== undefined && p.onceki !== null && String(p.onceki) === a.id ? 1 : 0),
 };
 
 export { IDEO };

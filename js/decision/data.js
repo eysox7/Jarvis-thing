@@ -82,6 +82,7 @@ export function prepareRows(raw, spec) {
   const choiceCol = cols.find((c) => CHOICE_COLS[fold(c)]);
   if (!choiceCol) throw new Error('seçim sütunu bulunamadı (secim / tercih / choice / oy / karar)');
   const wCol = cols.find((c) => ['agirlik', 'weight', 'w'].includes(fold(c)));
+  const pastCol = cols.find((c) => ['onceki', 'onceki_secim', 'onceki_oy', 'gecmis_oy', 'gecmis', 'previous', 'past'].includes(fold(c)));
   // Satıra özgü seçenek özellikleri: "<özellik>_<seçenek>" (ör. fiyat_A) ve bulunurluk "var_<seçenek>"
   const attrKeys = Object.keys(resolveChoice(spec).domain.seceneOzellikleri || {});
   const altCols = [];
@@ -103,6 +104,7 @@ export function prepareRows(raw, spec) {
       const v = mapValue(dim, r[c]);
       if (v) p[dim] = v; else if (r[c] !== '' && r[c] !== undefined) unmapped++;
     }
+    if (pastCol && r[pastCol] !== '' && r[pastCol] !== undefined) p.onceki = altIds.get(fold(r[pastCol])) || fold(r[pastCol]);
     const w = wCol ? Number(r[wCol]) : 1;
     const row = { p, secim: id, w: Number.isFinite(w) && w > 0 ? w : 1 };
     for (const { c, alt, attr } of altCols) {
@@ -117,6 +119,7 @@ export function prepareRows(raw, spec) {
   if (unknownChoice) warn.push(`${unknownChoice} satırda seçim, seçeneklerle eşleşmedi ve atlandı`);
   if (unmapped) warn.push(`${unmapped} hücre şemaya eşlenemedi ve boş sayıldı`);
   if (!Object.keys(dimOf).length) warn.push('hiç persona sütunu tanınmadı — yalnızca seçenek sabitleri öğrenilebilir');
+  if (pastCol) warn.push('geçmiş davranış sütunu bulundu (önceki seçim → sadakat ve geçiş matrisi öğrenilecek)');
   if (altCols.length) warn.push(`${altCols.length} satıra özgü seçenek sütunu bulundu (conjoint/satış verisi)`);
   return { rows, uyarilar: warn, eslesen_boyutlar: [...new Set(Object.values(dimOf))] };
 }

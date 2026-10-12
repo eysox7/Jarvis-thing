@@ -141,6 +141,21 @@ ok(JSON.stringify(mixShares({ a: { x: 60, y: 40 }, b: { x: 20, y: 80 } }, { a: 0
 let thr = false; try { await siliconProbs(SECIM, valid.slice(0, 2)); } catch { thr = true; }
 ok(thr, 'model bağlantısı olmadan silikon örneklem açık hata verir');
 
+console.log('\n[12] Geçmiş davranış (önceki oy / sadakat)');
+const LOYAL = { theta: { yakinlik: 1.6, parti_kimligi: 0.8, gecmis: 2.5, katilmama: 1 }, asc: { A: 0.2, B: 0, C: -0.2, X: 0 } };
+const prevSpec = { ...SECIM, baglam: { ...SECIM.baglam, onceki_paylar: { A: 42, B: 28, C: 12, X: 18 } } };
+const pp = predictChoice(prevSpec, { model: LOYAL, n: 1500, seed: 4, keepPeople: true, explain: false });
+const pastCounts = {}; pp._people.forEach((x) => { pastCounts[x.p.onceki] = (pastCounts[x.p.onceki] || 0) + 1; });
+ok(Math.abs(pastCounts.A / 1500 * 100 - 42) < 3, `önceki paylar personalara tutarlı atanır (A %${(pastCounts.A / 15).toFixed(1)})`);
+let seedR = 1; const RR = () => { seedR = (seedR * 16807) % 2147483647; return seedR / 2147483647; };
+const prow = pp._people.map((x) => { let u = RR(), j = 0; while (j < x.P.length - 1 && (u -= x.P[j]) > 0) j++; return { p: x.p, secim: ['A', 'B', 'C', 'X'][j], w: 1 }; });
+const cvP = crossValidate(SECIM, prow, { k: 3, iters: 200 }), cvN = crossValidate(SECIM, prow.map((x) => { const { onceki, ...p } = x.p; return { ...x, p }; }), { k: 3, iters: 200 });
+ok(cvP.isabet_yuzde > cvN.isabet_yuzde + 10, `geçmiş oy isabeti büyük ölçüde artırır (%${cvN.isabet_yuzde} → %${cvP.isabet_yuzde})`);
+const pm = fitChoiceModel(SECIM, prow, { iters: 250 });
+ok(Math.abs(pm.theta.gecmis - 2.5) < 0.5, `sadakat katsayısı geri kazanılır (${pm.theta.gecmis})`);
+const pcsv = prepareRows(parseCSV('yas;onceki_oy;secim\n30;B;B\n50;Kapanan Parti;A'), SECIM);
+ok(pcsv.rows[0].p.onceki === 'B' && pcsv.rows[1].p.onceki === 'kapanan_parti', 'CSV önceki oy sütunu: seçenek ya da bugün olmayan etiket');
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ karar testleri geçti');

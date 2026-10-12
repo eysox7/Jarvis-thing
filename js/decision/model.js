@@ -7,7 +7,8 @@
 
 import { samplePopulation, features, DIMENSIONS } from '../audience/personas.js';
 import { predict as audiencePredict } from '../audience/engine.js';
-import { DECISION_DOMAINS, ILETISIM } from './domains.js';
+import { DECISION_DOMAINS, ILETISIM, GECMIS } from './domains.js';
+import { rng } from '../audience/personas.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 const pct = (x) => Math.round(x * 1000) / 10;
@@ -21,7 +22,7 @@ export function resolveChoice(spec = {}) {
   if (new Set(alts.map((a) => a.id)).size !== alts.length) throw new Error('seçenek kimlikleri benzersiz olmalı');
   const ctx = { ...(spec.baglam || spec.context || {}) };
   if (domain.hazirla) Object.assign(ctx, domain.hazirla(alts, ctx));
-  const terms = [...domain.terimler, ILETISIM];
+  const terms = [...domain.terimler, ILETISIM, GECMIS];
   return { domain, alts, ctx, terms };
 }
 
@@ -99,6 +100,36 @@ function campaignEffects(resolved, kampanya, popOpts) {
 }
 
 /**
+ * Nüfus personalarına önceki seçimi atar: önceki sonuç paylarıyla (ör. geçen seçim) tutarlı,
+ * ama kimin neyi seçmiş olduğu kişinin kuram/model olasılığıyla orantılı (iteratif oransal uyum).
+ * Önceki paylarda bugün olmayan seçenekler (kapanan parti, eski marka) etiket olarak kalır.
+ */
+function assignPast(resolved, coef, pop, prevShares, seed = 42) {
+  const labels = Object.keys(prevShares);
+  const tot = labels.reduce((s, k) => s + Number(prevShares[k] || 0), 0);
+  if (!(tot > 0)) return;
+  const target = labels.map((k) => Number(prevShares[k]) / tot);
+  const noPast = { ...coef, theta: { ...coef.theta, gecmis: 0 } };
+  const base = pop.map((p, i) => {
+    const P = personProbs(resolved, noPast, features(p), { ...p, onceki: undefined }, i).P;
+    return labels.map((k) => { const j = resolved.alts.findIndex((a) => a.id === k); return j >= 0 ? P[j] + 0.02 : 0.1; });
+  });
+  const mult = labels.map(() => 1);
+  for (let it = 0; it < 30; it++) {
+    const cur = labels.map(() => 0);
+    for (const b of base) { const s = b.reduce((acc, v, q) => acc + v * mult[q], 0); b.forEach((v, q) => { cur[q] += (v * mult[q]) / s; }); }
+    labels.forEach((_, q) => { mult[q] *= target[q] / Math.max(1e-9, cur[q] / pop.length); });
+  }
+  const r = rng((seed * 131 + 7) >>> 0);
+  pop.forEach((p, i) => {
+    const w = base[i].map((v, q) => v * mult[q]);
+    let u = r() * w.reduce((a, b) => a + b, 0), q = 0;
+    while (q < w.length - 1 && (u -= w[q]) > 0) q++;
+    p.onceki = labels[q];
+  });
+}
+
+/**
  * Bir karar durumunda nüfusun seçimlerini tahmin eder.
  * @param {object} spec  {alan, secenekler, baglam, kampanya?}
  * @param {object} opts  {n, seed, target, marginals, model, segmentBy, explain, theta, asc}
@@ -111,6 +142,7 @@ export function predictChoice(spec, opts = {}) {
   const pop = samplePopulation(popOpts);
   if (!pop.length) throw new Error('hedef kitleye uyan persona örneklenemedi');
   resolved.ctx.iletisim = campaignEffects(resolved, spec.kampanya, popOpts);
+  if (resolved.ctx.onceki_paylar) assignPast(resolved, coef, pop, resolved.ctx.onceki_paylar, popOpts.seed);
 
   const J = resolved.alts.length;
   const people = pop.map((p, i) => {
