@@ -7,6 +7,9 @@ Tarayıcıda açılır, ana ekrana eklenince yerli uygulama gibi çalışır.
 
 > Tasarım önceliği: **işlevsellik**. Süs yok, iş var.
 
+> Bu depoda ayrıca **[Influence](influence/README.md)** var: telefonda yerel yapay zekayla
+> eğitilen karar klonu ve arkadaşlar arası klon arenası (`/influence/`).
+
 ---
 
 ## Ne yapar

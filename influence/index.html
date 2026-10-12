@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#05070f">
+  <meta name="description" content="Influence — verilerinle eğitilen yapay zeka klonun senin gibi karar verebilir mi? Arkadaşlarınla klonlarınızı kapıştırın.">
+  <title>Influence</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <header class="top">
+    <button class="brand" data-go="home" aria-label="Ana ekran"><span class="logo">◈</span> INFLUENCE</button>
+    <div id="topRight" class="mono dim"></div>
+  </header>
+
+  <main id="app" tabindex="-1"></main>
+
+  <nav id="tabbar" hidden>
+    <button data-go="lab"><span>🧬</span>Klonum</button>
+    <button data-go="feed"><span>📥</span>Besle</button>
+    <button data-go="arena"><span>⚔️</span>Arena</button>
+    <button data-go="settings"><span>⚙️</span>Ayarlar</button>
+  </nav>
+
+  <div id="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <button class="x" data-act="closeModal" aria-label="Kapat">×</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "Influence — Klon Arenası",
+  "short_name": "Influence",
+  "description": "Verilerinle eğitilen yapay zeka klonun senin gibi karar verebilir mi? Arkadaşlarınla kapıştır.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#05070f",
+  "theme_color": "#05070f",
+  "lang": "tr",
+  "categories": ["games", "entertainment", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
