@@ -81,7 +81,7 @@ export function fitChoiceModel(spec, rows, o = {}) {
   // Adam ile MAP (tam yığın, analitik gradyan); gradyan/ölçek W ile normalize
   const g = new Float64Array(nP), m1 = new Float64Array(nP), m2 = new Float64Array(nP);
   const iters = o.iters ?? 350, lr = o.lr ?? 0.05;
-  let ll = 0;
+  let ll = 0, prevLL = Infinity;
   for (let it = 1; it <= iters; it++) {
     g.fill(0); ll = 0;
     data.forEach((d, i) => {
@@ -110,6 +110,8 @@ export function fitChoiceModel(spec, rows, o = {}) {
       x[q] += lr * (m1[q] / (1 - 0.9 ** it)) / (Math.sqrt(m2[q] / (1 - 0.999 ** it)) + 1e-8);
     }
     if (Math.sqrt(gn) < 1e-5) break;
+    // Erken durdurma: log-olabilirlik 20 adımda %0.01'den az değişiyorsa yakınsamış say
+    if (it > 60 && it % 20 === 0) { if (Math.abs(ll - prevLL) < 1e-4 * Math.abs(ll)) break; prevLL = ll; }
   }
 
   // Yaklaşık standart hatalar: Fisher bilgisinin köşegeni + öncül hassasiyeti
@@ -194,12 +196,14 @@ export function crossValidate(spec, rows, o = {}) {
   for (let i = uniq.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [uniq[i], uniq[j]] = [uniq[j], uniq[i]]; }
   const foldOf = new Map(uniq.map((g, q) => [g, q % k]));
   const learned = [], theory = [], major = [];
+  // Büyük veride iç ayar bir kez yapılır (iyimserlik ihmal edilebilir, süre 5 kat kısalır)
+  const sharedSigma = o.demoSigma === 'oto' && rows.length > 2000 ? tuneDemoSigma(spec, rows.filter((_, i) => foldOf.get(gid[i]) !== 0), o) : null;
   for (let f = 0; f < k; f++) {
     const testI = new Set(rows.map((_, i) => i).filter((i) => foldOf.get(gid[i]) === f));
     const train = rows.filter((_, q) => !testI.has(q)), test = rows.filter((_, q) => testI.has(q));
     const C = Number(o.siniflar) || 1;
     // İç içe doğrulama: düzenlileştirme yalnızca eğitim katında seçilir (raporlanan isabet iyimser olmasın)
-    const sigma = o.demoSigma === 'oto' ? tuneDemoSigma(spec, train, o) : o.demoSigma;
+    const sigma = sharedSigma ?? (o.demoSigma === 'oto' ? tuneDemoSigma(spec, train, o) : o.demoSigma);
     const model = C > 1 ? fitLatentClass(spec, train, { ...o, C, demoSigma: sigma }) : fitChoiceModel(spec, train, { ...o, demoSigma: sigma, iters: o.iters ?? 250 });
     learned.push(...rowProbs(spec, model, test));
     theory.push(...rowProbs(spec, {}, test));
@@ -227,12 +231,15 @@ export function crossValidate(spec, rows, o = {}) {
 export function tuneDemoSigma(spec, rows, o = {}) {
   const cands = o.sigmaAdaylari || [0.08, 0.18, 0.4];
   if (rows.length < 40) return cands[0];
-  const half = rows.filter((_, i) => i % 2 === 0), other = rows.filter((_, i) => i % 2 === 1);
+  // Hız: ayar en çok ~1200 satırlık alt örneklemde yapılır (σ seçimi bundan sonra pek değişmez)
+  const step = Math.max(1, Math.floor(rows.length / 1200));
+  const sub = rows.filter((_, i) => i % step === 0);
+  const half = sub.filter((_, i) => i % 2 === 0), other = sub.filter((_, i) => i % 2 === 1);
   let best = cands[1], bestLL = Infinity;
   for (const sg of cands) {
     let ll = 0;
     for (const [tr, te] of [[half, other], [other, half]]) {
-      const m = fitChoiceModel(spec, tr, { ...o, demoSigma: sg, iters: Math.min(o.iters ?? 180, 180) });
+      const m = fitChoiceModel(spec, tr, { ...o, demoSigma: sg, iters: Math.min(o.iters ?? 120, 120) });
       ll += scoreProbs(rowProbs(spec, m, te)).log_kayip;
     }
     if (ll < bestLL) { bestLL = ll; best = sg; }
