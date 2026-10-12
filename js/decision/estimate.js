@@ -115,9 +115,10 @@ export function fitChoiceModel(spec, rows, o = {}) {
   }
 
   // Yaklaşık standart hatalar: Fisher bilgisinin köşegeni + öncül hassasiyeti
-  const info = new Float64Array(K);
+  const info = new Float64Array(K), infoA = new Float64Array(J);
   data.forEach((d, i) => {
     probs(d, i);
+    for (let j = 1; j < J; j++) infoA[j] += d.w * P[j] * (1 - P[j]);
     for (let k = 0; k < K; k++) {
       const z = d.zs[tIdx[k]];
       let zbar = 0; for (let j = 0; j < J; j++) zbar += P[j] * z[j];
@@ -153,9 +154,14 @@ export function fitChoiceModel(spec, rows, o = {}) {
       if (Object.keys(m).length) etk[t.id] = m;
     });
   }
+  // Laplace (köşegen) yaklaşık sonsal std. hataları → tahmin aralıkları için parametre çekilişi
+  const belirsizlik = {
+    theta_se: Object.fromEntries(terms.map((t, k) => [t.id, r3(1 / Math.sqrt(info[k] + 1 / (sigT * sigT)))])),
+    asc_se: Object.fromEntries(resolved.alts.map((a, j) => [a.id, j === 0 ? 0 : r3(1 / Math.sqrt(infoA[j] + 1 / (sigA * sigA)))])),
+  };
   return {
     alan: resolved.domain.id, kaynak: `veriden öğrenilmiş (${data.length} gözlem, kuram öncüllü MAP${useInt ? ' + etkileşimler' : ''})`,
-    theta, asc, demo, etk, n: data.length, log_olabilirlik: r3(ll),
+    theta, asc, demo, etk, belirsizlik, n: data.length, log_olabilirlik: r3(ll),
     kuramlar: kuramlar.sort((a, b) => Math.abs(b.ogrenilen) - Math.abs(a.ogrenilen)),
   };
 }
@@ -332,7 +338,7 @@ export function calibrateShares(spec, targets, o = {}) {
   const model = { ...(o.model || {}), asc: { ...(o.model?.asc || {}) } };
   let last;
   for (let it = 0; it < (o.iters || 25); it++) {
-    last = predictChoice(spec, { ...o, n: o.n || 1500, model, explain: false }).paylar;
+    last = predictChoice(spec, { ...o, n: o.n || 1500, model, explain: false, aralik: false }).paylar;
     let maxErr = 0;
     for (const [id, t] of Object.entries(targets)) {
       const want = Math.max(0.05, (Number(t) / tot) * 100), have = Math.max(0.05, last[id]);
@@ -381,7 +387,7 @@ export function shareDiagnostics(spec, rows, model, o = {}) {
   return {
     ham_orneklem: share(rows.map((r) => ({ ...r, w: 1 }))),
     agirlikli_orneklem: share(raked.rows),
-    model_nufus: predictChoice(spec, { model, n: o.n || 2000, marginals: o.marginals, explain: false }).paylar,
+    model_nufus: predictChoice(spec, { model, n: o.n || 2000, marginals: o.marginals, explain: false, aralik: false }).paylar,
     etkin_orneklem: raked.etkin_orneklem,
   };
 }

@@ -258,13 +258,43 @@ export function predictChoice(spec, opts = {}) {
     }).filter(Boolean).filter((x) => Math.abs(x.kazanan_payina_etki_puan) >= 0.05)
       .sort((a, b) => Math.abs(b.kazanan_payina_etki_puan) - Math.abs(a.kazanan_payina_etki_puan));
   }
+  // Tahmin aralığı (%90): öğrenilmiş modelde parametre belirsizliği; anketle kalibre modelde anket hata payı
+  if (opts.aralik !== false && !opts._icCekilis) {
+    const band = shareInterval(spec, opts, resolved);
+    if (band) result.pay_araligi_90 = band;
+  }
   if (opts.keepPeople) result._people = people;
   return result;
 }
 
+/** Laplace yaklaşık sonsalından parametre çekip payları yeniden hesaplar → %5–95 aralık. */
+function shareInterval(spec, opts, resolved) {
+  const m = opts.model;
+  if (m?.anket_birlesimi?.hata_payi_95) {
+    const moe = m.anket_birlesimi.hata_payi_95, sh = m.anket_birlesimi.paylar;
+    return Object.fromEntries(Object.keys(sh).map((k) => [k, [Math.max(0, Math.round((sh[k] - moe[k] * 0.84) * 10) / 10), Math.round((sh[k] + moe[k] * 0.84) * 10) / 10]]));
+  }
+  const se = m?.belirsizlik;
+  if (!se || m.siniflar) return null;
+  const r = rng(((opts.seed ?? 42) * 977 + 3) >>> 0);
+  const gauss = () => Math.sqrt(-2 * Math.log(r() || 1e-9)) * Math.cos(2 * Math.PI * r());
+  const draws = resolved.alts.map(() => []);
+  const D = opts.cekilis || 24;
+  for (let d = 0; d < D; d++) {
+    const theta = Object.fromEntries(Object.entries(m.theta || {}).map(([k, v]) => [k, v + (se.theta_se?.[k] || 0) * gauss()]));
+    const asc = Object.fromEntries(Object.entries(m.asc || {}).map(([k, v]) => [k, v + (se.asc_se?.[k] || 0) * gauss()]));
+    const sh = predictChoice(spec, { ...opts, model: { ...m, theta, asc }, n: Math.min(opts.n || 2000, 600), explain: false, segmentBy: [], keepPeople: false, _icCekilis: true }).paylar;
+    resolved.alts.forEach((a, j) => draws[j].push(sh[a.id]));
+  }
+  return Object.fromEntries(resolved.alts.map((a, j) => {
+    const v = draws[j].sort((x, y) => x - y);
+    return [a.id, [v[Math.floor(0.05 * (D - 1))], v[Math.ceil(0.95 * (D - 1))]]];
+  }));
+}
+
 /** Ne olur? Bir seçeneğin özelliklerini değiştirip payların nasıl kaydığını gösterir. */
 export function whatIf(spec, changes, opts = {}) {
-  const base = predictChoice(spec, { ...opts, explain: false });
+  const base = predictChoice(spec, { ...opts, explain: false, aralik: false });
   const changed = {
     ...spec,
     baglam: { ...(spec.baglam || {}), ...(changes.baglam || {}) },
@@ -274,7 +304,7 @@ export function whatIf(spec, changes, opts = {}) {
     }),
     kampanya: changes.kampanya ?? spec.kampanya,
   };
-  const after = predictChoice(changed, { ...opts, explain: false });
+  const after = predictChoice(changed, { ...opts, explain: false, aralik: false });
   return {
     once: base.paylar, sonra: after.paylar,
     degisim_puan: Object.fromEntries(Object.keys(base.paylar).map((k) => [k, r3(after.paylar[k] - base.paylar[k])])),

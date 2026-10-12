@@ -204,6 +204,15 @@ const iy = whatIf(TELEFON, { secenekler: { Y: { fiyat: 9000 } } }, { model: im, 
 const io = whatIf(TELEFON, { secenekler: { Y: { fiyat: 9000 } } }, { model: im, n: 800, target: { yas: '65+' } }).degisim_puan.Y;
 ok(iy > io, `fiyat indirimi gençlerde daha etkili (${iy} > ${io})`);
 
+console.log('\n[17] Tahmin aralıkları');
+const mI = fitChoiceModel(SECIM, rows.slice(0, 300), { iters: 200 });
+const big = fitChoiceModel(SECIM, rows, { iters: 200 });
+const pI = predictChoice(SECIM, { model: mI, n: 800, explain: false }), pB = predictChoice(SECIM, { model: big, n: 800, explain: false });
+ok(pI.pay_araligi_90 && Object.entries(pI.paylar).every(([k, v]) => pI.pay_araligi_90[k][0] <= v + 1.5 && v - 1.5 <= pI.pay_araligi_90[k][1]), 'öğrenilmiş modelde pay aralıkları tahmini çevreler');
+const w = (r) => r.pay_araligi_90.A[1] - r.pay_araligi_90.A[0];
+ok(w(pI) > w(pB), `az veride aralık geniş, çok veride dar (${w(pI).toFixed(1)} > ${w(pB).toFixed(1)} puan)`);
+ok(predictChoice(SECIM, { ...O }).pay_araligi_90 === undefined, 'kuram öncülü tahminde sahte aralık üretilmez');
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ karar testleri geçti');

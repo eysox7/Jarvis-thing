@@ -187,7 +187,11 @@ Rastgele fayda kuramı (McFadden): kişi i seçenek j'den `U_ij = ASC_j + Σ θ_
    nüfus tahmini persona nüfusu üzerinden yapılır (MRP mantığı); raking ve Kish etkin örneklem de verilir.
 7. **Anket birleştirme ve pay kalibrasyonu.** Bireysel veri yoksa anketler `decision_polls` ile
    birleştirilir (√n × tazelik, kuruluş yanlılığı, %95 hata payı) ve senaryo bu paylara kalibre edilir.
-8. **Topluluk.** `decision_ensemble` kuram, öğrenilmiş model ve dil modeline personaları canlandırtan
+8. **Tahmin aralıkları.** Öğrenilmiş modelde parametre belirsizliği (Laplace yaklaşımı, kuram
+   katsayıları ve seçenek sabitleri) nüfus paylarına %90 aralık olarak taşınır; anketle kalibre
+   senaryoda anket hata payı kullanılır. Demografik etkilerin belirsizliği dahil değildir — aralıklar
+   bu yüzden bir miktar dar olabilir. Kuram öncülüyle yapılan tahminde aralık üretilmez.
+9. **Topluluk.** `decision_ensemble` kuram, öğrenilmiş model ve dil modeline personaları canlandırtan
    silikon örneklemi doğrulama satırlarında karşılaştırıp log-kaybı en aza indiren ağırlıkları öğrenir.
 
 ### CSV biçimi
