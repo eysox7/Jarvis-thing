@@ -34,6 +34,11 @@ const DEFAULTS = {
     institutions: {},   // {id: kurum profili}
     calibration: {},    // {kurum_id | '_genel': {weights, intercepts, fit}}
   },
+  decision: {     // karar tahmini: senaryolar, veri setleri, öğrenilmiş modeller
+    scenarios: {},      // {id: {alan, secenekler, baglam, ad}}
+    datasets: {},       // {senaryo_id: {rows, uyarilar, eslesen_boyutlar, at}}
+    models: {},         // {senaryo_id: model (theta, asc, demo, cv, kuramlar, topluluk?)}
+  },
 };
 
 let state = load();
@@ -49,6 +54,7 @@ function load() {
       ...parsed,
       settings: { ...DEFAULTS.settings, ...(parsed.settings || {}) },
       audience: { ...structuredClone(DEFAULTS.audience), ...(parsed.audience || {}) },
+      decision: { ...structuredClone(DEFAULTS.decision), ...(parsed.decision || {}) },
     };
   } catch (e) {
     console.warn('depo okunamadı, sıfırlanıyor', e);
@@ -94,6 +100,7 @@ export function replaceAll(next) {
     ...structuredClone(DEFAULTS), ...next,
     settings: { ...DEFAULTS.settings, ...(next.settings || {}) },
     audience: { ...structuredClone(DEFAULTS.audience), ...(next.audience || {}) },
+    decision: { ...structuredClone(DEFAULTS.decision), ...(next.decision || {}) },
   };
   save();
 }
@@ -208,3 +215,10 @@ export function clearChat() { state.chat = []; save(); }
 export function saveInstitution(id, profile) { state.audience.institutions[id] = { ...profile, id }; save(); return state.audience.institutions[id]; }
 export function removeInstitution(id) { delete state.audience.institutions[id]; delete state.audience.calibration[id]; save(); }
 export function setCalibration(key, cal) { state.audience.calibration[key] = cal; save(); }
+
+/* ---- karar tahmini ---- */
+const dec = () => (state.decision ||= structuredClone(DEFAULTS.decision));
+export function saveScenario(id, spec) { dec().scenarios[id] = { ...spec, id }; save(); return dec().scenarios[id]; }
+export function removeScenario(id) { const d = dec(); delete d.scenarios[id]; delete d.datasets[id]; delete d.models[id]; save(); }
+export function saveDataset(id, ds) { dec().datasets[id] = { ...ds, rows: ds.rows.slice(0, 5000), at: Date.now() }; save(); }
+export function saveModel(id, model) { dec().models[id] = { ...model, at: Date.now() }; save(); }

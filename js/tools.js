@@ -12,6 +12,12 @@ import { runSurvey } from './audience/survey.js';
 import { extractMessage } from './audience/extract.js';
 import { SCENARIOS } from './audience/scenarios.js';
 import { chatWithFallback } from './providers.js';
+import { predictChoice, whatIf as choiceWhatIf, resolveChoice } from './decision/model.js';
+import { DECISION_DOMAINS } from './decision/domains.js';
+import { parseCSV, prepareRows } from './decision/data.js';
+import { learn, calibrateShares, shareDiagnostics } from './decision/estimate.js';
+import { buildEnsemble, siliconProbs, mixShares } from './decision/ensemble.js';
+import { samplePopulation } from './audience/personas.js';
 import { DIMENSIONS } from './audience/personas.js';
 
 const T = {};
@@ -584,6 +590,168 @@ def({
     if (!S.db().audience?.institutions?.[a.id]) throw new Error('kurum bulunamadı: ' + a.id);
     S.removeInstitution(a.id);
     return { silindi: a.id };
+  },
+});
+
+/* ---------------- karar tahmini (oy · satın alma · gündelik) ---------------- */
+
+const decDb = () => S.db().decision || { scenarios: {}, datasets: {}, models: {} };
+
+/** Senaryo kimliği ya da satır içi tanımdan seçim tanımı + kayıtlı model. */
+function scenarioOf(a) {
+  const d = decDb();
+  if (a.senaryo) {
+    const sc = d.scenarios[a.senaryo];
+    if (!sc) throw new Error(`senaryo bulunamadı: ${a.senaryo}. Önce decision_scenario_save ile kaydet. Kayıtlı: ${Object.keys(d.scenarios).join(', ') || '(yok)'}`);
+    const spec = { ...sc, baglam: { ...(sc.baglam || {}), ...(a.baglam || {}) }, kampanya: a.kampanya };
+    return { spec, model: a.kuram_modeli ? undefined : d.models[a.senaryo], id: a.senaryo };
+  }
+  if (!a.alan || !Array.isArray(a.secenekler)) throw new Error('senaryo id ya da alan + secenekler ver');
+  return { spec: { alan: a.alan, secenekler: a.secenekler, baglam: a.baglam || {}, kampanya: a.kampanya }, model: undefined, id: null };
+}
+
+const chatFn = (ctx) => async (system, user) => (await chatWithFallback(S.profileChain(), {
+  system, messages: [{ role: 'user', content: user }], temperature: 0.7, proxy: ctx?.settings?.proxy,
+})).text;
+
+const SCEN_PARAMS = {
+  senaryo: 'string — kayıtlı senaryo id (decision_scenario_save). Verilirse alan/secenekler gerekmez',
+  alan: '"siyaset" | "ticaret" | "gundelik"',
+  secenekler: 'object[] — her biri {id, ad, ...özellikler}; özellikler için decision_catalog',
+  baglam: 'object — ör. siyaset için {"ekonomi_algisi": -0.4}',
+};
+
+def({
+  name: 'decision_predict',
+  desc: 'İnsanların bir karar durumunda (seçimde oy, ürün satın alma, gündelik/sağduyu kararı) ne seçeceğini tahmin eder: seçenek payları, en olası seçim, kararsızlık, segment kırılımı ve hangi kuramın sonucu ne kadar ittiği. Senaryoya veriden öğrenilmiş model bağlıysa onu kullanır ve doğrulama isabetini raporlar; yoksa kuram öncülleriyle çalışır (bunu kullanıcıya söyle).',
+  params: {
+    ...SCEN_PARAMS,
+    hedef: 'object — hedef kitle filtresi, ör. {"yas":"18-24"}',
+    segment: 'string[] — kırılım boyutları',
+    kampanya: 'object — {secenek: id, mesaj: {audience_predict mesaj alanları}}: kampanyanın karara etkisi',
+    kuram_modeli: 'boolean — kayıtlı modeli yok sayıp yalnız kuramla tahmin et',
+  },
+  run: (a) => {
+    const { spec, model } = scenarioOf(a);
+    const seg = Array.isArray(a.segment) ? a.segment : a.segment ? [a.segment] : [];
+    const r = predictChoice(spec, { model, target: a.hedef, segmentBy: seg, n: 2000 });
+    if (model?.topluluk?.silikon_paylari) r.topluluk_paylari = mixShares({ ogrenilmis: r.paylar, silikon: model.topluluk.silikon_paylari }, model.topluluk.agirliklar);
+    r.terim_etkileri = r.terim_etkileri?.slice(0, 8);
+    return r;
+  },
+});
+
+def({
+  name: 'decision_whatif',
+  desc: 'Ne olur analizi: bir seçeneğin özelliklerini (fiyat, lider puanı, norm, varsayılan…) veya bağlamı değiştirince payların nasıl kayacağını gösterir.',
+  params: { ...SCEN_PARAMS, degisiklik: 'object (zorunlu) — {secenekler: {id: {özellik: yeni}}, baglam: {...}, kampanya?: {...}}', hedef: 'object' },
+  run: (a) => {
+    if (!a.degisiklik) throw new Error('degisiklik zorunlu');
+    const { spec, model } = scenarioOf(a);
+    return choiceWhatIf(spec, a.degisiklik, { model, target: a.hedef, n: 2000 });
+  },
+});
+
+def({
+  name: 'decision_scenario_save',
+  desc: 'Bir karar senaryosunu (seçim, ürün pazarı, gündelik karar) kaydeder; veri yükleme, öğrenme ve tahmin bu id ile yapılır.',
+  params: { id: 'string (zorunlu)', ad: 'string', alan: '"siyaset" | "ticaret" | "gundelik" (zorunlu)', secenekler: 'object[] (zorunlu)', baglam: 'object' },
+  run: (a) => {
+    const id = String(a.id || '').trim().replace(/\s+/g, '_');
+    if (!id) throw new Error('id zorunlu');
+    const spec = { ad: a.ad || id, alan: a.alan, secenekler: a.secenekler, baglam: a.baglam || {} };
+    resolveChoice(spec);
+    S.saveScenario(id, spec);
+    return { kaydedildi: id, secenekler: spec.secenekler.map((x) => x.id ?? x.ad) };
+  },
+});
+
+def({
+  name: 'decision_data_import',
+  desc: 'Kurumun bireysel verisini (anket, seçim sonrası anket, satış/CRM, conjoint) CSV olarak senaryoya yükler. Sütunlar: persona alanları (yas, cinsiyet, egitim, gelir, ideoloji…) + secim; opsiyonel agirlik, satıra özgü "<özellik>_<seçenek>" (ör. fiyat_A) ve "var_<seçenek>". Veri uydurma — yalnızca kullanıcının verdiği veriyi yükle.',
+  params: { senaryo: 'string (zorunlu)', csv: 'string (zorunlu) — başlık satırlı CSV metni' },
+  run: (a) => {
+    const { spec, id } = scenarioOf({ senaryo: a.senaryo });
+    const prep = prepareRows(parseCSV(a.csv), spec);
+    if (!prep.rows.length) throw new Error('geçerli satır yok: ' + prep.uyarilar.join('; '));
+    S.saveDataset(id, prep);
+    const counts = {};
+    for (const r of prep.rows) counts[r.secim] = (counts[r.secim] || 0) + 1;
+    return { senaryo: id, satir: prep.rows.length, secim_dagilimi: counts, eslesen_boyutlar: prep.eslesen_boyutlar, uyarilar: prep.uyarilar };
+  },
+});
+
+def({
+  name: 'decision_learn',
+  desc: 'Senaryoya yüklenen veriden kuram öncüllü modeli öğrenir, 5-katlı çapraz doğrulamayla görülmemiş verideki isabeti ölçer (kuram ve çoğunluk temel modelleriyle kıyaslı) ve modeli kaydeder. Hangi kuramın bu kitlede veriyle desteklendiğini de raporlar.',
+  params: { senaryo: 'string (zorunlu)', kuram_guveni: 'number — kuram öncülünün sıkılığı σ (varsayılan 1; küçük = kurama daha bağlı)' },
+  run: (a) => {
+    const { spec, id } = scenarioOf({ senaryo: a.senaryo });
+    const ds = decDb().datasets[id];
+    if (!ds?.rows?.length) throw new Error('bu senaryoda veri yok; önce decision_data_import');
+    const model = learn(spec, ds.rows, { kuramGuveni: Number(a.kuram_guveni) || 1 });
+    S.saveModel(id, model);
+    const diag = shareDiagnostics(spec, ds.rows, model);
+    return { senaryo: id, dogrulama: model.cv, kuramlar: model.kuramlar, paylar: diag };
+  },
+});
+
+def({
+  name: 'decision_calibrate_shares',
+  desc: 'Bireysel veri yokken bilinen toplam paylara (anket sonucu, geçmiş seçim, pazar payı) senaryoyu kalibre eder ve kaydeder. Kişi düzeyindeki farklılaşmayı kuram terimleri korur.',
+  params: { senaryo: 'string (zorunlu)', paylar: 'object (zorunlu) — {seçenek_id: yüzde}' },
+  run: (a) => {
+    const { spec, id, model } = scenarioOf({ senaryo: a.senaryo });
+    const m = calibrateShares(spec, a.paylar || {}, { model });
+    S.saveModel(id, { ...(model || {}), ...m });
+    return { senaryo: id, hedef: m.hedef, ulasilan: m.son_paylar };
+  },
+});
+
+def({
+  name: 'decision_ensemble',
+  desc: 'Senaryonun verisinin %25\'inde kuram, öğrenilmiş model ve (istenirse) dil modeli persona simülasyonunu (silikon örneklem) karşılaştırıp topluluk ağırlıklarını öğrenir; nüfus tahmini bu ağırlıklarla yapılır. silikon=true model çağrısı yapar.',
+  params: { senaryo: 'string (zorunlu)', silikon: 'boolean — LLM persona bileşenini ekle', dogrulama_satir: 'number — kaç satırla (varsayılan 40, silikonda maliyet!)' },
+  run: async (a, ctx) => {
+    const { spec, id } = scenarioOf({ senaryo: a.senaryo });
+    const ds = decDb().datasets[id];
+    if (!ds?.rows?.length) throw new Error('bu senaryoda veri yok; önce decision_data_import');
+    const cut = Math.floor(ds.rows.length * 0.75);
+    const train = ds.rows.slice(0, cut), valid = ds.rows.slice(cut, cut + Math.min(Number(a.dogrulama_satir) || 40, 200));
+    const learned = learn(spec, train, { cv: false });
+    const comps = { kuram: {}, ogrenilmis: learned };
+    if (a.silikon) comps.silikon = 'silikon';
+    const ens = await buildEnsemble(spec, valid, comps, { chat: chatFn(ctx) });
+    const full = { ...(decDb().models[id] || learn(spec, ds.rows, { cv: false })) };
+    if (a.silikon && ens.agirliklar.silikon > 0) {
+      const panel = samplePopulation({ n: 24, seed: 5 }).map((p) => ({ p }));
+      const sp = (await siliconProbs(spec, panel, chatFn(ctx))).filter(Boolean);
+      const alts = resolveChoice(spec).alts;
+      const sh = Object.fromEntries(alts.map((x, j) => [x.id, Math.round(sp.reduce((s, P) => s + P[j], 0) / sp.length * 1000) / 10]));
+      full.topluluk = { agirliklar: { ogrenilmis: ens.agirliklar.ogrenilmis + ens.agirliklar.kuram, silikon: ens.agirliklar.silikon }, silikon_paylari: sh };
+    }
+    S.saveModel(id, full);
+    return { senaryo: id, agirliklar: ens.agirliklar, bilesen_basarimi: ens.bilesen_basarimi, topluluk_basarimi: ens.topluluk_basarimi, dogrulama_satiri: valid.length };
+  },
+});
+
+def({
+  name: 'decision_catalog',
+  desc: 'Karar alanlarını, her alanın kuram terimlerini ve seçenek özelliklerini, kayıtlı senaryoları ve modellerin doğrulama isabetini listeler.',
+  params: {},
+  run: () => {
+    const d = decDb();
+    return {
+      alanlar: Object.fromEntries(Object.entries(DECISION_DOMAINS).map(([k, v]) => [k, {
+        ad: v.ad, secenek_ozellikleri: v.seceneOzellikleri, baglam: v.baglam,
+        kuram_terimleri: v.terimler.map((t) => `${t.id} — ${t.ad} (${t.kuram})`),
+      }])),
+      senaryolar: Object.fromEntries(Object.entries(d.scenarios).map(([k, v]) => [k, {
+        ad: v.ad, alan: v.alan, secenekler: v.secenekler.map((x) => x.id ?? x.ad),
+        veri_satiri: d.datasets[k]?.rows?.length || 0,
+        model: d.models[k] ? { kaynak: d.models[k].kaynak, isabet_yuzde: d.models[k].cv?.isabet_yuzde } : null,
+      }])),
+    };
   },
 });
 
