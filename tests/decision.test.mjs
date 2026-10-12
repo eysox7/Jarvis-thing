@@ -225,6 +225,15 @@ const contrary = async (sys, user) => JSON.stringify({ yanitlar: user.split('PER
 const so2 = await siliconSecondOpinion(SECIM, undefined, contrary, { k: 12 });
 ok(so2.ayrisma_puan > 40 && so2.yorum.includes('belirgin'), `uyuşmayan görüş açıkça işaretlenir (${so2.ayrisma_puan} puan)`);
 
+console.log('\n[19] Davranışsal ekonomi terimleri');
+const yor = (yil) => predictChoice({ ...SECIM, baglam: { ...SECIM.baglam, iktidar_suresi_yil: yil } }, { ...O, target: { yas: '18-24' } }).paylar.A;
+ok(yor(20) < yor(0), `iktidar yorgunluğu gençlerde iktidar oyunu düşürür (${yor(0)} → ${yor(20)})`);
+ok(whatIf(TELEFON, { secenekler: { O: { indirim_yuzde: 30 } } }, O).degisim_puan.O > 0, 'ilan edilen indirim talebi artırır');
+const tk = (g) => whatIf(TELEFON, { secenekler: { P: { taksit: true } } }, { ...O, target: { gelir: g } }).degisim_puan.P;
+ok(tk('dusuk') > tk('yuksek'), `taksit düşük gelirde daha etkili (${tk('dusuk')} > ${tk('yuksek')})`);
+ok(whatIf(ASI, { secenekler: { evet: { kayip_cercevesi: true } } }, O).degisim_puan.evet > 0, 'kayıp çerçevesi davranışı artırır');
+ok(whatIf(ASI, { secenekler: { evet: { maliyet: 0 } } }, O).degisim_puan.evet > whatIf(ASI, { secenekler: { evet: { maliyet: 0.02 } } }, O).degisim_puan.evet + 1, 'sıfır fiyat etkisi: bedava, neredeyse bedavadan belirgin güçlü');
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ karar testleri geçti');
