@@ -2,6 +2,8 @@
 import { predictChoice, whatIf, resolveChoice } from '../js/decision/model.js';
 import { simulateDataset, parseCSV, prepareRows, mapValue } from '../js/decision/data.js';
 import { fitChoiceModel, crossValidate, scoreProbs, calibrateShares, learn, rake, shareDiagnostics } from '../js/decision/estimate.js';
+import { buildEnsemble, stackWeights, siliconProbs, mixShares } from '../js/decision/ensemble.js';
+import { describePersona } from '../js/audience/survey.js';
 
 const fails = [];
 const ok = (c, m) => { console.log((c ? '  ✔ ' : '  ✖ ') + m); if (!c) fails.push(m); };
@@ -113,6 +115,31 @@ const err = (x) => Object.keys(truePop).reduce((s, k) => s + Math.abs(x[k] - tru
 ok(err(diag.model_nufus) < err(diag.ham_orneklem), `model-tabanlı nüfus tahmini ham örneklemden isabetli (hata ${err(diag.model_nufus).toFixed(1)} vs ${err(diag.ham_orneklem).toFixed(1)})`);
 const rk = rake(bias);
 ok(rk.etkin_orneklem < bias.length && rk.boyutlar.includes('yas'), `raking ağırlık verir ve etkin örneklemi raporlar (${rk.etkin_orneklem}/${bias.length})`);
+
+console.log('\n[11] Topluluk: kuram + öğrenilmiş + silikon');
+// Sahte LLM: personayı metinden tanıyıp GERÇEK olasılığı gürültüyle söyler (iyi silikon) / tekdüze (kötü silikon)
+const train = rows.slice(0, 1000), valid = rows.slice(1000, 1300);
+const byDesc = new Map(rows.map((r) => [describePersona(r.p), r._P]));
+const mkChat = (good) => async (sys, user) => {
+  const lines = user.split('PERSONALAR:')[1].trim().split('\n');
+  return JSON.stringify({ yanitlar: lines.map((l, i) => {
+    const P = byDesc.get(l.replace(/^\d+\.\s*/, '')) || [0.25, 0.25, 0.25, 0.25];
+    const q = good ? P.map((v, j) => Math.max(0.01, v + 0.04 * Math.sin(i * 7 + j * 3))) : [1, 1, 1, 1];
+    return { no: i + 1, olasiliklar: { A: q[0], B: q[1], C: q[2], X: q[3] } };
+  }) });
+};
+const learnedM = fitChoiceModel(SECIM, train, { iters: 250 });
+const ens = await buildEnsemble(SECIM, valid, { kuram: {}, ogrenilmis: learnedM, silikon: 'silikon' }, { chat: mkChat(true) });
+const best = Math.min(...Object.values(ens.bilesen_basarimi).map((b) => b.log_kayip));
+ok(ens.topluluk_basarimi.log_kayip <= best + 1e-9, `topluluk en iyi bileşenden kötü değil (${ens.topluluk_basarimi.log_kayip} ≤ ${best})`);
+ok(ens.agirliklar.silikon > 0.1, `bilgi taşıyan silikon bileşen ağırlık alır (${JSON.stringify(ens.agirliklar)})`);
+const ensBad = await buildEnsemble(SECIM, valid, { ogrenilmis: learnedM, silikon: 'silikon' }, { chat: mkChat(false) });
+ok(ensBad.agirliklar.silikon <= 0.1, `işe yaramaz silikon bileşen ~0 ağırlık alır (${ensBad.agirliklar.silikon})`);
+const sw = stackWeights([[[0.9, 0.1]], [[0.1, 0.9]]], [0]);
+ok(sw.agirliklar[0] === 1, 'yığınlama doğru bileşeni seçer');
+ok(JSON.stringify(mixShares({ a: { x: 60, y: 40 }, b: { x: 20, y: 80 } }, { a: 0.5, b: 0.5 })) === JSON.stringify({ x: 40, y: 60 }), 'pay karışımı');
+let thr = false; try { await siliconProbs(SECIM, valid.slice(0, 2)); } catch { thr = true; }
+ok(thr, 'model bağlantısı olmadan silikon örneklem açık hata verir');
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
