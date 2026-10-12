@@ -7,33 +7,15 @@
 //                Argyle vd. 2023: LLM persona yanıtları alt grup oy dağılımlarını yeniden üretebilir)
 // Ağırlıklar: doğrulama gözlemlerinde log-kaybı en aza indiren olasılık karışımı (doğrusal havuz).
 
-import { features } from '../audience/personas.js';
 import { describePersona } from '../audience/survey.js';
 import { extractJson } from '../util.js';
-import { resolveChoice, coefficients, zMatrix, rowResolved } from './model.js';
+import { resolveChoice, rowProbabilities } from './model.js';
 import { scoreProbs } from './estimate.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 
 /** Bir model için satır başı olasılık vektörleri. */
-export function modelProbs(spec, model, rows) {
-  const resolved = resolveChoice(spec);
-  const coef = coefficients(resolved, model || {});
-  const altIndex = Object.fromEntries(resolved.alts.map((a, j) => [a.id, j]));
-  return rows.map((r, i) => {
-    const f = features(r.p);
-    const { r: rr, mask } = rowResolved(resolved, r);
-    const zs = zMatrix(rr, f, r.p, i);
-    const V = resolved.alts.map((a, j) => {
-      let v = coef.asc[a.id] || 0;
-      if (coef.demo && coef.demo[a.id]) for (const k in r.p) v += coef.demo[a.id][k + '=' + r.p[k]] || 0;
-      resolved.terms.forEach((t, k) => { v += (coef.theta[t.id] || 0) * zs[k][j]; });
-      return mask && !mask[j] ? -Infinity : v;
-    });
-    const m = Math.max(...V), e = V.map((v) => Math.exp(v - m)), s = e.reduce((a, b) => a + b, 0);
-    return { P: e.map((v) => v / s), y: altIndex[r.secim], w: r.w ?? 1 };
-  });
-}
+export const modelProbs = (spec, model, rows) => rowProbabilities(spec, model, rows);
 
 const SYSTEM = `Sen bir karar simülasyonusun. Her persona İÇİN o kişi olsaydın seçeneklerden hangisini seçeceğini canlandır.
 Kişinin değerlerini, gelirini, ideolojisini, alışkanlıklarını ve kurumlara güvenini ciddiye al; klişe ve sosyal beğenirlik yanlılığından kaçın.

@@ -8,7 +8,7 @@
 // isabet, log-kayıp, Brier ve kalibrasyon hatası (ECE) raporlar ve iki temel modelle kıyaslar.
 
 import { features, DIMENSIONS, rng } from '../audience/personas.js';
-import { resolveChoice, coefficients, zMatrix, predictChoice, rowResolved } from './model.js';
+import { resolveChoice, coefficients, zMatrix, predictChoice, rowResolved, rowProbabilities } from './model.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 const pct = (x) => Math.round(x * 1000) / 10;
@@ -140,25 +140,7 @@ export function fitChoiceModel(spec, rows, o = {}) {
 }
 
 /** Bir modelin satırlar üzerindeki tahmin olasılıkları. */
-function rowProbs(spec, model, rows) {
-  const resolved = resolveChoice(spec);
-  const coef = coefficients(resolved, model || {});
-  const altIndex = Object.fromEntries(resolved.alts.map((a, j) => [a.id, j]));
-  return rows.map((r, i) => {
-    const f = features(r.p);
-    const { r: rr, mask } = rowResolved(resolved, r);
-    let V = resolved.alts.map((a) => {
-      let v = coef.asc[a.id] || 0;
-      if (coef.demo && coef.demo[a.id]) for (const k in r.p) v += coef.demo[a.id][k + '=' + r.p[k]] || 0;
-      return v;
-    });
-    const zs = zMatrix(rr, f, r.p, i);
-    resolved.terms.forEach((t, k) => { const th = coef.theta[t.id] || 0; if (th) V = V.map((v, j) => v + th * zs[k][j]); });
-    if (mask) V = V.map((v, j) => (mask[j] ? v : -Infinity));
-    const m = Math.max(...V), e = V.map((v) => Math.exp(v - m)), s = e.reduce((a, b) => a + b, 0);
-    return { P: e.map((v) => v / s), y: altIndex[r.secim], w: r.w ?? 1 };
-  });
-}
+const rowProbs = (spec, model, rows) => rowProbabilities(spec, model, rows);
 
 /** Tahmin kalitesi ölçütleri. */
 export function scoreProbs(list) {
@@ -187,13 +169,17 @@ export function scoreProbs(list) {
 export function crossValidate(spec, rows, o = {}) {
   const k = Math.max(2, Math.min(o.k || 5, 10));
   const r = rng(o.seed ?? 11);
-  const idx = rows.map((_, i) => i);
-  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  // Katlar kişi düzeyinde (panel verisinde aynı kişinin satırları eğitim ve testte birlikte olmasın)
+  const gid = rows.map((row, i) => row.kisi ?? '#' + i);
+  const uniq = [...new Set(gid)];
+  for (let i = uniq.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [uniq[i], uniq[j]] = [uniq[j], uniq[i]]; }
+  const foldOf = new Map(uniq.map((g, q) => [g, q % k]));
   const learned = [], theory = [], major = [];
   for (let f = 0; f < k; f++) {
-    const testI = new Set(idx.filter((_, q) => q % k === f));
+    const testI = new Set(rows.map((_, i) => i).filter((i) => foldOf.get(gid[i]) === f));
     const train = rows.filter((_, q) => !testI.has(q)), test = rows.filter((_, q) => testI.has(q));
-    const model = fitChoiceModel(spec, train, { ...o, iters: o.iters ?? 250 });
+    const C = Number(o.siniflar) || 1;
+    const model = C > 1 ? fitLatentClass(spec, train, { ...o, C }) : fitChoiceModel(spec, train, { ...o, iters: o.iters ?? 250 });
     learned.push(...rowProbs(spec, model, test));
     theory.push(...rowProbs(spec, {}, test));
     const counts = {};
@@ -213,10 +199,71 @@ export function crossValidate(spec, rows, o = {}) {
   };
 }
 
-/** Tüm veriyle öğren + çapraz doğrula: kullanıcıya verilecek nihai model. */
+/**
+ * Gizli sınıf çok terimli logit (EM). Demografinin açıklamadığı tercih tiplerini yakalar
+ * (ör. aynı demografide "fiyat odaklı" ve "marka odaklı" tüketiciler; "sadık" ve "salınan"
+ * seçmenler). Her sınıf aynı kuram öncüllerine çekilir; sınıf payları veriden öğrenilir.
+ */
+export function fitLatentClass(spec, rows, o = {}) {
+  const C = Math.max(2, Math.min(Number(o.C) || 2, 4));
+  const r = rng(o.seed ?? 21);
+  const N = rows.length;
+  // Başlangıç (simetriyi kırmak için): kişileri, seçimlerinin en çok ayrıştırdığı kuram terimine
+  // göre (seçilen − ortalama z) sıralayıp C dilime böl; dilimlere yumuşak atama.
+  const res0 = resolveChoice(spec);
+  const groups0 = new Map();
+  rows.forEach((row, i) => { const g = row.kisi ?? '#' + i; if (!groups0.has(g)) groups0.set(g, []); groups0.get(g).push(i); });
+  const pre = rows.map((row, i) => { const { r: rr } = rowResolved(res0, row); return zMatrix(rr, features(row.p), row.p, i); });
+  const altIdx = Object.fromEntries(res0.alts.map((a, j) => [a.id, j]));
+  const score = res0.terms.map((_, k) => [...groups0.values()].map((idx) => idx.reduce((s, i) => { const z = pre[i][k]; const m = z.reduce((a, b) => a + b, 0) / z.length; return s + z[altIdx[rows[i].secim]] - m; }, 0) / idx.length));
+  const variance = score.map((v) => { const m = v.reduce((a, b) => a + b, 0) / v.length; return v.reduce((a, b) => a + (b - m) ** 2, 0); });
+  const kBest = variance.indexOf(Math.max(...variance));
+  const order = [...groups0.keys()].map((g, q) => [g, score[kBest][q] + 1e-6 * r()]).sort((a, b) => a[1] - b[1]);
+  const sliceOf = new Map(order.map(([g], q) => [g, Math.min(C - 1, Math.floor((q / order.length) * C))]));
+  let resp = rows.map((row, i) => { const c0 = sliceOf.get(row.kisi ?? '#' + i); return Array.from({ length: C }, (_, c) => (c === c0 ? 0.8 : 0.2 / (C - 1))); });
+  let classes = [], pay = Array(C).fill(1 / C), ll = 0;
+  for (let em = 0; em < (o.emIters || 6); em++) {
+    classes = Array.from({ length: C }, (_, c) => fitChoiceModel(spec, rows.map((row, i) => ({ ...row, w: (row.w ?? 1) * resp[i][c] })), { ...o, iters: o.iters ?? 150, demoSigma: o.demoSigma ?? 0.3 }));
+    pay = Array.from({ length: C }, (_, c) => resp.reduce((s, q) => s + q[c], 0) / N);
+    // E adımı kişi düzeyinde: aynı kişinin tüm seçimleri sınıf olabilirliğine birlikte katkı verir
+    const loglik = classes.map((m) => rowProbabilities(spec, m, rows).map((x) => Math.log(Math.max(1e-12, x.P[x.y]))));
+    const groups = new Map();
+    rows.forEach((row, i) => { const g = row.kisi ?? '#' + i; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(i); });
+    ll = 0;
+    resp = new Array(N);
+    for (const idx of groups.values()) {
+      const lv = pay.map((p, c) => Math.log(Math.max(1e-12, p)) + idx.reduce((s, i) => s + loglik[c][i] * (rows[i].w ?? 1), 0));
+      const m = Math.max(...lv), e = lv.map((v) => Math.exp(v - m)), s = e.reduce((a, b) => a + b, 0);
+      ll += m + Math.log(s);
+      const q = e.map((v) => v / s);
+      for (const i of idx) resp[i] = q;
+    }
+  }
+  const siniflar = classes.map((m, c) => ({ pay: r3(pay[c]), theta: m.theta, asc: m.asc, demo: m.demo }));
+  // Okunur etiket: sınıfın öncülden en çok ayrıştığı terim
+  const res = resolveChoice(spec);
+  siniflar.forEach((cl) => {
+    const dev = res.terms.filter((t) => cl.theta[t.id] !== undefined).map((t) => [t, cl.theta[t.id] - t.onsel]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
+    cl.etiket = dev ? `${dev[1] > 0 ? 'güçlü' : 'zayıf'} ${dev[0].ad.toLocaleLowerCase('tr')}` : '';
+  });
+  return { alan: res.domain.id, kaynak: `veriden öğrenilmiş gizli sınıf modeli (${C} sınıf, ${N} gözlem)`, siniflar, n: N, log_olabilirlik: r3(ll), kuramlar: classes.reduce((a, b, c) => (pay[c] > pay[classes.indexOf(a)] ? b : a)).kuramlar };
+}
+
+/**
+ * Tüm veriyle öğren + çapraz doğrula: kullanıcıya verilecek nihai model.
+ * siniflar: 1 (varsayılan) | 2..4 | 'oto' → 1 ve 2 sınıf çapraz doğrulamayla kıyaslanır.
+ */
 export function learn(spec, rows, o = {}) {
-  const model = fitChoiceModel(spec, rows, o);
-  model.cv = o.cv === false ? undefined : crossValidate(spec, rows, o);
+  let C = o.siniflar === 'oto' ? (rows.length >= 300 ? 'oto' : 1) : Number(o.siniflar) || 1;
+  let cv1, cv2;
+  if (C === 'oto') {
+    cv1 = crossValidate(spec, rows, { ...o, siniflar: 1, k: 3 });
+    cv2 = crossValidate(spec, rows, { ...o, siniflar: 2, k: 3 });
+    C = cv2.log_kayip < cv1.log_kayip - 0.005 ? 2 : 1;
+  }
+  const model = C > 1 ? fitLatentClass(spec, rows, { ...o, C }) : fitChoiceModel(spec, rows, o);
+  if (o.cv !== false) model.cv = cv1 && cv2 ? (C === 1 ? cv1 : cv2) : crossValidate(spec, rows, { ...o, siniflar: C });
+  if (cv1 && cv2) model.sinif_secimi = { tek_sinif_log_kayip: cv1.log_kayip, iki_sinif_log_kayip: cv2.log_kayip, secilen: C };
   return model;
 }
 

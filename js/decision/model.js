@@ -38,6 +38,42 @@ export function coefficients(resolved, model = {}, overrides = {}) {
   return { theta, asc, demo: model.demo || null };
 }
 
+/**
+ * Gizli sınıf modelinde her sınıfın katsayıları ve payı; tek sınıflı modelde tek öğe.
+ * model.asc üst düzeyde bir kalibrasyon düzeltmesi olarak tüm sınıflara eklenir.
+ */
+export function classCoefs(resolved, model = {}, overrides = {}) {
+  if (!model?.siniflar?.length) return [{ pay: 1, coef: coefficients(resolved, model, overrides) }];
+  return model.siniflar.map((c) => {
+    const coef = coefficients(resolved, c, overrides);
+    for (const [id, v] of Object.entries(model.asc || {})) coef.asc[id] = (coef.asc[id] || 0) + v;
+    return { pay: c.pay, coef };
+  });
+}
+
+/** Satır başı seçim olasılıkları (satıra özgü seçenek seti ve gizli sınıflar dahil). */
+export function rowProbabilities(spec, model, rows) {
+  const resolved = resolveChoice(spec);
+  const cls = classCoefs(resolved, model || {});
+  const altIndex = Object.fromEntries(resolved.alts.map((a, j) => [a.id, j]));
+  return rows.map((r, i) => {
+    const f = features(r.p);
+    const { r: rr, mask } = rowResolved(resolved, r);
+    const zs = zMatrix(rr, f, r.p, i);
+    const P = new Array(resolved.alts.length).fill(0);
+    for (const { pay, coef } of cls) {
+      const V = rr.alts.map((a, j) => {
+        let v = (coef.asc[a.id] || 0) + (coef.demo ? demoUtility(coef.demo, a.id, r.p) : 0);
+        rr.terms.forEach((t, k) => { v += (coef.theta[t.id] || 0) * zs[k][j]; });
+        return mask && !mask[j] ? -Infinity : v;
+      });
+      const m = Math.max(...V), e = V.map((v) => Math.exp(v - m)), s = e.reduce((a, b) => a + b, 0);
+      e.forEach((v, j) => { P[j] += pay * v / s; });
+    }
+    return { P, y: altIndex[r.secim], w: r.w ?? 1 };
+  });
+}
+
 /** Seçeneğe özgü demografik etki toplamı (öğrenilmiş modelde). */
 export function demoUtility(demo, altId, p) {
   const d = demo && demo[altId];
@@ -136,7 +172,9 @@ function assignPast(resolved, coef, pop, prevShares, seed = 42) {
  */
 export function predictChoice(spec, opts = {}) {
   const resolved = resolveChoice(spec);
-  const coef = coefficients(resolved, opts.model, { theta: opts.theta, asc: opts.asc });
+  const cls = classCoefs(resolved, opts.model, { theta: opts.theta, asc: opts.asc });
+  // Açıklama ve geçmiş atama için baskın sınıf (tek sınıflı modelde modelin kendisi)
+  const coef = cls.reduce((a, b) => (b.pay > a.pay ? b : a)).coef;
   const n = Math.max(50, Math.min(Math.round(opts.n || 2000), 20000));
   const popOpts = { n, seed: opts.seed ?? 42, target: opts.target, marginals: opts.marginals };
   const pop = samplePopulation(popOpts);
@@ -148,7 +186,10 @@ export function predictChoice(spec, opts = {}) {
   const people = pop.map((p, i) => {
     const f = features(p);
     const zs = zMatrix(resolved, f, p, i);
-    return { p, f, zs, P: personProbs(resolved, coef, f, p, i, zs).P };
+    if (cls.length === 1) return { p, f, zs, P: personProbs(resolved, coef, f, p, i, zs).P };
+    const P = new Array(resolved.alts.length).fill(0);
+    for (const c of cls) personProbs(resolved, c.coef, f, p, i, zs).P.forEach((q, j) => { P[j] += c.pay * q; });
+    return { p, f, zs, P };
   });
 
   const shares = new Array(J).fill(0), firsts = new Array(J).fill(0);
@@ -165,7 +206,8 @@ export function predictChoice(spec, opts = {}) {
     paylar: Object.fromEntries(resolved.alts.map((a, j) => [a.id, pct(shares[j] / N)])),
     en_olasi_secim_yuzde: Object.fromEntries(resolved.alts.map((a, j) => [a.id, pct(firsts[j] / N)])),
     kararsizlik: r3(entropy / N),
-    kaynak: opts.model?.kaynak || (opts.model?.theta ? 'veriden öğrenilmiş model' : 'kuram öncülleri (kalibre edilmemiş)'),
+    kaynak: opts.model?.kaynak || (opts.model?.theta || opts.model?.siniflar ? 'veriden öğrenilmiş model' : 'kuram öncülleri (kalibre edilmemiş)'),
+    gizli_siniflar: opts.model?.siniflar ? opts.model.siniflar.map((c) => ({ pay_yuzde: pct(c.pay), etiket: c.etiket })) : undefined,
     dogrulama: opts.model?.cv ? { isabet_yuzde: opts.model.cv.isabet_yuzde, log_kayip: opts.model.cv.log_kayip, temel_isabet_yuzde: opts.model.cv.cogunluk_isabet_yuzde } : undefined,
   };
   const order = resolved.alts.map((a, j) => [a.id, shares[j]]).sort((x, y) => y[1] - x[1]);

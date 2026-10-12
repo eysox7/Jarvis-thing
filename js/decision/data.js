@@ -4,7 +4,7 @@
 // Türkçe karakter, büyük/küçük harf ve sayısal yaş otomatik eşlenir; tanınmayan değer boş sayılır.
 
 import { DIMENSIONS, samplePopulation, features, rng } from '../audience/personas.js';
-import { resolveChoice, coefficients, personProbs, rowResolved } from './model.js';
+import { resolveChoice, classCoefs, personProbs, rowResolved } from './model.js';
 
 const fold = (s) => String(s ?? '').trim().toLocaleLowerCase('tr')
   .replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c')
@@ -82,6 +82,7 @@ export function prepareRows(raw, spec) {
   const choiceCol = cols.find((c) => CHOICE_COLS[fold(c)]);
   if (!choiceCol) throw new Error('seçim sütunu bulunamadı (secim / tercih / choice / oy / karar)');
   const wCol = cols.find((c) => ['agirlik', 'weight', 'w'].includes(fold(c)));
+  const idCol = cols.find((c) => ['kisi', 'katilimci', 'respondent', 'musteri', 'musteri_id', 'kisi_id'].includes(fold(c)));
   const pastCol = cols.find((c) => ['onceki', 'onceki_secim', 'onceki_oy', 'gecmis_oy', 'gecmis', 'previous', 'past'].includes(fold(c)));
   // Satıra özgü seçenek özellikleri: "<özellik>_<seçenek>" (ör. fiyat_A) ve bulunurluk "var_<seçenek>"
   const attrKeys = Object.keys(resolveChoice(spec).domain.seceneOzellikleri || {});
@@ -107,6 +108,7 @@ export function prepareRows(raw, spec) {
     if (pastCol && r[pastCol] !== '' && r[pastCol] !== undefined) p.onceki = altIds.get(fold(r[pastCol])) || fold(r[pastCol]);
     const w = wCol ? Number(r[wCol]) : 1;
     const row = { p, secim: id, w: Number.isFinite(w) && w > 0 ? w : 1 };
+    if (idCol && r[idCol] !== '') row.kisi = String(r[idCol]);
     for (const { c, alt, attr } of altCols) {
       const raw = r[c];
       if (raw === '' || raw === undefined) continue;
@@ -125,20 +127,30 @@ export function prepareRows(raw, spec) {
 }
 
 /** Bilinen "gerçek" modelden sentetik bireysel veri üretir (doğrulama ve testler için). */
-export function simulateDataset(spec, trueModel, { n = 2000, seed = 7, target, marginals, vary } = {}) {
+export function simulateDataset(spec, trueModel, { n = 2000, seed = 7, target, marginals, vary, gorev = 1 } = {}) {
   const resolved = resolveChoice(spec);
-  const coef = coefficients(resolved, trueModel);
+  const cls = classCoefs(resolved, trueModel);
   const pop = samplePopulation({ n, seed, target, marginals });
   const r = rng(seed * 31 + 5);
-  return pop.map((p, i) => {
-    // vary: {altId: {özellik: [min, max]}} → her satırda rastgele özellik (conjoint tasarımı)
-    let row = { p, w: 1 };
-    if (vary) for (const [alt, attrs] of Object.entries(vary)) for (const [k, [lo, hi]] of Object.entries(attrs)) ((row.ozel ||= {})[alt] ||= {})[k] = Math.round(lo + (hi - lo) * r());
-    const { r: rr, mask } = rowResolved(resolved, row);
-    let { P } = personProbs(rr, coef, features(p), p, i);
-    if (mask) { P = P.map((q, j) => (mask[j] ? q : 0)); const s = P.reduce((a, b) => a + b, 0); P = P.map((q) => q / s); }
-    let u = r(), j = 0;
-    while (j < P.length - 1 && (u -= P[j]) > 0) j++;
-    return { ...row, secim: resolved.alts[j].id, _P: P };
+  const out = [];
+  pop.forEach((p, i) => {
+    // Gizli sınıflı gerçek modelde kişi sınıfını bir kez "çeker"; tüm görevlerinde o sınıfla seçer
+    let u0 = r(), c = 0;
+    while (c < cls.length - 1 && (u0 -= cls[c].pay) > 0) c++;
+    for (let t = 0; t < gorev; t++) {
+      // vary: {altId: {özellik: [min, max]}} → her görevde rastgele özellik (conjoint tasarımı)
+      const row = { p, w: 1, kisi: gorev > 1 ? i : undefined };
+      if (vary) for (const [alt, attrs] of Object.entries(vary)) for (const [k, [lo, hi]] of Object.entries(attrs)) ((row.ozel ||= {})[alt] ||= {})[k] = Math.round(lo + (hi - lo) * r());
+      const { r: rr, mask } = rowResolved(resolved, row);
+      const f = features(p);
+      const norm = (P) => { if (!mask) return P; const q = P.map((v, j) => (mask[j] ? v : 0)); const s2 = q.reduce((a, b) => a + b, 0); return q.map((v) => v / s2); };
+      const P = norm(personProbs(rr, cls[c].coef, f, p, i).P);
+      // _P: sınıfı bilmeyen en iyi tahminci (karışım) — dürüst tavan
+      const Pmix = norm(cls.reduce((acc, k) => personProbs(rr, k.coef, f, p, i).P.map((v, j) => acc[j] + k.pay * v), new Array(P.length).fill(0)));
+      let u = r(), j = 0;
+      while (j < P.length - 1 && (u -= P[j]) > 0) j++;
+      out.push({ ...row, secim: resolved.alts[j].id, _P: Pmix });
+    }
   });
+  return out;
 }

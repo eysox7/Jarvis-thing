@@ -1,7 +1,7 @@
 // Karar tahmin motoru: kuram-temelli çok terimli logit (tarayıcısız).
-import { predictChoice, whatIf, resolveChoice } from '../js/decision/model.js';
+import { predictChoice, whatIf, resolveChoice, rowProbabilities } from '../js/decision/model.js';
 import { simulateDataset, parseCSV, prepareRows, mapValue } from '../js/decision/data.js';
-import { fitChoiceModel, crossValidate, scoreProbs, calibrateShares, learn, rake, shareDiagnostics } from '../js/decision/estimate.js';
+import { fitChoiceModel, crossValidate, scoreProbs, calibrateShares, learn, rake, shareDiagnostics, fitLatentClass } from '../js/decision/estimate.js';
 import { buildEnsemble, stackWeights, siliconProbs, mixShares } from '../js/decision/ensemble.js';
 import { describePersona } from '../js/audience/survey.js';
 
@@ -155,6 +155,21 @@ const pm = fitChoiceModel(SECIM, prow, { iters: 250 });
 ok(Math.abs(pm.theta.gecmis - 2.5) < 0.5, `sadakat katsayısı geri kazanılır (${pm.theta.gecmis})`);
 const pcsv = prepareRows(parseCSV('yas;onceki_oy;secim\n30;B;B\n50;Kapanan Parti;A'), SECIM);
 ok(pcsv.rows[0].p.onceki === 'B' && pcsv.rows[1].p.onceki === 'kapanan_parti', 'CSV önceki oy sütunu: seçenek ya da bugün olmayan etiket');
+
+console.log('\n[13] Gizli sınıflar (panel / conjoint verisi)');
+const LC = { siniflar: [
+  { pay: 0.5, theta: { fiyat: 4.5, kalite: 0.5, marka: 0 }, asc: { P: 0, O: 0, Y: 0.3, N: -0.5 } },
+  { pay: 0.5, theta: { fiyat: 0.4, kalite: 2.5, marka: 3.5 }, asc: { P: 0.5, O: 0, Y: -0.5, N: -1 } }] };
+const lrows = simulateDataset(TELEFON, LC, { n: 250, seed: 8, vary, gorev: 6 });
+ok(new Set(lrows.map((r) => r.kisi)).size === 250 && lrows.length === 1500, 'panel verisi: kişi başı 6 görev');
+const lcm = fitLatentClass(TELEFON, lrows, { C: 2, emIters: 5 });
+const fy = lcm.siniflar.map((c) => c.theta.fiyat).sort((a, b) => a - b);
+ok(fy[1] - fy[0] > 1.5, `EM fiyat avcılarını ve marka tutkunlarını ayırır (fiyat katsayıları ${fy.join(' / ')})`);
+ok(lcm.siniflar.every((c) => c.etiket && c.pay > 0.3), `sınıflar okunur etiket ve payla gelir (${lcm.siniflar.map((c) => c.etiket).join(' · ')})`);
+const cvOne = crossValidate(TELEFON, lrows, { k: 2, siniflar: 1, iters: 200 }), cvTwo = crossValidate(TELEFON, lrows, { k: 2, siniflar: 2, emIters: 4 });
+ok(cvTwo.log_kayip < cvOne.log_kayip, `görülmemiş kişilerde gizli sınıf modeli tek sınıftan iyi (log-kayıp ${cvTwo.log_kayip} < ${cvOne.log_kayip})`);
+const pc = predictChoice(TELEFON, { model: lcm, n: 800, explain: false });
+ok(pc.gizli_siniflar?.length === 2 && Math.abs(Object.values(pc.paylar).reduce((a, b) => a + b, 0) - 100) < 0.5, 'nüfus tahmini sınıf karışımıyla yapılır');
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }

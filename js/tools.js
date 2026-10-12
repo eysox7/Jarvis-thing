@@ -668,7 +668,7 @@ def({
 
 def({
   name: 'decision_data_import',
-  desc: 'Kurumun bireysel verisini (anket, seçim sonrası anket, satış/CRM, conjoint) CSV olarak senaryoya yükler. Sütunlar: persona alanları (yas, cinsiyet, egitim, gelir, ideoloji…) + secim; opsiyonel agirlik, satıra özgü "<özellik>_<seçenek>" (ör. fiyat_A) ve "var_<seçenek>". Veri uydurma — yalnızca kullanıcının verdiği veriyi yükle.',
+  desc: 'Kurumun bireysel verisini (anket, seçim sonrası anket, satış/CRM, conjoint) CSV olarak senaryoya yükler. Sütunlar: persona alanları (yas, cinsiyet, egitim, gelir, ideoloji…) + secim; opsiyonel agirlik, kisi (aynı kişinin birden çok seçimi: panel/conjoint), onceki (önceki oy/marka — en güçlü yordayıcı), satıra özgü "<özellik>_<seçenek>" (ör. fiyat_A) ve "var_<seçenek>". Veri uydurma — yalnızca kullanıcının verdiği veriyi yükle.',
   params: { senaryo: 'string (zorunlu)', csv: 'string (zorunlu) — başlık satırlı CSV metni' },
   run: (a) => {
     const { spec, id } = scenarioOf({ senaryo: a.senaryo });
@@ -684,15 +684,19 @@ def({
 def({
   name: 'decision_learn',
   desc: 'Senaryoya yüklenen veriden kuram öncüllü modeli öğrenir, 5-katlı çapraz doğrulamayla görülmemiş verideki isabeti ölçer (kuram ve çoğunluk temel modelleriyle kıyaslı) ve modeli kaydeder. Hangi kuramın bu kitlede veriyle desteklendiğini de raporlar.',
-  params: { senaryo: 'string (zorunlu)', kuram_guveni: 'number — kuram öncülünün sıkılığı σ (varsayılan 1; küçük = kurama daha bağlı)' },
+  params: {
+    senaryo: 'string (zorunlu)', kuram_guveni: 'number — kuram öncülünün sıkılığı σ (varsayılan 1; küçük = kurama daha bağlı)',
+    siniflar: '1 | 2 | 3 | "oto" — gizli tercih sınıfları (panel/conjoint verisinde anlamlı; varsayılan: kişi kimliği varsa "oto", yoksa 1)',
+  },
   run: (a) => {
     const { spec, id } = scenarioOf({ senaryo: a.senaryo });
     const ds = decDb().datasets[id];
     if (!ds?.rows?.length) throw new Error('bu senaryoda veri yok; önce decision_data_import');
-    const model = learn(spec, ds.rows, { kuramGuveni: Number(a.kuram_guveni) || 1 });
+    const panel = ds.rows.some((r) => r.kisi !== undefined);
+    const model = learn(spec, ds.rows, { kuramGuveni: Number(a.kuram_guveni) || 1, siniflar: a.siniflar ?? (panel ? 'oto' : 1) });
     S.saveModel(id, model);
     const diag = shareDiagnostics(spec, ds.rows, model);
-    return { senaryo: id, dogrulama: model.cv, kuramlar: model.kuramlar, paylar: diag };
+    return { senaryo: id, dogrulama: model.cv, kuramlar: model.kuramlar, gizli_siniflar: model.siniflar?.map((c) => ({ pay: c.pay, etiket: c.etiket })), sinif_secimi: model.sinif_secimi, paylar: diag };
   },
 });
 
