@@ -4,6 +4,10 @@
 
 import * as S from './store.js';
 import { calcExpression, parseWhen, fmtDate, truncate } from './util.js';
+import { predict, compare, optimize, DOMAINS, CHANNELS, FRAMES } from './audience/engine.js';
+import { INSTITUTIONS } from './audience/institutions.js';
+import { THEORIES } from './audience/theories.js';
+import { DIMENSIONS } from './audience/personas.js';
 
 const T = {};
 const def = (t) => { T[t.name] = t; return t; };
@@ -394,6 +398,136 @@ def({
   run: async (a, ctx) => {
     const ans = await ctx.ask(String(a.question || '?'), Array.isArray(a.options) ? a.options : []);
     return { answer: ans };
+  },
+});
+
+/* ---------------- kitle tahmini (MatrAIx × iletişim kuramları) ---------------- */
+
+const MSG_PARAMS = {
+  alan: `string — ${Object.keys(DOMAINS).join(' | ')}`,
+  kurum: 'string — kurum türü (audience_catalog) veya institution_save ile kaydedilmiş kurum id',
+  kanallar: `string[] — ${Object.keys(CHANNELS).join(' | ')} (boşsa kurumun kanalları)`,
+  cerceve: `string — ${Object.keys(FRAMES).join(' | ')}`,
+  arguman_kalitesi: 'number 0..1 — kanıt/argüman gücü (ELM merkezi yol)',
+  cevresel_ipucu: 'number 0..1 — ünlü yüz, estetik, duygu (ELM çevresel yol)',
+  durus: '"egemen" | "notr" | "muhalif" — mesajın egemen ideolojiyle ilişkisi (Hall/Gramsci)',
+  egilim: '"sol" | "merkez" | "sag" veya -1..1 — mesajın ideolojik eğilimi',
+  yenilik: 'number 0..1 — yeni bir ürün/davranış mı (Rogers)',
+  tekrar: 'number — kaç kez gösterilecek (gündem belirleme)',
+  tartismali: 'number 0..1 — konunun tartışmalılığı (suskunluk sarmalı)',
+  ticari: 'number 0..1 — ticari/reklam niteliği (kültür endüstrisi)',
+  temsil: 'number -1..1 — kalıp yargı (-1) … kapsayıcı temsil (1)',
+};
+const OPT_PARAMS = {
+  hedef: `object — hedef kitle, ör. {"yas":"18-24"} veya {"ideoloji":["sol","merkez"]}. Boyutlar: ${Object.keys(DIMENSIONS).join(', ')}`,
+  mercek: '"butunlesik" (varsayılan) | "ana_akim" | "elestirel"',
+  n: 'number — sentetik persona sayısı (varsayılan 2000)',
+};
+
+/** Ajanın düz argümanlarını motor girdisine çevirir; kayıtlı kurum ve kalibrasyonu bağlar. */
+function audienceInput(a) {
+  const aud = S.db().audience || { institutions: {}, calibration: {} };
+  const kurumId = a.kurum || a.institution;
+  const kurum = kurumId && aud.institutions[kurumId] ? aud.institutions[kurumId] : kurumId;
+  const msg = { ...a, institution: kurum };
+  delete msg.kurum;
+  const calibration = (kurumId && aud.calibration[kurumId]) || aud.calibration._genel || undefined;
+  const marginals = (kurumId && aud.institutions[kurumId]?.kitle) || undefined;
+  return { msg, opts: { target: a.hedef, lens: a.mercek, n: a.n, calibration, marginals } };
+}
+
+const compact = (r) => ({ ...r, kuramlar: r.kuramlar.slice(0, 8) });
+
+def({
+  name: 'audience_predict',
+  desc: 'Bir mesajın/kampanyanın kitle tepkisini tahmin eder: erişim, tutum, paylaşım, benimseme, Hall okumaları (egemen/müzakereci/karşıt), hangi iletişim kuramının ne kadar etkilediği ve segment kırılımı. MatrAIx tarzı sentetik persona nüfusu üzerinde ana akım + eleştirel kuramlarla simüle eder. Her alanda (siyaset, sağlık, ticaret, eğitim, kriz…) çalışır.',
+  params: { ...MSG_PARAMS, ...OPT_PARAMS, segment: `string[] — kırılım boyutları, ör. ["yas","ideoloji"]` },
+  run: (a) => {
+    const { msg, opts } = audienceInput(a);
+    const seg = Array.isArray(a.segment) ? a.segment : a.segment ? [a.segment] : [];
+    return compact(predict(msg, { ...opts, segmentBy: seg }));
+  },
+});
+
+def({
+  name: 'audience_compare',
+  desc: 'Birden çok mesaj varyantını aynı sentetik nüfusta karşılaştırır (sanal A/B testi) ve kazananı söyler.',
+  params: {
+    varyantlar: 'object[] (zorunlu) — her biri {ad, ...audience_predict mesaj alanları}',
+    metrik: '"ortalama_tutum" | "erisim_yuzde" | "olumlu_yuzde" | "paylasim_yuzde" | "benimseme_yuzde"',
+    ...OPT_PARAMS,
+  },
+  run: (a) => {
+    if (!Array.isArray(a.varyantlar) || a.varyantlar.length < 2) throw new Error('varyantlar en az 2 öğeli dizi olmalı');
+    const inputs = a.varyantlar.map((v) => audienceInput({ ...v, hedef: a.hedef, mercek: a.mercek, n: a.n }));
+    return compare(inputs.map((x) => x.msg), inputs[0].opts, a.metrik || 'ortalama_tutum');
+  },
+});
+
+def({
+  name: 'audience_optimize',
+  desc: 'Bir kurum ve alan için en etkili çerçeve × kanal kombinasyonunu arar; en iyi ve en kötü stratejileri döner.',
+  params: { ...MSG_PARAMS, ...OPT_PARAMS, metrik: 'string — audience_compare ile aynı' },
+  run: (a) => {
+    const { msg, opts } = audienceInput(a);
+    return optimize(msg, { ...opts, n: Math.min(Number(a.n) || 600, 1500) }, a.metrik || 'ortalama_tutum');
+  },
+});
+
+def({
+  name: 'audience_catalog',
+  desc: 'Kitle tahmininde kullanılabilen alanları, çerçeveleri, kanalları, kurum türlerini, kayıtlı kurumları, persona boyutlarını ve kuramları listeler.',
+  params: { bolum: '"alanlar" | "cerceveler" | "kanallar" | "kurumlar" | "boyutlar" | "kuramlar" (boşsa hepsi, kısa)' },
+  run: (a) => {
+    const aud = S.db().audience || { institutions: {} };
+    const all = {
+      alanlar: Object.fromEntries(Object.entries(DOMAINS).map(([k, v]) => [k, v.label])),
+      cerceveler: FRAMES,
+      kanallar: Object.fromEntries(Object.entries(CHANNELS).map(([k, v]) => [k, v.label])),
+      kurumlar: {
+        turler: Object.fromEntries(Object.entries(INSTITUTIONS).map(([k, v]) => [k, v.ad])),
+        kayitli: Object.fromEntries(Object.entries(aud.institutions).map(([k, v]) => [k, v.ad || k])),
+      },
+      boyutlar: Object.fromEntries(Object.entries(DIMENSIONS).map(([k, v]) => [k, Object.keys(v.base)])),
+      kuramlar: THEORIES.map((t) => ({ id: t.id, ad: t.ad, kurucu: t.kurucu, gelenek: t.gelenek, ozet: t.ozet })),
+    };
+    if (a.bolum && all[a.bolum]) return { [a.bolum]: all[a.bolum] };
+    return { ...all, kuramlar: THEORIES.map((t) => `${t.id} (${t.gelenek})`) };
+  },
+});
+
+def({
+  name: 'institution_save',
+  desc: 'Kurumun kendi profilini kaydeder; sonra audience_* araçlarında kurum=id ile kullanılır. Kurumun kendi kitle verisi (kitle) örneklemi ezer.',
+  params: {
+    id: 'string (zorunlu) — kısa kimlik, ör. "izmir_bb"',
+    ad: 'string — görünen ad',
+    tur: 'string — temel kurum türü (audience_catalog kurumlar)',
+    sahiplik: '"devlet" | "sermaye" | "bagimsiz" | "uye"',
+    ideoloji: 'number -1..1', hegemonik: 'number 0..1 — iktidar yapısına gömülülük',
+    guvenilirlik: 'number 0..1', ticari: 'number 0..1',
+    uzmanlik: 'object — {alan: 0..1}', kanallar: 'string[]',
+    kitle: 'object — kurumun kitle marjinalleri, ör. {"yas":{"18-24":40,"25-34":30}}',
+  },
+  run: (a) => {
+    const id = String(a.id || '').trim().replace(/\s+/g, '_');
+    if (!id) throw new Error('id zorunlu');
+    const { id: _ignored, ...profile } = a;
+    predict({ institution: profile }, { n: 50, bootstrap: 0, marginals: a.kitle });   // geçersiz profili kaydetmeden yakala
+    const saved = S.saveInstitution(id, profile);
+    return { kaydedildi: id, ad: saved.ad || id };
+  },
+});
+
+def({
+  name: 'institution_delete',
+  desc: 'Kayıtlı kurum profilini ve kalibrasyonunu siler.',
+  params: { id: 'string (zorunlu)' },
+  danger: true,
+  run: (a) => {
+    if (!S.db().audience?.institutions?.[a.id]) throw new Error('kurum bulunamadı: ' + a.id);
+    S.removeInstitution(a.id);
+    return { silindi: a.id };
   },
 });
 

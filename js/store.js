@@ -30,6 +30,10 @@ const DEFAULTS = {
   memory: {},     // {anahtar: değer}
   reminders: [],  // {id,at,message,fired}
   chat: [],       // {role,content,ts}
+  audience: {     // kitle tahmini: kurumun kendi profilleri ve kalibrasyonları
+    institutions: {},   // {id: kurum profili}
+    calibration: {},    // {kurum_id | '_genel': {weights, intercepts, fit}}
+  },
 };
 
 let state = load();
@@ -44,6 +48,7 @@ function load() {
       ...structuredClone(DEFAULTS),
       ...parsed,
       settings: { ...DEFAULTS.settings, ...(parsed.settings || {}) },
+      audience: { ...structuredClone(DEFAULTS.audience), ...(parsed.audience || {}) },
     };
   } catch (e) {
     console.warn('depo okunamadı, sıfırlanıyor', e);
@@ -194,3 +199,8 @@ export function pushChat(m) {
   save();
 }
 export function clearChat() { state.chat = []; save(); }
+
+/* ---- kitle tahmini ---- */
+export function saveInstitution(id, profile) { state.audience.institutions[id] = { ...profile, id }; save(); return state.audience.institutions[id]; }
+export function removeInstitution(id) { delete state.audience.institutions[id]; delete state.audience.calibration[id]; save(); }
+export function setCalibration(key, cal) { state.audience.calibration[key] = cal; save(); }
