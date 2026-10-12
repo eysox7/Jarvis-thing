@@ -37,11 +37,11 @@ export function fitChoiceModel(spec, rows, o = {}) {
   const K = terms.length;
   const tIdx = terms.map((t) => resolved.terms.indexOf(t));
   const prior = coefficients(resolved, o.baslangic || {});
-  const sigT = o.kuramGuveni ?? 1.0, sigA = 3, sigD = Number.isFinite(+o.demoSigma) ? +o.demoSigma : 0.25;
+  const sigT = o.kuramGuveni ?? 1.0, sigA = 3, sigD = Number.isFinite(+o.demoSigma) && +o.demoSigma > 0 ? +o.demoSigma : 0.25;
 
   // Parametre vektörü: [θ_1..θ_K, ASC_1..ASC_{J-1}, demo...]
   const demoKeys = [];
-  if (o.demografik !== false) {
+  if (o.demografik !== false && o.demoSigma !== 0) {   // σ=0: demografik etkiler kapalı (ayar adayı)
     const seen = new Set(data.flatMap((d) => d.keys));
     for (const k of seen) demoKeys.push(k);
   }
@@ -235,22 +235,23 @@ export function crossValidate(spec, rows, o = {}) {
  * log-kaybı en düşük aday. Az veride sıkı (aşırı uyum yok), çok veride gevşek (esneklik).
  */
 export function tuneDemoSigma(spec, rows, o = {}) {
-  const cands = o.sigmaAdaylari || [0.08, 0.18, 0.4];
-  if (rows.length < 40) return cands[0];
+  const cands = o.sigmaAdaylari || [0, 0.08, 0.18, 0.4];
+  if (rows.length < 40) return 0;
   // Hız: ayar en çok ~1200 satırlık alt örneklemde yapılır (σ seçimi bundan sonra pek değişmez)
   const step = Math.max(1, Math.floor(rows.length / 1200));
   const sub = rows.filter((_, i) => i % step === 0);
   const half = sub.filter((_, i) => i % 2 === 0), other = sub.filter((_, i) => i % 2 === 1);
-  let best = cands[1], bestLL = Infinity;
-  for (const sg of cands) {
+  const lls = cands.map((sg) => {
     let ll = 0;
     for (const [tr, te] of [[half, other], [other, half]]) {
       const m = fitChoiceModel(spec, tr, { ...o, demoSigma: sg, iters: Math.min(o.iters ?? 120, 120) });
       ll += scoreProbs(rowProbs(spec, m, te)).log_kayip;
     }
-    if (ll < bestLL) { bestLL = ll; best = sg; }
-  }
-  return best;
+    return ll;
+  });
+  // Bir-standart-hata kuralı: en iyiye yeterince yakın olan EN BASİT aday (küçük veride eşik büyük)
+  const bestLL = Math.min(...lls), margin = 0.01 + 3 / sub.length;
+  return cands[lls.findIndex((ll) => ll <= bestLL + margin)];
 }
 
 /**
