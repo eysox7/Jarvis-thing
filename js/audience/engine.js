@@ -270,27 +270,54 @@ function fmt(s, ci) {
   };
 }
 
+/** Standart normal ters dağılım fonksiyonu (Acklam yaklaşımı, |hata| < 1.2e-9). */
+function normInv(p) {
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+  const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+  const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+  const pl = 0.02425;
+  if (p < pl) { const q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  if (p > 1 - pl) { const q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  const q = p - 0.5, t = q * q;
+  return (((((a[0] * t + a[1]) * t + a[2]) * t + a[3]) * t + a[4]) * t + a[5]) * q / (((((b[0] * t + b[1]) * t + b[2]) * t + b[3]) * t + b[4]) * t + 1);
+}
+
 /**
  * Kuram (model) belirsizliği: bootstrap yalnızca örneklem belirsizliğini ölçer. Burada her
  * kuramın ağırlığı log-normal gürültüyle (σ≈0.4 → kabaca ×0.5..×2) bozulup tahmin tekrarlanır;
  * ayrıca ana akım ve eleştirel mercekler ayrı koşturulur. Geniş bant = sonuç kuram
  * varsayımlarına duyarlı; kalibrasyon veya gerçek veri olmadan karar verme.
  */
-export function modelUncertainty(message, opts = {}, K = opts.uncertaintyRuns || 24) {
+export function modelUncertainty(message, opts = {}, K = opts.uncertaintyRuns || 40) {
   const r = rng(((opts.seed ?? 42) * 7919 + 17) >>> 0);
-  const gauss = () => Math.sqrt(-2 * Math.log(r() || 1e-9)) * Math.cos(2 * Math.PI * r());
+  // Latin hiperküp: her kuram için K tabakalı normal kantil, kuram başına rastgele permütasyon.
+  // Saf rastgele çekiliş az koşuda kuyrukları temsil etmiyor ve bandı daraltıyordu (doğrulama C).
+  const ids = THEORIES.filter((t) => !t.core).map((t) => t.id);
+  const lhs = Object.fromEntries(ids.map((id) => {
+    const z = Array.from({ length: K }, (_, i) => normInv((i + 0.5) / K));
+    for (let i = K - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [z[i], z[j]] = [z[j], z[i]]; }
+    return [id, z];
+  }));
   const base = { ...opts, n: Math.min(opts.n || 600, 600), bootstrap: 0, segmentBy: [], modelUncertainty: false, keepPeople: false };
   const keys = ['erisim_yuzde', 'ortalama_tutum', 'olumlu_yuzde', 'paylasim_yuzde', 'benimseme_yuzde'];
   const runs = Object.fromEntries(keys.map((k) => [k, []]));
   for (let i = 0; i < K; i++) {
-    const weightScale = Object.fromEntries(THEORIES.filter((t) => !t.core).map((t) => [t.id, Math.exp(0.4 * gauss())]));
+    const weightScale = Object.fromEntries(ids.map((id) => [id, Math.exp(0.4 * lhs[id][i])]));
     const s = predict(message, { ...base, weightScale }).sonuc;
     for (const k of keys) runs[k].push(s[k]);
   }
+  // Az koşudan çıkan yüzdelikler gerçek aralığı daraltır (K örnekte 5–95. yüzdelik ≈ %(K-1)/(K+1)·90
+  // kapsar). Doğrulamada ölçülen eksik kapsamayı gidermek için bant uçlarını medyandan
+  // küçük-örneklem düzeltmesiyle (K+1)/(K-1) oranında genişletiyoruz.
   const band = {};
+  const q = (a, p) => { const i = p * (a.length - 1), lo = Math.floor(i), hi = Math.ceil(i); return a[lo] + (a[hi] - a[lo]) * (i - lo); };
+  const inflate = (K + 1) / (K - 1);
   for (const k of keys) {
     const a = runs[k].sort((x, y) => x - y);
-    band[k] = [a[Math.floor(0.05 * (a.length - 1))], a[Math.ceil(0.95 * (a.length - 1))]];
+    const med = q(a, 0.5), lo = q(a, 0.05), hi = q(a, 0.95);
+    const r = (v) => (k === 'ortalama_tutum' ? Math.round(v * 1000) / 1000 : Math.round(v * 10) / 10);
+    band[k] = [r(med - (med - lo) * inflate), r(med + (hi - med) * inflate)];
   }
   const lens = (l) => predict(message, { ...base, lens: l }).sonuc;
   const ma = lens('ana_akim'), el = lens('elestirel');

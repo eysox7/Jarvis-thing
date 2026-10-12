@@ -111,7 +111,8 @@ export const THEORIES = [
     ozet: 'Bilgi akışı arttıkça yüksek SES grupları daha hızlı öğrenir; dijital kanal açığı büyütür.',
     apply: ({ f, channels, CH }) => {
       const dig = channels.reduce((s, c) => s + (CH[c]?.digital ?? 0), 0) / channels.length;
-      return { comp: 2 * ((f.egitim + f.gelir) / 2 - 0.4) + 1.2 * dig * (f.dijital - 0.5) };
+      // İkinci düzey dijital uçurum: dijital kanalda beceri farkı anlamayı ayrıca açar (van Dijk)
+      return { comp: 2 * ((f.egitim + f.gelir) / 2 - 0.4) + 2.2 * dig * (f.dijital - 0.5) + 0.8 * dig * (f.egitim - 0.4) };
     },
   },
   {
