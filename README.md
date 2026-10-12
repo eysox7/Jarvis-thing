@@ -25,6 +25,10 @@ Tarayıcıda açılır, ana ekrana eklenince yerli uygulama gibi çalışır.
   anahtar bozuk, servis çöktü) otomatik olarak bir alttakine geçer.
 - **Tamamen sesle kullanılır.** Eller serbest modda telefona hiç dokunmazsın: adını
   söyle, isteğini söyle, cevabı dinle. Onay pencereleri de sesle cevaplanır.
+- **İnsanların kararlarını tahmin eder.** Seçimde kime oy verecekleri (katılım ve geçerli oy
+  payları dahil), hangi ürünü alacakları, gündelik bir kararda ne yapacakları. Kuram-temelli
+  bir rastgele fayda modeli kurumun verisinden öğrenir, doğruluğunu görülmemiş veride ölçer ve
+  raporlar. Ayrıntı: [Karar tahmini](#karar-tahmini).
 - **Kitle tepkisini tahmin eder.** Bir duyurunun, kampanyanın ya da haberin kime ulaşacağını,
   nasıl okunacağını ve tutumu nasıl değiştireceğini; MatrAIx tarzı sentetik persona nüfusu
   üzerinde ana akım **ve** eleştirel iletişim kuramlarıyla birlikte simüle eder. Kurum kendi
@@ -130,10 +134,87 @@ Model bu araçları kendi kararıyla çağırır. `[onay]` işaretliler izin ist
 | Web | `web_search`, `http_fetch` `[onay]`, `open_url` `[onay]` |
 | Cihaz | `device_info`, `geolocate` `[onay]`, `clipboard_write`, `share` `[onay]`, `notify`, `speak`, `vibrate` |
 | Etkileşim | `ask_user` — bilgi eksikse uydurmaz, sorar |
+| Karar tahmini | `decision_predict`, `decision_whatif`, `decision_scenario_save`, `decision_data_import`, `decision_learn`, `decision_calibrate_shares`, `decision_polls`, `decision_ensemble`, `decision_catalog` |
 | Kitle tahmini | `audience_predict`, `audience_compare`, `audience_optimize`, `audience_survey`, `audience_extract`, `audience_calibrate`, `audience_catalog`, `institution_save`, `institution_delete` `[onay]` |
 
 Yeni araç eklemek: `js/tools.js` içinde bir `def({name, desc, params, run})` bloğu.
 Sistem mesajındaki katalog otomatik güncellenir, başka hiçbir yere dokunmak gerekmez.
+
+## Karar tahmini
+
+**⚖️ Karar** sekmesinden ya da sohbetten ("bu anketle kim kazanır?", "fiyatı 18 bine çekersek
+pazar payımız ne olur?", "otomatik katılımda kaç kişi sistemde kalır?") kullanılır.
+
+```
+ seçenekler + bağlam ─┐
+ persona nüfusu ──────┼─► kuram terimleri z_k(persona, seçenek) ─► U = ASC + Σ θ_k z_k (+ demografi, + sınıf)
+ kampanya (kitle) ────┘                                                  │  P = softmax(U)   (çok terimli logit)
+                                                                         ▼
+ kurumun verisi (CSV) ─► MAP öğrenme (öncül = kuram) ─► k-katlı doğrulama: isabet · log-kayıp · Brier · ECE
+ anketler ─► birleştirme (n, tazelik, kuruluş yanlılığı) ─► pay kalibrasyonu
+ önceki seçim / pazar payı ─► geçmiş davranış ataması (sadakat, geçiş)
+ LLM persona (silikon örneklem) ─► topluluk ağırlıkları (doğrulamada log-kayıpla)
+```
+
+### Model
+
+Rastgele fayda kuramı (McFadden): kişi i seçenek j'den `U_ij = ASC_j + Σ θ_k z_k + ε` fayda alır,
+`P_ij = exp(V_ij)/Σ exp(V_il)`. Her `z_k` bir kuramdan gelir ve personaya göre değişir:
+
+| Alan | Kuram terimleri |
+|---|---|
+| Siyaset | mekânsal yakınlık (Downs), yönsel oy (Rabinowitz–Macdonald), parti kimliği (Michigan), geriye dönük ekonomik oy (Fiorina), sistem güveni (Easton), lider valensi (Stokes), stratejik oy (Duverger), katılmama (Riker–Ordeshook); konu önemi bağlamı |
+| Ticaret | log-fiyat × gelir, referans fiyat / kayıp kaçınma (Kahneman–Tversky, Thaler), kalite, marka (sezgisel işleme), sosyal kanıt (Cialdini), etnosentrizm, sürdürülebilirlik, statüko (Samuelson–Zeckhauser), dijital erişim (TAM), satın almama |
+| Gündelik | beklenen fayda, maliyet, risk kaçınma, şimdiki zaman yanlılığı (Laibson), sosyal norm ve algılanan kontrol (Ajzen), varsayılan etkisi (Johnson–Goldstein), alışkanlık, otoriteye güven |
+| Hepsi | geçmiş davranış / sadakat (durum bağımlılığı), kampanya etkisi (kitle motorunun 20 kuramından) |
+
+### Doğruluk nereden gelir
+
+1. **Veriden öğrenme (asıl kaynak).** `decision_learn` kurumun bireysel verisinden MAP tahmini
+   yapar: kuram katsayıları *öncül* (veri azken kurama yaslanır, çoğaldıkça veri konuşur), seçeneğe
+   özgü demografik etkiler sıkı öncülle. Düzenlileştirme sıkılığı iç içe doğrulamayla veriden seçilir.
+   Her terim için öğrenilen katsayı, std. hata ve "veri kuramı destekliyor / ters yönde" yorumu verilir.
+2. **Görülmemiş veride ölçüm.** k-katlı çapraz doğrulama (panelde kişi düzeyinde katlar) isabet,
+   log-kayıp, Brier ve kalibrasyon hatasını; yalnız-kuram ve çoğunluk temel modelleriyle kıyaslı raporlar.
+   Tahmin her zaman bu doğrulama bilgisiyle birlikte döner.
+3. **Geçmiş davranış.** `onceki` sütunu (önceki oy / marka) en güçlü yordayıcıdır; model sadakati ve
+   seçenekler arası geçişi öğrenir. Nüfus tahmininde `baglam.onceki_paylar` personalara tutarlı atanır.
+4. **Satıra özgü seçenekler.** Conjoint / satış verisinde `fiyat_A`, `var_A` gibi sütunlar her
+   gözlemde farklı fiyat ve bulunurluğu taşır — fiyat esnekliği ancak böyle tanımlanabilir.
+5. **Gizli sınıflar.** Panel verisinde (`kisi` sütunu, kişi başı birden çok seçim) EM ile tercih tipleri
+   (ör. fiyat avcıları / marka tutkunları) öğrenilir; sınıf sayısı doğrulamayla seçilir.
+6. **Nüfusa taşıma.** Model demografiye koşullu olduğundan yanlı örneklemden (ör. çevrimiçi anket)
+   nüfus tahmini persona nüfusu üzerinden yapılır (MRP mantığı); raking ve Kish etkin örneklem de verilir.
+7. **Anket birleştirme ve pay kalibrasyonu.** Bireysel veri yoksa anketler `decision_polls` ile
+   birleştirilir (√n × tazelik, kuruluş yanlılığı, %95 hata payı) ve senaryo bu paylara kalibre edilir.
+8. **Topluluk.** `decision_ensemble` kuram, öğrenilmiş model ve dil modeline personaları canlandırtan
+   silikon örneklemi doğrulama satırlarında karşılaştırıp log-kaybı en aza indiren ağırlıkları öğrenir.
+
+### CSV biçimi
+
+```
+yas;cinsiyet;egitim;gelir;ideoloji;onceki_oy;kisi;fiyat_A;var_C;secim
+34;kadın;lisans;orta;sol;B;101;20000;1;B
+```
+
+Persona sütunlarının hepsi isteğe bağlı; Türkçe karakter, büyük/küçük harf ve sayısal yaş
+otomatik eşlenir. Seçim, seçenek kimliği ya da adıyla eşleşebilir.
+
+### Ölçülen başarım (sentetik "gerçek" modellerle — `npm run validate`)
+
+Gerçek kampanya verisi olmadan dürüst ölçüm, bilinen bir gerçek modelden veri üretip görülmemiş
+veride teorik tavanla kıyaslamaktır:
+
+- Siyasette n=600'de görülmemiş veride isabet tavana ~2 puan yakın (yakalanan kazanç ~%94).
+- Geçmiş oy eklenince isabet ~%65 → ~%85.
+- Conjoint verisinden fiyat esnekliği ve fiyat senaryosunun etkisi gerçeğe çok yakın geri kazanılır.
+- Yanlı örneklemde model-tabanlı nüfus tahmini ham örneklemden belirgin biçimde isabetli.
+- Panelde gizli sınıf modeli tek sınıftan iyi ve tavana yakın.
+
+**Sınır:** bunlar modelin *iç tutarlılığını ve öğrenme mekanizmasını* sınar. Gerçek dünyadaki
+isabet, kurumun verisinin kalitesine ve kapsamına bağlıdır ve `decision_learn` her seferinde onu
+ayrıca ölçer. Veri yüklenmeden yapılan tahminler kuram öncülleridir; mutlak paylar değil, yönler ve
+"ne olur" karşılaştırmaları için kullanılmalıdır.
 
 ## Kitle tahmini
 
@@ -264,6 +345,9 @@ js/app.js        → ekranların kablolaması
 js/audienceView.js → Kitle sekmesi
 js/audience/     → kitle tahmini: personas · theories · institutions · engine
                    · calibrate · extract · survey · scenarios (saf JS, node'da da çalışır)
+js/decision/     → karar tahmini: domains (kuram terimleri) · model (logit, ne olur) · estimate
+                   (MAP, doğrulama, gizli sınıf, raking) · data (CSV) · ensemble · polls · presets
+js/decisionView.js → Karar sekmesi
 ```
 
 ## Testler
@@ -275,7 +359,7 @@ npm install      # yalnızca playwright (dev bağımlılığı)
 npm test         # gerçek Chromium'da, mobil ekran boyutunda koşar
 ```
 
-Beş paket:
+Yedi paket (+ `npm run validate` doğrulama raporu):
 
 - `tests/smoke.test.mjs` — açılış, sekmeler, uçtan uca ajan döngüsü (plan kartı → araç
   kartları → sonuç), kalıcılık, yeniden yükleme, riskli araç onayı, API hata yolu, konsol temizliği
@@ -284,6 +368,10 @@ Beş paket:
 - `tests/audience.test.mjs` — kitle çekirdeği (tarayıcısız): örnekleyici, her kuramın beklenen
   yöne ittiği, mercekler, kalibrasyonun bilinen parametreleri geri kazanması, metin çıkarımı,
   sahte persona ajanlarıyla anket, tüm hazır senaryolar
+- `tests/decision.test.mjs` — karar motoru: üç alanda kuram yönleri, veriden öğrenme ve teorik
+  tavana yakınlık, pay kalibrasyonu, CSV, conjoint fiyat esnekliği, raking/MRP, topluluk, geçmiş
+  davranış, gizli sınıflar, anket birleştirme, seçim biçimi, etkileşimler
+- `tests/decision_tools.test.mjs` — karar araçları ve Karar sekmesi, tarayıcıda uçtan uca
 - `tests/audience_tools.test.mjs` — kitle araçlarının ajan döngüsünde ve Kitle sekmesinde uçtan uca çalışması
 - `tests/voice.test.mjs` — eller serbest döngüsü: uyandırma kelimesi kapısı, sesli komut →
   ajan → sesli cevap → tekrar dinleme, sesle onay ve soru cevaplama, yerel komutlar
