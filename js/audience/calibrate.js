@@ -5,7 +5,7 @@
 // uzaklaştıkça cezalandırılır; az veriyle aşırı uyumu ve kuramı "silmeyi" engeller.
 
 import { predict } from './engine.js';
-import { THEORIES } from './theories.js';
+import { THEORIES, lensWeights } from './theories.js';
 
 /** Gözlem anahtarı → ilgili sabit terim ve hata ölçeği (yüzde ölçeği 0..100, tutum -1..1). */
 const METRICS = {
@@ -50,7 +50,8 @@ export function calibrate(observations, o = {}) {
 
   const n = o.n || 300, rounds = o.rounds || 3, lambda = o.lambda ?? 1;
   const used = new Set(obs.flatMap((x) => Object.keys(x.observed).map((k) => METRICS[k].icpt)));
-  const cal = { weights: Object.fromEntries(THEORIES.filter((t) => !t.core).map((t) => [t.id, 1])), intercepts: { exp: 0, shift: 0, share: 0, adopt: 0 } };
+  const active = lensWeights(o.lens);   // kapalı mercekteki kuramlar ayarlanmaz
+  const cal = { weights: Object.fromEntries(THEORIES.filter((t) => !t.core && active[t.id]).map((t) => [t.id, 1])), intercepts: { exp: 0, shift: 0, share: 0, adopt: 0 } };
   const before = loss(obs, cal, n, lambda);
   let best = before.total;
 

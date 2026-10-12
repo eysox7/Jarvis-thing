@@ -92,7 +92,11 @@ export function predict(message, opts = {}) {
   const seed = opts.seed ?? 42;
   const lens = ['ana_akim', 'elestirel', 'butunlesik'].includes(opts.lens) ? opts.lens : 'butunlesik';
   const cal = opts.calibration || {};
-  const W = lensWeights(lens, { ...(cal.weights || {}), ...(opts.weights || {}) });
+  // Mercek hangi kuramların açık olduğunu belirler; kalibrasyon yalnızca açık olanları ölçekler
+  // (çarpan — kapalı kuramı geri açamaz); opts.weights açık geçersiz kılmadır.
+  const W = lensWeights(lens);
+  for (const [k, v] of Object.entries(cal.weights || {})) if (k in W && Number.isFinite(+v)) W[k] *= +v;
+  for (const [k, v] of Object.entries(opts.weights || {})) if (k in W && Number.isFinite(+v)) W[k] = +v;
   // Model belirsizliği taraması için çarpanlar (modelUncertainty kullanır)
   if (opts.weightScale) for (const k in W) W[k] *= opts.weightScale[k] ?? 1;
   const icpt = cal.intercepts || {};
@@ -203,7 +207,7 @@ export function predict(message, opts = {}) {
     people.forEach((x, i) => { (groups[x.p[k]] ||= []).push(outs[i]); });
     segments[k] = Object.fromEntries(Object.entries(groups).map(([v, arr]) => {
       const s = summarize(arr);
-      return [v, { n: arr.length, erisim: s.erisim_yuzde, tutum: s.ortalama_tutum, olumlu: s.olumlu_yuzde, paylasim: s.paylasim_yuzde, okuma: s.okuma }];
+      return [v, { n: arr.length, erisim: s.erisim_yuzde, tutum: s.ortalama_tutum, olumlu: s.olumlu_yuzde, paylasim: s.paylasim_yuzde, okuma: W.kodlama_kodacimlama ? s.okuma : undefined }];
     }));
   }
 
@@ -304,11 +308,16 @@ export function modelUncertainty(message, opts = {}, K = opts.uncertaintyRuns ||
   };
 }
 
-/** Birden çok mesaj varyantını aynı nüfusta karşılaştırır (A/B öncesi sanal test). */
+/**
+ * Birden çok mesaj varyantını aynı nüfusta karşılaştırır (A/B öncesi sanal test).
+ * Öğe düz mesaj ya da {message, opts} olabilir; ikincisi varyanta özgü kalibrasyon/marjinal taşır.
+ */
 export function compare(messages, opts = {}, metric = 'ortalama_tutum') {
   if (!Array.isArray(messages) || messages.length < 2) throw new Error('karşılaştırma için en az 2 mesaj ver');
-  const rows = messages.map((msg, i) => {
-    const r = predict(msg, { ...opts, bootstrap: 0 });
+  const rows = messages.map((item, i) => {
+    const own = item && item.message && typeof item.message === 'object';
+    const msg = own ? item.message : item;
+    const r = predict(msg, { ...opts, ...(own ? item.opts : {}), bootstrap: 0 });
     return { varyant: msg.ad || msg.name || `V${i + 1}`, ...r.mesaj, ...r.sonuc, _skor: r.sonuc[metric] ?? r.sonuc.ortalama_tutum };
   });
   rows.sort((a, b) => b._skor - a._skor);

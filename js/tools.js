@@ -471,7 +471,7 @@ def({
   run: (a) => {
     if (!Array.isArray(a.varyantlar) || a.varyantlar.length < 2) throw new Error('varyantlar en az 2 öğeli dizi olmalı');
     const inputs = a.varyantlar.map((v) => audienceInput({ ...v, hedef: a.hedef, mercek: a.mercek, n: a.n }));
-    return compare(inputs.map((x) => x.msg), inputs[0].opts, a.metrik || 'ortalama_tutum');
+    return compare(inputs.map((x) => ({ message: x.msg, opts: x.opts })), {}, a.metrik || 'ortalama_tutum');
   },
 });
 

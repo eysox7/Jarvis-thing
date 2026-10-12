@@ -160,6 +160,22 @@ ok(mu1.mercek_karsilastirma.ana_akim && mu1.mercek_karsilastirma.elestirel && mu
 const withMu = predict({ domain: 'bilim' }, { n: 300, bootstrap: 0, modelUncertainty: true, uncertaintyRuns: 6 });
 ok(!!withMu.model_belirsizligi && predict({ domain: 'bilim' }, { n: 300, bootstrap: 0 }).model_belirsizligi === undefined, 'predict yalnızca istenince belirsizlik ekler');
 
+console.log('\n[11] Gerileme testleri');
+const calX = { weights: { hegemonya: 1.5, kodlama_kodacimlama: 1, elm: 2 } };
+const rx = predict({ domain: 'saglik' }, { lens: 'ana_akim', calibration: calX, bootstrap: 0, n: 200 });
+ok(rx.kuramlar.every((t) => t.gelenek === 'ana_akim') && rx.sonuc.hall_okuma_yuzde === null, 'kalibrasyon kapalı mercekteki kuramı geri açmaz');
+ok(rx.kuramlar.find((t) => t.id === 'elm').agirlik === 2, 'kalibrasyon açık kuramı ölçekler');
+const rs = predict({ domain: 'saglik' }, { lens: 'ana_akim', bootstrap: 0, n: 200, segmentBy: ['yas'] });
+ok(Object.values(rs.segmentler.yas).every((g) => g.okuma === undefined), 'Hall kapalıyken segmentlerde okuma uydurulmaz');
+const calE = calibrate(cobs, { lens: 'elestirel', rounds: 1 });
+ok(Object.keys(calE.weights).every((k) => THEORIES.find((t) => t.id === k).gelenek === 'elestirel'), 'eleştirel mercekte yalnızca eleştirel kuramlar kalibre edilir');
+
+const cmpOwn = compare([
+  { message: { ad: 'kalibre', domain: 'saglik' }, opts: { calibration: { intercepts: { exp: -3 } } } },
+  { message: { ad: 'ham', domain: 'saglik' }, opts: {} },
+], { n: 300 }, 'erisim_yuzde');
+ok(cmpOwn.kazanan === 'ham', 'compare her varyantın kendi kalibrasyonunu kullanır');
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ kitle testleri geçti');

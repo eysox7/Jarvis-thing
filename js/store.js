@@ -90,7 +90,11 @@ export const settings = () => state.settings;
 export function setSetting(k, v) { state.settings[k] = v; save(); }
 
 export function replaceAll(next) {
-  state = { ...structuredClone(DEFAULTS), ...next, settings: { ...DEFAULTS.settings, ...(next.settings || {}) } };
+  state = {
+    ...structuredClone(DEFAULTS), ...next,
+    settings: { ...DEFAULTS.settings, ...(next.settings || {}) },
+    audience: { ...structuredClone(DEFAULTS.audience), ...(next.audience || {}) },
+  };
   save();
 }
 

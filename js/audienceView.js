@@ -180,7 +180,7 @@ function renderPrediction(r) {
       for (const [v, g] of Object.entries(groups)) {
         tbl.append(el('tr', {}, el('td', { text: v }), el('td', { text: g.n }), el('td', { text: `%${g.erisim}` }),
           el('td', { class: g.tutum >= 0 ? 'pos' : 'neg', text: g.tutum.toFixed(3) }), el('td', { text: `%${g.olumlu}` }),
-          el('td', { text: r.sonuc.hall_okuma_yuzde ? `%${g.okuma.karsit}` : '—' })));
+          el('td', { text: g.okuma ? `%${g.okuma.karsit}` : '—' })));
       }
       wrap.append(tbl);
     }
