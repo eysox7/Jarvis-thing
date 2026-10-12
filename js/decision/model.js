@@ -33,7 +33,17 @@ export function coefficients(resolved, model = {}, overrides = {}) {
   const asc = {};
   for (const a of resolved.alts) asc[a.id] = Number.isFinite(+a.asc) ? +a.asc : 0;
   Object.assign(asc, model.asc || {}, overrides.asc || {});
-  return { theta, asc };
+  // Veriden öğrenilmiş seçeneğe özgü demografik etkiler: demo[altId]['boyut=değer'] = katsayı
+  return { theta, asc, demo: model.demo || null };
+}
+
+/** Seçeneğe özgü demografik etki toplamı (öğrenilmiş modelde). */
+export function demoUtility(demo, altId, p) {
+  const d = demo && demo[altId];
+  if (!d) return 0;
+  let v = 0;
+  for (const k in p) { const c = d[k + '=' + p[k]]; if (c) v += c; }
+  return v;
 }
 
 /** Tek kişi için seçenek faydaları ve olasılıklar. zs: terim × seçenek özellik matrisi (yeniden kullanım için). */
@@ -41,7 +51,7 @@ export function personProbs(resolved, coef, f, p, i = 0, zs = null) {
   const { alts, terms, ctx } = resolved;
   const V = new Array(alts.length);
   for (let j = 0; j < alts.length; j++) {
-    let v = coef.asc[alts[j].id] || 0;
+    let v = (coef.asc[alts[j].id] || 0) + (coef.demo ? demoUtility(coef.demo, alts[j].id, p) : 0);
     for (let k = 0; k < terms.length; k++) {
       const z = zs ? zs[k][j] : terms[k].z(f, p, alts[j], ctx, i);
       v += (coef.theta[terms[k].id] || 0) * z;
@@ -109,7 +119,8 @@ export function predictChoice(spec, opts = {}) {
     paylar: Object.fromEntries(resolved.alts.map((a, j) => [a.id, pct(shares[j] / N)])),
     en_olasi_secim_yuzde: Object.fromEntries(resolved.alts.map((a, j) => [a.id, pct(firsts[j] / N)])),
     kararsizlik: r3(entropy / N),
-    kaynak: opts.model?.theta ? 'veriden öğrenilmiş model' : 'kuram öncülleri (kalibre edilmemiş)',
+    kaynak: opts.model?.kaynak || (opts.model?.theta ? 'veriden öğrenilmiş model' : 'kuram öncülleri (kalibre edilmemiş)'),
+    dogrulama: opts.model?.cv ? { isabet_yuzde: opts.model.cv.isabet_yuzde, log_kayip: opts.model.cv.log_kayip, temel_isabet_yuzde: opts.model.cv.cogunluk_isabet_yuzde } : undefined,
   };
   const order = resolved.alts.map((a, j) => [a.id, shares[j]]).sort((x, y) => y[1] - x[1]);
   result.kazanan = order[0][0];
@@ -132,7 +143,7 @@ export function predictChoice(spec, opts = {}) {
       let s = 0;
       for (const x of people) {
         const V = resolved.alts.map((a, j) => {
-          let v = coef.asc[a.id] || 0;
+          let v = (coef.asc[a.id] || 0) + (coef.demo ? demoUtility(coef.demo, a.id, x.p) : 0);
           for (let q = 0; q < resolved.terms.length; q++) if (q !== k) v += (coef.theta[resolved.terms[q].id] || 0) * x.zs[q][j];
           return v;
         });
