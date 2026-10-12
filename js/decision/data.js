@@ -4,7 +4,7 @@
 // Türkçe karakter, büyük/küçük harf ve sayısal yaş otomatik eşlenir; tanınmayan değer boş sayılır.
 
 import { DIMENSIONS, samplePopulation, features, rng } from '../audience/personas.js';
-import { resolveChoice, coefficients, personProbs } from './model.js';
+import { resolveChoice, coefficients, personProbs, rowResolved } from './model.js';
 
 const fold = (s) => String(s ?? '').trim().toLocaleLowerCase('tr')
   .replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c')
@@ -82,6 +82,19 @@ export function prepareRows(raw, spec) {
   const choiceCol = cols.find((c) => CHOICE_COLS[fold(c)]);
   if (!choiceCol) throw new Error('seçim sütunu bulunamadı (secim / tercih / choice / oy / karar)');
   const wCol = cols.find((c) => ['agirlik', 'weight', 'w'].includes(fold(c)));
+  // Satıra özgü seçenek özellikleri: "<özellik>_<seçenek>" (ör. fiyat_A) ve bulunurluk "var_<seçenek>"
+  const attrKeys = Object.keys(resolveChoice(spec).domain.seceneOzellikleri || {});
+  const altCols = [];
+  for (const c of cols) {
+    const fc = fold(c);
+    for (const a of alts) {
+      const sfx = '_' + fold(a.id);
+      if (!fc.endsWith(sfx)) continue;
+      const attr = fc.slice(0, -sfx.length);
+      if (attr === 'var' || attr === 'mevcut_mu') altCols.push({ c, alt: a.id, attr: '__var' });
+      else if (attrKeys.includes(attr)) altCols.push({ c, alt: a.id, attr });
+    }
+  }
   for (const r of raw) {
     const id = altIds.get(fold(r[choiceCol]));
     if (!id) { unknownChoice++; continue; }
@@ -91,24 +104,38 @@ export function prepareRows(raw, spec) {
       if (v) p[dim] = v; else if (r[c] !== '' && r[c] !== undefined) unmapped++;
     }
     const w = wCol ? Number(r[wCol]) : 1;
-    rows.push({ p, secim: id, w: Number.isFinite(w) && w > 0 ? w : 1 });
+    const row = { p, secim: id, w: Number.isFinite(w) && w > 0 ? w : 1 };
+    for (const { c, alt, attr } of altCols) {
+      const raw = r[c];
+      if (raw === '' || raw === undefined) continue;
+      if (attr === '__var') { if (['0', 'hayir', 'false', 'yok'].includes(fold(raw))) (row.yok ||= []).push(alt); continue; }
+      const v = ['evet', 'true'].includes(fold(raw)) ? true : ['hayir', 'false'].includes(fold(raw)) ? false : Number(String(raw).replace(',', '.'));
+      if (v === true || v === false || Number.isFinite(v)) ((row.ozel ||= {})[alt] ||= {})[attr] = v;
+    }
+    rows.push(row);
   }
   if (unknownChoice) warn.push(`${unknownChoice} satırda seçim, seçeneklerle eşleşmedi ve atlandı`);
   if (unmapped) warn.push(`${unmapped} hücre şemaya eşlenemedi ve boş sayıldı`);
   if (!Object.keys(dimOf).length) warn.push('hiç persona sütunu tanınmadı — yalnızca seçenek sabitleri öğrenilebilir');
+  if (altCols.length) warn.push(`${altCols.length} satıra özgü seçenek sütunu bulundu (conjoint/satış verisi)`);
   return { rows, uyarilar: warn, eslesen_boyutlar: [...new Set(Object.values(dimOf))] };
 }
 
 /** Bilinen "gerçek" modelden sentetik bireysel veri üretir (doğrulama ve testler için). */
-export function simulateDataset(spec, trueModel, { n = 2000, seed = 7, target, marginals } = {}) {
+export function simulateDataset(spec, trueModel, { n = 2000, seed = 7, target, marginals, vary } = {}) {
   const resolved = resolveChoice(spec);
   const coef = coefficients(resolved, trueModel);
   const pop = samplePopulation({ n, seed, target, marginals });
   const r = rng(seed * 31 + 5);
   return pop.map((p, i) => {
-    const { P } = personProbs(resolved, coef, features(p), p, i);
+    // vary: {altId: {özellik: [min, max]}} → her satırda rastgele özellik (conjoint tasarımı)
+    let row = { p, w: 1 };
+    if (vary) for (const [alt, attrs] of Object.entries(vary)) for (const [k, [lo, hi]] of Object.entries(attrs)) ((row.ozel ||= {})[alt] ||= {})[k] = Math.round(lo + (hi - lo) * r());
+    const { r: rr, mask } = rowResolved(resolved, row);
+    let { P } = personProbs(rr, coef, features(p), p, i);
+    if (mask) { P = P.map((q, j) => (mask[j] ? q : 0)); const s = P.reduce((a, b) => a + b, 0); P = P.map((q) => q / s); }
     let u = r(), j = 0;
     while (j < P.length - 1 && (u -= P[j]) > 0) j++;
-    return { p, secim: resolved.alts[j].id, w: 1, _P: P };
+    return { ...row, secim: resolved.alts[j].id, _P: P };
   });
 }

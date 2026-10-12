@@ -64,6 +64,20 @@ export function personProbs(resolved, coef, f, p, i = 0, zs = null) {
   return { V, P: e.map((x) => x / s) };
 }
 
+/**
+ * Satıra özgü seçenek seti: conjoint ve satış verisinde her gözlemde fiyat/özellik ve
+ * bulunurluk değişir. row.ozel = {altId: {özellik: değer}}, row.yok = [altId] (bulunmayan).
+ * Döner: {resolved', mask} — mask[j] = false olan seçenek o satırda seçilemez.
+ */
+export function rowResolved(resolved, row) {
+  if (!row || (!row.ozel && !row.yok)) return { r: resolved, mask: null };
+  const alts = resolved.alts.map((a) => (row.ozel && row.ozel[a.id] ? { ...a, ...row.ozel[a.id] } : a));
+  const ctx = { ...resolved.ctx };
+  if (resolved.domain.hazirla) Object.assign(ctx, resolved.domain.hazirla(alts, ctx));
+  const mask = row.yok ? alts.map((a) => !row.yok.includes(a.id)) : null;
+  return { r: { ...resolved, alts, ctx }, mask };
+}
+
 /** Kişi için z matrisi (terim × seçenek). Tahmin ve öğrenme ortak kullanır. */
 export function zMatrix(resolved, f, p, i = 0) {
   return resolved.terms.map((t) => resolved.alts.map((a) => t.z(f, p, a, resolved.ctx, i)));

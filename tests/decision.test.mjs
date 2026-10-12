@@ -1,7 +1,7 @@
 // Karar tahmin motoru: kuram-temelli çok terimli logit (tarayıcısız).
 import { predictChoice, whatIf, resolveChoice } from '../js/decision/model.js';
 import { simulateDataset, parseCSV, prepareRows, mapValue } from '../js/decision/data.js';
-import { fitChoiceModel, crossValidate, scoreProbs, calibrateShares, learn } from '../js/decision/estimate.js';
+import { fitChoiceModel, crossValidate, scoreProbs, calibrateShares, learn, rake, shareDiagnostics } from '../js/decision/estimate.js';
 
 const fails = [];
 const ok = (c, m) => { console.log((c ? '  ✔ ' : '  ✖ ') + m); if (!c) fails.push(m); };
@@ -92,6 +92,27 @@ const csv = 'Yaş;Cinsiyet;Eğitim;Tercih\n23;K;Lisans;B\n61;E;ilkokul;A\n45;E;l
 const prep = prepareRows(parseCSV(csv), { ...SECIM, secenekler: SECIM.secenekler.map((a) => ({ ...a })) });
 ok(prep.rows.length === 3 && prep.uyarilar.some((u) => u.includes('eşleşmedi')), 'eşleşmeyen seçim atlanır ve uyarılır');
 ok(prep.rows[0].p.egitim === 'universite' && prep.rows[2].secim === 'X', 'seçenek adıyla da eşleşir (Oy kullanmama → X)');
+
+console.log('\n[9] Conjoint / satış verisi: satıra özgü fiyatlar');
+const TRUE_T = { theta: { fiyat: 2.6, kalite: 1.2, marka: 0.8, sosyal_kanit: 1.1, yerli: 1.4, disarida: 1.0 }, asc: { P: 0.2, O: 0.3, Y: 0, N: -0.5 } };
+const vary = { P: { fiyat: [35000, 60000] }, O: { fiyat: [15000, 30000] }, Y: { fiyat: [8000, 16000] } };
+const crow = simulateDataset(TELEFON, TRUE_T, { n: 1500, seed: 5, vary });
+const cm = fitChoiceModel(TELEFON, crow, { iters: 250 });
+ok(Math.abs(cm.theta.fiyat - 2.6) < 0.4, `fiyat esnekliği veriden öğrenilir (gerçek 2.6 → ${cm.theta.fiyat})`);
+const wT = whatIf(TELEFON, { secenekler: { O: { fiyat: 18000 } } }, { model: TRUE_T, n: 1200 }), wM = whatIf(TELEFON, { secenekler: { O: { fiyat: 18000 } } }, { model: cm, n: 1200 });
+ok(Math.abs(wT.degisim_puan.O - wM.degisim_puan.O) < 2, `fiyat senaryosu gerçeğe yakın (${wM.degisim_puan.O} vs ${wT.degisim_puan.O})`);
+const csv2 = 'yas;gelir;secim;fiyat_P;fiyat_O;var_Y\n30;orta;O;50000;20000;1\n50;dusuk;N;40000;28000;0';
+const pr2 = prepareRows(parseCSV(csv2), TELEFON);
+ok(pr2.rows[0].ozel.O.fiyat === 20000 && pr2.rows[1].yok.includes('Y'), 'CSV satıra özgü fiyat ve bulunurluk sütunlarını okur');
+
+console.log('\n[10] Yanlı örneklem → nüfus (raking / MRP)');
+const bias = simulateDataset(TELEFON, TRUE_T, { n: 1200, seed: 9, vary, marginals: { yas: { '18-24': 60, '25-34': 30, '35-44': 5, '45-54': 3, '55-64': 1, '65+': 1 }, egitim: { universite: 70, lisansustu: 20, lise: 8, ilkokul: 2 } } });
+const truePop = predictChoice(TELEFON, { model: TRUE_T, n: 1500, explain: false }).paylar;
+const diag = shareDiagnostics(TELEFON, bias, fitChoiceModel(TELEFON, bias, { iters: 250 }), { n: 1500 });
+const err = (x) => Object.keys(truePop).reduce((s, k) => s + Math.abs(x[k] - truePop[k]), 0);
+ok(err(diag.model_nufus) < err(diag.ham_orneklem), `model-tabanlı nüfus tahmini ham örneklemden isabetli (hata ${err(diag.model_nufus).toFixed(1)} vs ${err(diag.ham_orneklem).toFixed(1)})`);
+const rk = rake(bias);
+ok(rk.etkin_orneklem < bias.length && rk.boyutlar.includes('yas'), `raking ağırlık verir ve etkin örneklemi raporlar (${rk.etkin_orneklem}/${bias.length})`);
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }

@@ -8,7 +8,7 @@
 // isabet, log-kayıp, Brier ve kalibrasyon hatası (ECE) raporlar ve iki temel modelle kıyaslar.
 
 import { features, DIMENSIONS, rng } from '../audience/personas.js';
-import { resolveChoice, coefficients, zMatrix, predictChoice } from './model.js';
+import { resolveChoice, coefficients, zMatrix, predictChoice, rowResolved } from './model.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 const pct = (x) => Math.round(x * 1000) / 10;
@@ -18,8 +18,9 @@ function precompute(resolved, rows) {
   const altIndex = Object.fromEntries(resolved.alts.map((a, j) => [a.id, j]));
   return rows.map((r, i) => {
     const f = features(r.p);
-    return { p: r.p, y: altIndex[r.secim], w: r.w ?? 1, zs: zMatrix(resolved, f, r.p, i), keys: Object.entries(r.p).map(([k, v]) => k + '=' + v) };
-  }).filter((x) => x.y !== undefined);
+    const { r: rr, mask } = rowResolved(resolved, r);
+    return { p: r.p, y: altIndex[r.secim], w: r.w ?? 1, mask, zs: zMatrix(rr, f, r.p, i), keys: Object.entries(r.p).map(([k, v]) => k + '=' + v) };
+  }).filter((x) => x.y !== undefined && (!x.mask || x.mask[x.y]));
 }
 
 /**
@@ -61,7 +62,7 @@ export function fitChoiceModel(spec, rows, o = {}) {
       let v = ascOf(j);
       for (const q of di[i]) v += demoOf(j, q);
       for (let k = 0; k < K; k++) v += x[k] * d.zs[tIdx[k]][j];
-      V[j] = v;
+      V[j] = d.mask && !d.mask[j] ? -Infinity : v;
     }
     let m = -Infinity; for (let j = 0; j < J; j++) if (V[j] > m) m = V[j];
     let s = 0; for (let j = 0; j < J; j++) { P[j] = Math.exp(V[j] - m); s += P[j]; }
@@ -145,13 +146,15 @@ function rowProbs(spec, model, rows) {
   const altIndex = Object.fromEntries(resolved.alts.map((a, j) => [a.id, j]));
   return rows.map((r, i) => {
     const f = features(r.p);
+    const { r: rr, mask } = rowResolved(resolved, r);
     let V = resolved.alts.map((a) => {
       let v = coef.asc[a.id] || 0;
       if (coef.demo && coef.demo[a.id]) for (const k in r.p) v += coef.demo[a.id][k + '=' + r.p[k]] || 0;
       return v;
     });
-    const zs = zMatrix(resolved, f, r.p, i);
+    const zs = zMatrix(rr, f, r.p, i);
     resolved.terms.forEach((t, k) => { const th = coef.theta[t.id] || 0; if (th) V = V.map((v, j) => v + th * zs[k][j]); });
+    if (mask) V = V.map((v, j) => (mask[j] ? v : -Infinity));
     const m = Math.max(...V), e = V.map((v) => Math.exp(v - m)), s = e.reduce((a, b) => a + b, 0);
     return { P: e.map((v) => v / s), y: altIndex[r.secim], w: r.w ?? 1 };
   });
@@ -240,6 +243,48 @@ export function calibrateShares(spec, targets, o = {}) {
     if (maxErr < 0.2) break;
   }
   return { ...model, kaynak: (o.model?.kaynak ? o.model.kaynak + ' + ' : '') + 'toplam paylara kalibre', hedef: targets, son_paylar: last };
+}
+
+/**
+ * Raking (iteratif oransal uyum): örneklem ağırlıklarını nüfus marjinallerine oturtur.
+ * Çevrimiçi anketler genç/eğitimliyi fazla temsil eder; ham paylar yanlıdır. Model zaten
+ * demografiye koşullu olduğundan nüfus tahmini persona nüfusu üzerinden (MRP mantığı) yapılır;
+ * raking ham örneklem paylarını ve öğrenme ağırlıklarını düzeltmek içindir.
+ */
+export function rake(rows, marginals = {}, iters = 30) {
+  const dims = Object.keys(DIMENSIONS).filter((d) => rows.some((r) => r.p[d]));
+  const target = {};
+  for (const d of dims) {
+    const base = { ...DIMENSIONS[d].base, ...(marginals[d] || {}) };
+    const present = new Set(rows.map((r) => r.p[d]).filter(Boolean));
+    const tot = [...present].reduce((s, v) => s + (base[v] || 0), 0);
+    if (tot > 0) target[d] = Object.fromEntries([...present].map((v) => [v, (base[v] || 0) / tot]));
+  }
+  const w = rows.map((r) => r.w ?? 1);
+  for (let it = 0; it < iters; it++) {
+    for (const d of Object.keys(target)) {
+      const cur = {}; let tot = 0;
+      rows.forEach((r, i) => { if (r.p[d]) { cur[r.p[d]] = (cur[r.p[d]] || 0) + w[i]; tot += w[i]; } });
+      rows.forEach((r, i) => { const v = r.p[d]; if (v && cur[v]) w[i] *= (target[d][v] * tot) / cur[v]; });
+    }
+  }
+  const mean = w.reduce((a, b) => a + b, 0) / w.length;
+  const out = rows.map((r, i) => ({ ...r, w: w[i] / mean }));
+  const deff = out.reduce((s, r) => s + r.w * r.w, 0) / out.length;   // Kish tasarım etkisi
+  return { rows: out, etkin_orneklem: Math.round(out.length / deff), boyutlar: Object.keys(target) };
+}
+
+/** Ham, ağırlıklı ve model-tabanlı (nüfusa yeniden çerçevelenmiş) payları yan yana verir. */
+export function shareDiagnostics(spec, rows, model, o = {}) {
+  const alts = resolveChoice(spec).alts;
+  const share = (rs) => { const t = rs.reduce((s, r) => s + (r.w ?? 1), 0); return Object.fromEntries(alts.map((a) => [a.id, pct(rs.filter((r) => r.secim === a.id).reduce((s, r) => s + (r.w ?? 1), 0) / t)])); };
+  const raked = rake(rows, o.marginals);
+  return {
+    ham_orneklem: share(rows.map((r) => ({ ...r, w: 1 }))),
+    agirlikli_orneklem: share(raked.rows),
+    model_nufus: predictChoice(spec, { model, n: o.n || 2000, marginals: o.marginals, explain: false }).paylar,
+    etkin_orneklem: raked.etkin_orneklem,
+  };
 }
 
 export { DIMENSIONS };
