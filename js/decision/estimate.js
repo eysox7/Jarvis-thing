@@ -26,7 +26,7 @@ function precompute(resolved, rows) {
 /**
  * @param {object} spec  seçim tanımı
  * @param {Array} rows   prepareRows çıktısı (veya simulateDataset)
- * @param {object} o     {kuramGuveni=1 (σ_θ), demoSigma=0.5, demografik=true, iters=350, lr=0.05}
+ * @param {object} o     {kuramGuveni=1 (σ_θ), demoSigma=0.25 (0 = demografi kapalı), demografik=true, etkilesim=false, iters=350, lr=0.05}
  */
 export function fitChoiceModel(spec, rows, o = {}) {
   const resolved = resolveChoice(spec);
@@ -310,14 +310,14 @@ export function fitLatentClass(spec, rows, o = {}) {
  */
 export function learn(spec, rows, o = {}) {
   let C = o.siniflar === 'oto' ? (rows.length >= 300 ? 'oto' : 1) : Number(o.siniflar) || 1;
-  let cv1, cv2;
-  if (C === 'oto') {
-    cv1 = crossValidate(spec, rows, { ...o, siniflar: 1, k: 3 });
-    cv2 = crossValidate(spec, rows, { ...o, siniflar: 2, k: 3 });
-    C = cv2.log_kayip < cv1.log_kayip - 0.005 ? 2 : 1;
-  }
   // Varsayılan: düzenlileştirme veriden seçilir ('oto'); çapraz doğrulama bunu katın içinde tekrarlar
   const sigOpt = o.demoSigma ?? 'oto';
+  let cv1, cv2;
+  if (C === 'oto') {
+    cv1 = crossValidate(spec, rows, { ...o, siniflar: 1, k: 3, demoSigma: sigOpt });
+    cv2 = crossValidate(spec, rows, { ...o, siniflar: 2, k: 3, demoSigma: sigOpt });
+    C = cv2.log_kayip < cv1.log_kayip - 0.005 ? 2 : 1;
+  }
   const sigma = sigOpt === 'oto' ? tuneDemoSigma(spec, rows, o) : sigOpt;
   const model = C > 1 ? fitLatentClass(spec, rows, { ...o, C, demoSigma: sigma }) : fitChoiceModel(spec, rows, { ...o, demoSigma: sigma });
   model.duzenlilestirme = { demografik_sigma: sigma, secim: sigOpt === 'oto' ? 'iç doğrulamayla' : 'elle' };

@@ -311,3 +311,31 @@ export function whatIf(spec, changes, opts = {}) {
     kazanan_once: base.kazanan, kazanan_sonra: after.kazanan,
   };
 }
+
+/**
+ * Tek kişi tahmini: tanımlanan bir persona (eksik boyutlar nötr) için seçim olasılıkları ve
+ * kararını en çok hangi kuram teriminin belirlediği (en olası seçeneğin ikinciye karşı fayda farkı).
+ */
+export function predictPerson(spec, persona, opts = {}) {
+  const resolved = resolveChoice(spec);
+  const p = { ...persona };
+  const f = features(p);
+  const cls = classCoefs(resolved, opts.model);
+  const zs = zMatrix(resolved, f, p, 0);
+  const P = new Array(resolved.alts.length).fill(0);
+  for (const c of cls) personProbs(resolved, c.coef, f, p, 0, zs).P.forEach((q, j) => { P[j] += c.pay * q; });
+  const order = P.map((q, j) => [j, q]).sort((a, b) => b[1] - a[1]);
+  const [b, s] = [order[0][0], order[1][0]];
+  const coef = cls.reduce((a, c) => (c.pay > a.pay ? c : a)).coef;
+  const nedenler = resolved.terms.map((t, k) => {
+    const th = coef.etk ? thetaFor(coef, t.id, p) : coef.theta[t.id] || 0;
+    return { terim: t.ad, kuram: t.kuram, katki: r3(th * (zs[k][b] - zs[k][s])) };
+  }).filter((x) => Math.abs(x.katki) >= 0.02).sort((a, c) => Math.abs(c.katki) - Math.abs(a.katki)).slice(0, 6);
+  return {
+    olasiliklar: Object.fromEntries(resolved.alts.map((a, j) => [a.id, pct(P[j])])),
+    en_olasi: resolved.alts[b].id, ikinci: resolved.alts[s].id,
+    neden: nedenler,
+    eksik_boyutlar: Object.keys(DIMENSIONS).filter((d) => p[d] === undefined),
+    kaynak: opts.model?.kaynak || (opts.model?.theta || opts.model?.siniflar ? 'veriden öğrenilmiş model' : 'kuram öncülleri'),
+  };
+}

@@ -1,5 +1,5 @@
 // Karar tahmin motoru: kuram-temelli çok terimli logit (tarayıcısız).
-import { predictChoice, whatIf, resolveChoice, rowProbabilities } from '../js/decision/model.js';
+import { predictChoice, whatIf, resolveChoice, rowProbabilities, predictPerson } from '../js/decision/model.js';
 import { simulateDataset, parseCSV, prepareRows, mapValue } from '../js/decision/data.js';
 import { fitChoiceModel, crossValidate, scoreProbs, calibrateShares, learn, rake, shareDiagnostics, fitLatentClass } from '../js/decision/estimate.js';
 import { buildEnsemble, stackWeights, siliconProbs, mixShares, siliconSecondOpinion } from '../js/decision/ensemble.js';
@@ -233,6 +233,14 @@ const tk = (g) => whatIf(TELEFON, { secenekler: { P: { taksit: true } } }, { ...
 ok(tk('dusuk') > tk('yuksek'), `taksit düşük gelirde daha etkili (${tk('dusuk')} > ${tk('yuksek')})`);
 ok(whatIf(ASI, { secenekler: { evet: { kayip_cercevesi: true } } }, O).degisim_puan.evet > 0, 'kayıp çerçevesi davranışı artırır');
 ok(whatIf(ASI, { secenekler: { evet: { maliyet: 0 } } }, O).degisim_puan.evet > whatIf(ASI, { secenekler: { evet: { maliyet: 0.02 } } }, O).degisim_puan.evet + 1, 'sıfır fiyat etkisi: bedava, neredeyse bedavadan belirgin güçlü');
+
+console.log('\n[20] Tek kişi tahmini');
+const solcu = predictPerson(SECIM, { yas: '25-34', ideoloji: 'sol', dindarlik: 'dusuk', egitim: 'universite' });
+const sagci = predictPerson(SECIM, { yas: '55-64', ideoloji: 'sag', dindarlik: 'yuksek', kurumsal_guven: 'yuksek' });
+ok(solcu.en_olasi === 'B' && ['A', 'C'].includes(sagci.en_olasi), `kişiye göre farklı tahmin (sol→${solcu.en_olasi}, sağ→${sagci.en_olasi})`);
+ok(solcu.neden.length > 0 && solcu.neden[0].kuram && solcu.eksik_boyutlar.includes('gelir'), 'kararın kuram gerekçeleri ve eksik bilgiler raporlanır');
+const sadik = predictPerson(SECIM, { ideoloji: 'merkez', onceki: 'C' }, { model: { theta: { gecmis: 3 } } });
+ok(sadik.en_olasi === 'C', 'önceki seçim bilinen kişide sadakat etkisi');
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }

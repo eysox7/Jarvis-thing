@@ -12,7 +12,8 @@ import { runSurvey } from './audience/survey.js';
 import { extractMessage } from './audience/extract.js';
 import { SCENARIOS } from './audience/scenarios.js';
 import { chatWithFallback } from './providers.js';
-import { predictChoice, whatIf as choiceWhatIf, resolveChoice } from './decision/model.js';
+import { predictChoice, whatIf as choiceWhatIf, resolveChoice, predictPerson } from './decision/model.js';
+import { mapValue } from './decision/data.js';
 import { DECISION_DOMAINS } from './decision/domains.js';
 import { parseCSV, prepareRows } from './decision/data.js';
 import { learn, calibrateShares, shareDiagnostics } from './decision/estimate.js';
@@ -641,6 +642,23 @@ def({
     if (a.silikon) r.silikon_ikinci_gorus = await siliconSecondOpinion(spec, model, chatFn(ctx));
     r.terim_etkileri = r.terim_etkileri?.slice(0, 8);
     return r;
+  },
+});
+
+def({
+  name: 'decision_person',
+  desc: 'Tek bir kişinin (betimlenen persona) bir karar durumunda ne seçeceğini olasılıklarla tahmin eder ve kararını hangi kuramların belirlediğini açıklar. Örn. "35 yaşında, büyükşehirde yaşayan, üniversite mezunu, orta gelirli bir kadın".',
+  params: { ...SCEN_PARAMS, kisi: `object (zorunlu) — persona alanları; bilinmeyenleri yazma. Boyutlar: ${Object.keys(DIMENSIONS).join(', ')} (yaş sayı olabilir); onceki: önceki seçim` },
+  run: (a) => {
+    if (!a.kisi || typeof a.kisi !== 'object') throw new Error('kisi zorunlu');
+    const { spec, model } = scenarioOf(a);
+    const p = {};
+    for (const [k, v] of Object.entries(a.kisi)) {
+      if (k === 'onceki') { p.onceki = String(v); continue; }
+      const m = mapValue(k, v);
+      if (m) p[k] = m;
+    }
+    return predictPerson(spec, p, { model });
   },
 });
 

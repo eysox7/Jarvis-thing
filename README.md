@@ -134,7 +134,7 @@ Model bu araçları kendi kararıyla çağırır. `[onay]` işaretliler izin ist
 | Web | `web_search`, `http_fetch` `[onay]`, `open_url` `[onay]` |
 | Cihaz | `device_info`, `geolocate` `[onay]`, `clipboard_write`, `share` `[onay]`, `notify`, `speak`, `vibrate` |
 | Etkileşim | `ask_user` — bilgi eksikse uydurmaz, sorar |
-| Karar tahmini | `decision_predict`, `decision_whatif`, `decision_scenario_save`, `decision_data_import`, `decision_learn`, `decision_calibrate_shares`, `decision_polls`, `decision_ensemble`, `decision_catalog` |
+| Karar tahmini | `decision_predict`, `decision_person`, `decision_whatif`, `decision_scenario_save`, `decision_data_import`, `decision_learn`, `decision_calibrate_shares`, `decision_polls`, `decision_ensemble`, `decision_catalog` |
 | Kitle tahmini | `audience_predict`, `audience_compare`, `audience_optimize`, `audience_survey`, `audience_extract`, `audience_calibrate`, `audience_catalog`, `institution_save`, `institution_delete` `[onay]` |
 
 Yeni araç eklemek: `js/tools.js` içinde bir `def({name, desc, params, run})` bloğu.
@@ -163,10 +163,13 @@ Rastgele fayda kuramı (McFadden): kişi i seçenek j'den `U_ij = ASC_j + Σ θ_
 
 | Alan | Kuram terimleri |
 |---|---|
-| Siyaset | mekânsal yakınlık (Downs), yönsel oy (Rabinowitz–Macdonald), parti kimliği (Michigan), geriye dönük ekonomik oy (Fiorina), sistem güveni (Easton), lider valensi (Stokes), stratejik oy (Duverger), katılmama (Riker–Ordeshook); konu önemi bağlamı |
-| Ticaret | log-fiyat × gelir, referans fiyat / kayıp kaçınma (Kahneman–Tversky, Thaler), kalite, marka (sezgisel işleme), sosyal kanıt (Cialdini), etnosentrizm, sürdürülebilirlik, statüko (Samuelson–Zeckhauser), dijital erişim (TAM), satın almama |
-| Gündelik | beklenen fayda, maliyet, risk kaçınma, şimdiki zaman yanlılığı (Laibson), sosyal norm ve algılanan kontrol (Ajzen), varsayılan etkisi (Johnson–Goldstein), alışkanlık, otoriteye güven |
+| Siyaset | mekânsal yakınlık (Downs), yönsel oy (Rabinowitz–Macdonald), parti kimliği (Michigan), geriye dönük ekonomik oy (Fiorina), sistem güveni (Easton), iktidar yorgunluğu (Paldam), lider valensi (Stokes), stratejik oy (Duverger), katılmama (Riker–Ordeshook); konu önemi bağlamı |
+| Ticaret | log-fiyat × gelir, referans fiyat / kayıp kaçınma (Kahneman–Tversky, Thaler), indirim belirginliği, taksit (likidite kısıtı), kalite, marka (sezgisel işleme), sosyal kanıt (Cialdini), etnosentrizm, sürdürülebilirlik, statüko (Samuelson–Zeckhauser), dijital erişim (TAM), satın almama |
+| Gündelik | beklenen fayda, maliyet, risk kaçınma, şimdiki zaman yanlılığı (Laibson), sosyal norm ve algılanan kontrol (Ajzen), varsayılan etkisi (Johnson–Goldstein), alışkanlık, kayıp çerçevesi (Tversky–Kahneman), kıtlık (Cialdini), sıfır fiyat etkisi (Shampanier–Mazar–Ariely), otoriteye güven |
 | Hepsi | geçmiş davranış / sadakat (durum bağımlılığı), kampanya etkisi (kitle motorunun 20 kuramından) |
+
+Nüfus tahmininin yanında **tek kişi** tahmini de yapılır (`decision_person`): betimlenen kişinin
+seçim olasılıkları, kararını en çok hangi kuramların belirlediği ve hangi bilgilerin eksik olduğu.
 
 ### Doğruluk nereden gelir
 
@@ -209,7 +212,9 @@ otomatik eşlenir. Seçim, seçenek kimliği ya da adıyla eşleşebilir.
 Gerçek kampanya verisi olmadan dürüst ölçüm, bilinen bir gerçek modelden veri üretip görülmemiş
 veride teorik tavanla kıyaslamaktır:
 
-- Siyasette n=600'de görülmemiş veride isabet tavana ~2 puan yakın (yakalanan kazanç ~%94).
+- n=1600'de üç alanın ortalamasında teorik tavana göre yakalanan tahmin kazancı ~%83 (siyaset ~%97,
+  isabet tavana ~1 puan yakın). Az veride (n≈100) ticarette model çoğunluk tahmininin önüne geçemiyor —
+  bu kadar veriyle beklenen bir sınır.
 - Geçmiş oy eklenince isabet ~%65 → ~%85.
 - Conjoint verisinden fiyat esnekliği ve fiyat senaryosunun etkisi gerçeğe çok yakın geri kazanılır.
 - Yanlı örneklemde model-tabanlı nüfus tahmini ham örneklemden belirgin biçimde isabetli.
