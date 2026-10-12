@@ -8,6 +8,9 @@ import { predict, compare, optimize, DOMAINS, CHANNELS, FRAMES } from './audienc
 import { INSTITUTIONS } from './audience/institutions.js';
 import { THEORIES } from './audience/theories.js';
 import { calibrate, CALIBRATION_METRICS } from './audience/calibrate.js';
+import { runSurvey } from './audience/survey.js';
+import { extractMessage } from './audience/extract.js';
+import { chatWithFallback } from './providers.js';
 import { DIMENSIONS } from './audience/personas.js';
 
 const T = {};
@@ -405,6 +408,7 @@ def({
 /* ---------------- kitle tahmini (MatrAIx × iletişim kuramları) ---------------- */
 
 const MSG_PARAMS = {
+  metin: 'string — gerçek mesaj metni; verilirse alan/çerçeve/duruş vb. eksik alanlar metinden çıkarılır',
   alan: `string — ${Object.keys(DOMAINS).join(' | ')}`,
   kurum: 'string — kurum türü (audience_catalog) veya institution_save ile kaydedilmiş kurum id',
   kanallar: `string[] — ${Object.keys(CHANNELS).join(' | ')} (boşsa kurumun kanalları)`,
@@ -493,6 +497,29 @@ def({
     const cal = calibrate(obs, { lens: a.mercek });
     S.setCalibration(key, { ...cal, at: Date.now() });
     return { kalibrasyon: key, ...cal };
+  },
+});
+
+def({
+  name: 'audience_survey',
+  desc: 'MatrAIx tarzı sanal anket: sentetik nüfustan çeşitli personalar seçer, bağlı dil modeline her birini canlandırtarak mesaja tepkisini sorar ve kuram motorunun aynı personalar için tahminiyle karşılaştırır (uyum/korelasyon). Model çağrısı yapar.',
+  params: { ...MSG_PARAMS, ...OPT_PARAMS, katilimci: 'number — persona sayısı (varsayılan 8, en çok 24)', tabaka: 'string — çeşitliliğin korunacağı boyut (varsayılan ideoloji)' },
+  run: async (a, ctx) => {
+    const { msg, opts } = audienceInput(a);
+    const chat = async (system, user) => (await chatWithFallback(S.profileChain(), {
+      system, messages: [{ role: 'user', content: user }], temperature: 0.7, proxy: ctx?.settings?.proxy,
+    })).text;
+    return runSurvey(msg, { ...opts, k: a.katilimci, by: a.tabaka, chat });
+  },
+});
+
+def({
+  name: 'audience_extract',
+  desc: 'Bir mesaj metninden alan, çerçeve, argüman kalitesi, ticarilik, egemen/karşı duruş, ideolojik eğilim, temsil ve yenilik özelliklerini çıkarır; hangi kelimelere dayandığını gösterir.',
+  params: { metin: 'string (zorunlu)' },
+  run: (a) => {
+    if (!a.metin) throw new Error('metin zorunlu');
+    return extractMessage(String(a.metin));
   },
 });
 

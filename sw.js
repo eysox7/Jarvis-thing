@@ -18,6 +18,8 @@ const SHELL = [
   './js/audience/theories.js',
   './js/audience/institutions.js',
   './js/audience/calibrate.js',
+  './js/audience/extract.js',
+  './js/audience/survey.js',
   './manifest.webmanifest',
   './icons/icon.svg',
 ];

@@ -6,6 +6,7 @@
 import { samplePopulation, features, rng, DIMENSIONS } from './personas.js';
 import { THEORIES, lensWeights, sig } from './theories.js';
 import { DOMAINS, CHANNELS, FRAMES, resolveInstitution } from './institutions.js';
+import { extractMessage } from './extract.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const num = (v, d, lo, hi) => (v === undefined || v === null || v === '' || !Number.isFinite(+v) ? d : clamp(+v, lo, hi));
@@ -17,9 +18,13 @@ const SLANT = { sol: -1, merkez: 0, sag: 1, notr: 0 };
 
 /** Serbest biçimli mesaj tanımını motorun anladığı forma getirir; bilinmeyeni açıkça reddeder. */
 export function normalizeMessage(msg = {}) {
-  const domain = msg.domain || msg.alan || 'kamu_hizmeti';
+  // Metin verildiyse eksik alanlar metinden çıkarılır; açıkça verilen her alan önceliklidir.
+  const text = msg.text || msg.metin || '';
+  const ex = text ? extractMessage(text) : { message: {}, kanit: null };
+  const E = ex.message;
+  const domain = msg.domain || msg.alan || E.domain || 'kamu_hizmeti';
   if (!DOMAINS[domain]) throw new Error(`bilinmeyen alan: ${domain}. Kullanılabilir: ${Object.keys(DOMAINS).join(', ')}`);
-  const frame = msg.frame || msg.cerceve || 'notr';
+  const frame = msg.frame || msg.cerceve || E.frame || 'notr';
   if (!FRAMES[frame]) throw new Error(`bilinmeyen çerçeve: ${frame}. Kullanılabilir: ${Object.keys(FRAMES).join(', ')}`);
   const inst = resolveInstitution(msg.institution ?? msg.kurum);
   let channels = msg.channels ?? msg.kanallar ?? msg.channel ?? msg.kanal ?? inst.kanallar ?? ['sosyal'];
@@ -27,20 +32,19 @@ export function normalizeMessage(msg = {}) {
   for (const c of channels) if (!CHANNELS[c]) throw new Error(`bilinmeyen kanal: ${c}. Kullanılabilir: ${Object.keys(CHANNELS).join(', ')}`);
   if (!channels.length) channels = ['sosyal'];
 
-  const stance = msg.hegemonic ?? msg.stance ?? msg.durus;
-  const slant = msg.slant ?? msg.egilim;
+  const stance = msg.hegemonic ?? msg.stance ?? msg.durus ?? E.hegemonic;
+  const slant = msg.slant ?? msg.egilim ?? E.slant;
   return {
-    domain, frame, channels, inst,
-    text: msg.text || msg.metin || '',
-    quality: num(msg.quality ?? msg.arguman_kalitesi, 0.6, 0, 1),
-    cues: num(msg.cues ?? msg.cevresel_ipucu, 0.5, 0, 1),
+    domain, frame, channels, inst, text, extraction: ex.kanit,
+    quality: num(msg.quality ?? msg.arguman_kalitesi ?? E.quality, 0.6, 0, 1),
+    cues: num(msg.cues ?? msg.cevresel_ipucu ?? E.cues, 0.5, 0, 1),
     slant: typeof slant === 'string' ? (SLANT[slant] ?? 0) : num(slant, inst.ideoloji * 0.5, -1, 1),
     hegemonic: typeof stance === 'string' ? (STANCE[stance] ?? 0) : num(stance, 0, -1, 1),
-    novelty: num(msg.novelty ?? msg.yenilik, 0.3, 0, 1),
+    novelty: num(msg.novelty ?? msg.yenilik ?? E.novelty, 0.3, 0, 1),
     repetition: num(msg.repetition ?? msg.tekrar, 1, 1, 50),
     controversy: num(msg.controversy ?? msg.tartismali, DOMAINS[domain].controversy, 0, 1),
-    commercial: num(msg.commercial ?? msg.ticari, inst.ticari, 0, 1),
-    representation: num(msg.representation ?? msg.temsil, 0, -1, 1),
+    commercial: num(msg.commercial ?? msg.ticari ?? E.commercial, inst.ticari, 0, 1),
+    representation: num(msg.representation ?? msg.temsil ?? E.representation, 0, -1, 1),
   };
 }
 
@@ -198,10 +202,12 @@ export function predict(message, opts = {}) {
   }
 
   return {
+    _people: opts.keepPeople ? people.map((x, i) => ({ persona: x.p, out: outs[i] })) : undefined,   // anket katmanı için
     mesaj: {
       alan: dom.label, cerceve: FRAMES[m.frame], kanallar: m.channels.map((c) => CHANNELS[c].label),
       kurum: m.inst.ad, durus: m.hegemonic > 0 ? 'egemen' : m.hegemonic < 0 ? 'karşı-hegemonik' : 'nötr',
     },
+    cikarim: m.extraction || undefined,
     mercek: lens, n: N, tohum: seed,
     sonuc: { ...fmt(summary, ci), hall_okuma_yuzde: W.kodlama_kodacimlama ? summary.okuma : null },
     kuramlar: theories,

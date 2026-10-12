@@ -3,6 +3,8 @@ import { samplePopulation, DIMENSIONS } from '../js/audience/personas.js';
 import { predict, compare, optimize, normalizeMessage } from '../js/audience/engine.js';
 import { THEORIES, lensWeights } from '../js/audience/theories.js';
 import { calibrate } from '../js/audience/calibrate.js';
+import { extractMessage } from '../js/audience/extract.js';
+import { runSurvey, describePersona } from '../js/audience/survey.js';
 
 const fails = [];
 const ok = (c, m) => { console.log((c ? '  ✔ ' : '  ✖ ') + m); if (!c) fails.push(m); };
@@ -105,6 +107,40 @@ const one = calibrate(cobs.slice(0, 1));
 ok(!one.fit.agirliklar_ayarlandi && one.fit.not, 'az veride kuram ağırlıklarına dokunulmaz ve uyarılır');
 ok(throws(() => calibrate([{ message: {}, observed: { uydurma: 3 } }])), 'bilinmeyen metrik reddedilir');
 ok(throws(() => calibrate([])), 'boş gözlem reddedilir');
+
+console.log('\n[7] Metinden mesaj çıkarımı');
+const e1 = extractMessage('Grip aşısı olmazsanız sevdiklerinizi riske atarsınız. Araştırmaya göre %40 daha az hastalanıyorsunuz.');
+ok(e1.message.domain === 'saglik' && e1.message.frame === 'kayip', 'sağlık + kayıp çerçevesi bulundu');
+ok(e1.message.quality > 0.6 && e1.kanit.arguman.length >= 2, 'kanıt ifadeleri argüman kalitesini artırır');
+const e2 = extractMessage('Büyük indirim! Tüm ürünlerde fırsat, hemen sipariş ver 🔥');
+ok(e2.message.domain === 'ticaret' && e2.message.commercial >= 0.8, 'ticari mesaj tanındı');
+const e3 = extractMessage('Emekçilerin haklarımız için direnişi sürüyor, sömürüye karşı grev!');
+ok(e3.message.hegemonic < 0 && e3.message.slant < 0, 'karşı-hegemonik ve sol eğilim tanındı');
+ok(!('eşit' in (e3.kanit.temsil || {})), '"eşitsizlik" kapsayıcı temsil sayılmaz');
+const viaText = normalizeMessage({ metin: 'Deprem sonrası tahliye uyarısı: acil toplanma alanlarına gidin', frame: 'umut' });
+ok(viaText.domain === 'kriz' && viaText.frame === 'umut', 'metin eksikleri doldurur, açık alan önceliklidir');
+ok(predict({ metin: 'Yeni metro hattımız ilk kez açılıyor' }, { n: 200, bootstrap: 0 }).cikarim?.yenilik?.length > 0, 'tahmin çıkarım kanıtını raporlar');
+
+console.log('\n[8] Persona-ajan anketi (MatrAIx Survey)');
+ok(describePersona({ yas: '25-34', cinsiyet: 'kadin', yerlesim: 'metropol', egitim: 'universite', gelir: 'orta', ideoloji: 'sol', dindarlik: 'dusuk', dijital: 'yuksek', medya: 'sosyal', kurumsal_guven: 'dusuk', bilissel_ihtiyac: 'yuksek', kanaat_onderi: 'hayir', azinlik_kimlik: 'hayir' }).includes('sosyal medyadan'), 'persona doğal dile çevrilir');
+let calls = 0; const prompts = [];
+// Sahte persona ajanı: solda olanlar karşıt, diğerleri egemen okur
+const fakeChat = async (system, user) => {
+  calls++; prompts.push(user);
+  const lines = user.split('PERSONALAR:')[1].trim().split('\n');
+  return JSON.stringify({ yanitlar: lines.map((l, i) => {
+    const left = l.includes('solda');
+    return { no: i + 1, tutum: left ? -2 : 1, okuma: left ? 'karsit' : 'egemen', paylasir: !left, gerekce: 'test' };
+  }) });
+};
+const sv = await runSurvey({ domain: 'siyaset', institution: 'parti_iktidar', hegemonic: 'egemen' }, { k: 9, batch: 4, chat: fakeChat });
+ok(sv.katilimci === 9 && calls === 3, `9 persona 3 partide soruldu (${calls} çağrı)`);
+ok(prompts[0].includes('Siyasi parti (iktidar)'), 'kurum bilgisi personaya iletildi');
+ok(['solda', 'merkezde', 'sağda'].every((w) => prompts.join('').includes(w)), 'tabakalı panel ideolojik çeşitliliği korur');
+ok(sv.ajan_ozet.okuma_yuzde.karsit > 0 && sv.uyum.tutum_korelasyonu !== null, 'ajan özeti ve uyum metrikleri hesaplandı');
+ok(sv.uyum.tutum_korelasyonu > 0, `kuram motoru ile ajanlar aynı yönde (r=${sv.uyum.tutum_korelasyonu})`);
+let threw = false; try { await runSurvey({}, { chat: async () => 'json değil' }); } catch { threw = true; }
+ok(threw, 'bozuk model yanıtı açık hata verir');
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
