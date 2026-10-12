@@ -16,7 +16,7 @@ import { predictChoice, whatIf as choiceWhatIf, resolveChoice } from './decision
 import { DECISION_DOMAINS } from './decision/domains.js';
 import { parseCSV, prepareRows } from './decision/data.js';
 import { learn, calibrateShares, shareDiagnostics } from './decision/estimate.js';
-import { buildEnsemble, siliconProbs, mixShares } from './decision/ensemble.js';
+import { buildEnsemble, siliconProbs, mixShares, siliconSecondOpinion } from './decision/ensemble.js';
 import { aggregatePolls } from './decision/polls.js';
 import { samplePopulation } from './audience/personas.js';
 import { DIMENSIONS } from './audience/personas.js';
@@ -631,12 +631,14 @@ def({
     segment: 'string[] — kırılım boyutları',
     kampanya: 'object — {secenek: id, mesaj: {audience_predict mesaj alanları}}: kampanyanın karara etkisi',
     kuram_modeli: 'boolean — kayıtlı modeli yok sayıp yalnız kuramla tahmin et',
+    silikon: 'boolean — dil modeline tabakalı persona paneli sorup ikinci görüş ekle (model çağrısı yapar)',
   },
-  run: (a) => {
+  run: async (a, ctx) => {
     const { spec, model } = scenarioOf(a);
     const seg = Array.isArray(a.segment) ? a.segment : a.segment ? [a.segment] : [];
     const r = predictChoice(spec, { model, target: a.hedef, segmentBy: seg, n: 2000 });
     if (model?.topluluk?.silikon_paylari) r.topluluk_paylari = mixShares({ ogrenilmis: r.paylar, silikon: model.topluluk.silikon_paylari }, model.topluluk.agirliklar);
+    if (a.silikon) r.silikon_ikinci_gorus = await siliconSecondOpinion(spec, model, chatFn(ctx));
     r.terim_etkileri = r.terim_etkileri?.slice(0, 8);
     return r;
   },

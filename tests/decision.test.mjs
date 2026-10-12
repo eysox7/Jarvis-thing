@@ -2,7 +2,7 @@
 import { predictChoice, whatIf, resolveChoice, rowProbabilities } from '../js/decision/model.js';
 import { simulateDataset, parseCSV, prepareRows, mapValue } from '../js/decision/data.js';
 import { fitChoiceModel, crossValidate, scoreProbs, calibrateShares, learn, rake, shareDiagnostics, fitLatentClass } from '../js/decision/estimate.js';
-import { buildEnsemble, stackWeights, siliconProbs, mixShares } from '../js/decision/ensemble.js';
+import { buildEnsemble, stackWeights, siliconProbs, mixShares, siliconSecondOpinion } from '../js/decision/ensemble.js';
 import { aggregatePolls } from '../js/decision/polls.js';
 import { describePersona } from '../js/audience/survey.js';
 
@@ -212,6 +212,18 @@ ok(pI.pay_araligi_90 && Object.entries(pI.paylar).every(([k, v]) => pI.pay_arali
 const w = (r) => r.pay_araligi_90.A[1] - r.pay_araligi_90.A[0];
 ok(w(pI) > w(pB), `az veride aralık geniş, çok veride dar (${w(pI).toFixed(1)} > ${w(pB).toFixed(1)} puan)`);
 ok(predictChoice(SECIM, { ...O }).pay_araligi_90 === undefined, 'kuram öncülü tahminde sahte aralık üretilmez');
+
+console.log('\n[18] Silikon ikinci görüş');
+const agreeChat = async (sys, user) => {
+  const lines = user.split('PERSONALAR:')[1].trim().split('\n');
+  return JSON.stringify({ yanitlar: lines.map((l, i) => ({ no: i + 1, olasiliklar: l.includes('solda') ? { A: 0.05, B: 0.8, C: 0.05, X: 0.1 } : l.includes('sağda') ? { A: 0.6, B: 0.05, C: 0.25, X: 0.1 } : { A: 0.3, B: 0.3, C: 0.1, X: 0.3 } })) });
+};
+const so = await siliconSecondOpinion(SECIM, undefined, agreeChat, { k: 12 });
+ok(so.panel === 12 && so.tabaka === 'ideoloji', 'ideolojiye göre tabakalı panel soruldu');
+ok(so.ayrisma_puan < 20 && so.yorum, `sağduyulu dil modeli ile kuram modeli uyuşur (ayrışma ${so.ayrisma_puan} puan)`);
+const contrary = async (sys, user) => JSON.stringify({ yanitlar: user.split('PERSONALAR:')[1].trim().split('\n').map((_, i) => ({ no: i + 1, olasiliklar: { A: 0, B: 0, C: 0, X: 1 } })) });
+const so2 = await siliconSecondOpinion(SECIM, undefined, contrary, { k: 12 });
+ok(so2.ayrisma_puan > 40 && so2.yorum.includes('belirgin'), `uyuşmayan görüş açıkça işaretlenir (${so2.ayrisma_puan} puan)`);
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }

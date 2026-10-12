@@ -116,3 +116,33 @@ export function mixShares(componentShares, weights) {
   const ids = Object.keys(componentShares[names[0]]);
   return Object.fromEntries(ids.map((id) => [id, Math.round(names.reduce((s, n) => s + weights[n] * componentShares[n][id], 0) / tot * 10) / 10]));
 }
+
+/**
+ * Silikon ikinci görüş: nüfustan tabakalı küçük bir panel dil modeline sorulur; panel payları
+ * aynı personalar için modelin tahminiyle kıyaslanır. Veri yokken "sağduyu" kontrolü sağlar;
+ * ayrışma büyükse kuram varsayımları ya da seçenek tanımı gözden geçirilmeli.
+ */
+export async function siliconSecondOpinion(spec, model, chat, o = {}) {
+  const { samplePopulation } = await import('../audience/personas.js');
+  const resolved = resolveChoice(spec);
+  const k = Math.max(6, Math.min(Number(o.k) || 18, 48));
+  // İdeolojiye (siyaset) ya da gelire (diğer) göre tabakalı panel
+  const by = resolved.domain.id === 'siyaset' ? 'ideoloji' : 'gelir';
+  const pool = samplePopulation({ n: k * 8, seed: o.seed ?? 9 });
+  const groups = {};
+  for (const p of pool) (groups[p[by]] ||= []).push(p);
+  const lists = Object.values(groups), panel = [];
+  for (let i = 0; panel.length < k; i++) for (const l of lists) if (l[i] && panel.length < k) panel.push({ p: l[i] });
+  const sp = await siliconProbs(spec, panel, chat, o);
+  const mp = rowProbabilities(spec, model || {}, panel.map((x) => ({ ...x, secim: resolved.alts[0].id })));
+  const ok = sp.map((P, i) => (P ? i : -1)).filter((i) => i >= 0);
+  if (!ok.length) throw new Error('dil modeli panel yanıtını beklenen biçimde vermedi');
+  const avg = (get) => Object.fromEntries(resolved.alts.map((a, j) => [a.id, Math.round(ok.reduce((s, i) => s + get(i)[j], 0) / ok.length * 1000) / 10]));
+  const silikon = avg((i) => sp[i]), modelP = avg((i) => mp[i].P);
+  const tv = Math.round(resolved.alts.reduce((s, a) => s + Math.abs(silikon[a.id] - modelP[a.id]), 0) / 2 * 10) / 10;
+  return {
+    panel: ok.length, tabaka: by, silikon_paylari: silikon, ayni_paneldeki_model_paylari: modelP,
+    ayrisma_puan: tv,
+    yorum: tv < 8 ? 'model ile dil modeli sağduyusu büyük ölçüde uyuşuyor' : tv < 18 ? 'kısmi ayrışma — seçenek tanımını ve bağlamı kontrol et' : 'belirgin ayrışma — kuram varsayımları ya da seçenek özellikleri bu bağlama uymuyor olabilir; veriyle öğrenmeden karar verme',
+  };
+}
