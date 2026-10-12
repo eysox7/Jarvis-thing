@@ -226,3 +226,5 @@ code{background:var(--bg-3);padding:1px 5px;border-radius:5px;font-size:12px}
 .seg-table td{padding:5px 4px;border-bottom:1px solid var(--bg-3)}
 .seg-table td.pos{color:var(--ok)}.seg-table td.neg{color:var(--err)}
 .aud-out pre{white-space:pre-wrap;font-size:11.5px;color:var(--fg-dim)}
+.mu{background:var(--bg-2);border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.mu.mid{border-left-color:var(--warn)}.mu.hi{border-left-color:var(--err)}

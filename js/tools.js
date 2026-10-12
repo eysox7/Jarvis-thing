@@ -447,12 +447,16 @@ const compact = (r) => ({ ...r, kuramlar: r.kuramlar.slice(0, 8) });
 
 def({
   name: 'audience_predict',
-  desc: 'Bir mesajın/kampanyanın kitle tepkisini tahmin eder: erişim, tutum, paylaşım, benimseme, Hall okumaları (egemen/müzakereci/karşıt), hangi iletişim kuramının ne kadar etkilediği ve segment kırılımı. MatrAIx tarzı sentetik persona nüfusu üzerinde ana akım + eleştirel kuramlarla simüle eder. Her alanda (siyaset, sağlık, ticaret, eğitim, kriz…) çalışır.',
-  params: { ...MSG_PARAMS, ...OPT_PARAMS, segment: `string[] — kırılım boyutları, ör. ["yas","ideoloji"]` },
+  desc: 'Bir mesajın/kampanyanın kitle tepkisini tahmin eder: erişim, tutum, paylaşım, benimseme, Hall okumaları (egemen/müzakereci/karşıt), hangi iletişim kuramının ne kadar etkilediği, segment kırılımı ve model belirsizliği bandı (kullanıcıya mutlaka aktar: duyarlılık yüksekse sonucu kesin gibi sunma). MatrAIx tarzı sentetik persona nüfusu üzerinde ana akım + eleştirel kuramlarla simüle eder. Her alanda (siyaset, sağlık, ticaret, eğitim, kriz…) çalışır.',
+  params: {
+    ...MSG_PARAMS, ...OPT_PARAMS,
+    segment: `string[] — kırılım boyutları, ör. ["yas","ideoloji"]`,
+    model_belirsizligi: 'boolean — kuram ağırlıklarını bozarak model belirsizliği bandı ve mercek karşılaştırması ekler (varsayılan true)',
+  },
   run: (a) => {
     const { msg, opts } = audienceInput(a);
     const seg = Array.isArray(a.segment) ? a.segment : a.segment ? [a.segment] : [];
-    return compact(predict(msg, { ...opts, segmentBy: seg }));
+    return compact(predict(msg, { ...opts, segmentBy: seg, modelUncertainty: a.model_belirsizligi !== false }));
   },
 });
 

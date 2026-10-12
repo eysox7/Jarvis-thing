@@ -70,6 +70,7 @@ ok(store.audience?.institutions?.test_bb?.ad === 'Test Belediyesi', 'kurum depoy
 const fb = seen[2].messages.map((m) => m.content).join('\n');
 ok(fb.includes('Test Belediyesi'), 'tahmin kayıtlı kurum profiliyle yapıldı');
 ok(fb.includes('hall_okuma_yuzde') && fb.includes('kuramlar'), 'tahmin sonucu modele geri beslendi');
+ok(fb.includes('model_belirsizligi') && fb.includes('duyarlilik'), 'model belirsizliği varsayılan olarak modele iletildi');
 ok(fb.includes('"kazanan"'), 'karşılaştırma kazananı geri beslendi');
 ok(fb.includes('"kayitli"') && fb.includes('test_bb'), 'katalog kayıtlı kurumu listeliyor');
 ok(fb.includes('okuma_eslesme_yuzde') && fb.includes('"katilimci": 4'), 'anket sonucu ve uyum metrikleri geri beslendi');
@@ -94,6 +95,7 @@ await page.waitForSelector('#audPrediction', { timeout: 15000 });
 ok(await page.locator('#audPrediction .kpi').count() === 6, 'altı gösterge kutusu');
 ok(await page.locator('#audPrediction .th-row').count() >= 18, 'tüm kuram katkıları çizildi');
 ok(await page.locator('#audPrediction .hall span').count() === 3, 'Hall okuma çubuğu');
+ok((await page.locator('#audPrediction .mu').textContent()).includes('Duyarlılık'), 'model belirsizliği kartı');
 ok((await page.locator('#audPrediction').textContent()).includes('Sağlık'), 'alan metinden çıkarıldı (Sağlık)');
 ok(await page.locator('#audPrediction .seg-table tr').count() === 7, 'yaş kırılım tablosu (6 grup)');
 if (process.env.SHOT) { await page.screenshot({ path: process.env.SHOT }); await page.locator('#audPrediction').screenshot({ path: process.env.SHOT.replace('.png', '-sonuc.png') }); }

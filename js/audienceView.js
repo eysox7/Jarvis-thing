@@ -105,7 +105,7 @@ function run(kind) {
       const { msg, opts } = readForm();
       out.innerHTML = '';
       if (kind === 'optimize') out.append(renderOptimize(optimize(msg, { ...opts, n: 700 })));
-      else out.append(renderPrediction(predict(msg, { ...opts, n: 2000 })));
+      else out.append(renderPrediction(predict(msg, { ...opts, n: 2000, modelUncertainty: true })));
     } catch (e) {
       out.innerHTML = '';
       out.append(el('div', { class: 'msg err', text: e.message }));
@@ -131,6 +131,17 @@ function renderPrediction(r) {
     kpi('Benimseme', `%${s.benimseme_yuzde}`, fmtCi(s.benimseme_ga90)),
     kpi('Anlama / müzakere', `%${s.anlama_yuzde} / %${s.muzakere_yuzde}`),
   ));
+
+  const mu = r.model_belirsizligi;
+  if (mu) {
+    const b = mu.bant_ga90;
+    wrap.append(el('h4', { text: 'Model belirsizliği' }), el('div', { class: 'mu ' + (mu.duyarlilik.startsWith('yüksek') ? 'hi' : mu.duyarlilik.startsWith('orta') ? 'mid' : 'lo') },
+      el('div', {}, el('strong', { text: 'Duyarlılık: ' }), mu.duyarlilik),
+      el('div', { class: 'small', text: mu.yorum }),
+      el('div', { class: 'small muted', text: `Kuram ağırlıkları ×0.5–×2 bozulunca → erişim %${b.erisim_yuzde[0]}–${b.erisim_yuzde[1]} · tutum ${b.ortalama_tutum[0]} … ${b.ortalama_tutum[1]} · olumlu %${b.olumlu_yuzde[0]}–${b.olumlu_yuzde[1]}` }),
+      el('div', { class: 'small muted', text: `Yalnız ana akım: tutum ${mu.mercek_karsilastirma.ana_akim.ortalama_tutum} · yalnız eleştirel: tutum ${mu.mercek_karsilastirma.elestirel.ortalama_tutum}` }),
+    ));
+  }
 
   if (s.hall_okuma_yuzde) {
     const h = s.hall_okuma_yuzde;

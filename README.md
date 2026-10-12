@@ -224,7 +224,10 @@ yüksekse iki bağımsız yöntem uyuşuyor demektir; düşükse ayrışan perso
 
 - Bu bir **kuram-temelli simülasyondur, gözlem değildir.** Katsayılar kuramların yönünü ve göreli
   büyüklüğünü kodlar; mutlak değerler kalibrasyonsuz yalnızca senaryo karşılaştırması için anlamlıdır.
-- Güven aralığı yalnızca örneklem belirsizliğidir; model (kuram) belirsizliğini içermez.
+- `%90 GA` yalnızca örneklem belirsizliğidir. Kuram belirsizliği ayrıca **model belirsizliği
+  bandıyla** raporlanır: her kuramın ağırlığı log-normal gürültüyle (kabaca ×0.5–×2) bozulup tahmin
+  24 kez tekrarlanır, ana akım ve eleştirel mercekler ayrı koşturulur. Duyarlılık "yüksek" ya da
+  tutumun yönü bant içinde işaret değiştiriyorsa sonuç veriyle kalibre edilmeden yorumlanmamalıdır.
 - Varsayılan nüfus dağılımları ve kurum profilleri kaba yaklaşımlardır, gerçek kurumları temsil etmez.
 - Persona ajanları dil modelinin canlandırmasıdır; gerçek katılımcının yerini tutmaz.
 - Metin çıkarımı sözlük tabanlıdır; ironi ve bağlamı kaçırabilir — kanıt kelimelerine bakıp gerekirse alanları elle ver.

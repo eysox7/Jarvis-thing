@@ -1,6 +1,6 @@
 // Kitle tahmin çekirdeği: saf modül, tarayıcı gerekmez.
 import { samplePopulation, DIMENSIONS } from '../js/audience/personas.js';
-import { predict, compare, optimize, normalizeMessage } from '../js/audience/engine.js';
+import { predict, compare, optimize, normalizeMessage, modelUncertainty } from '../js/audience/engine.js';
 import { THEORIES, lensWeights } from '../js/audience/theories.js';
 import { calibrate } from '../js/audience/calibrate.js';
 import { extractMessage } from '../js/audience/extract.js';
@@ -149,6 +149,16 @@ for (const [k, sc] of Object.entries(SCENARIOS)) {
   ok(r.sonuc.erisim_yuzde > 0 && r.cikarim, `${sc.ad} → ${r.mesaj.alan}, tutum ${r.sonuc.ortalama_tutum}`);
 }
 ok(predict({ domain: 'genel' }, { n: 200, bootstrap: 0 }).sonuc.erisim_yuzde > 0, 'alan bağımsız "genel" alan çalışır');
+
+console.log('\n[10] Kuram (model) belirsizliği');
+const mu1 = modelUncertainty({ domain: 'siyaset', institution: 'parti_iktidar', frame: 'catisma' }, { n: 300, uncertaintyRuns: 12 });
+const mu2 = modelUncertainty({ domain: 'siyaset', institution: 'parti_iktidar', frame: 'catisma' }, { n: 300, uncertaintyRuns: 12 });
+ok(JSON.stringify(mu1) === JSON.stringify(mu2), 'belirsizlik taraması deterministik');
+ok(Object.values(mu1.bant_ga90).every(([lo, hi]) => lo <= hi), 'bantlar geçerli');
+ok(mu1.bant_ga90.ortalama_tutum[1] - mu1.bant_ga90.ortalama_tutum[0] > 0.01, 'kuram bozulması tahmini gerçekten oynatır');
+ok(mu1.mercek_karsilastirma.ana_akim && mu1.mercek_karsilastirma.elestirel && mu1.duyarlilik && mu1.yorum, 'mercek karşılaştırması ve yorum var');
+const withMu = predict({ domain: 'bilim' }, { n: 300, bootstrap: 0, modelUncertainty: true, uncertaintyRuns: 6 });
+ok(!!withMu.model_belirsizligi && predict({ domain: 'bilim' }, { n: 300, bootstrap: 0 }).model_belirsizligi === undefined, 'predict yalnızca istenince belirsizlik ekler');
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }

@@ -93,6 +93,8 @@ export function predict(message, opts = {}) {
   const lens = ['ana_akim', 'elestirel', 'butunlesik'].includes(opts.lens) ? opts.lens : 'butunlesik';
   const cal = opts.calibration || {};
   const W = lensWeights(lens, { ...(cal.weights || {}), ...(opts.weights || {}) });
+  // Model belirsizliği taraması için çarpanlar (modelUncertainty kullanır)
+  if (opts.weightScale) for (const k in W) W[k] *= opts.weightScale[k] ?? 1;
   const icpt = cal.intercepts || {};
 
   const pop = samplePopulation({ n, seed, marginals: opts.marginals, target: opts.target });
@@ -217,6 +219,7 @@ export function predict(message, opts = {}) {
     kuramlar: theories,
     segmentler: segBy.length ? segments : undefined,
     kalibre: !!(cal.weights || cal.intercepts),
+    model_belirsizligi: opts.modelUncertainty ? modelUncertainty(message, opts) : undefined,
     uyari: 'Kuram-temelli simülasyondur, gözlem değil. Gerçek kararlar için kurumun geçmiş verisiyle kalibre edin (audience_calibrate).',
   };
 }
@@ -260,6 +263,44 @@ function fmt(s, ci) {
     benimseme_yuzde: pct(s.benimseme), benimseme_ga90: band('benimseme'),
     anlama_yuzde: pct(s.anlama), muzakere_yuzde: pct(s.muzakere),
     hall_okuma_yuzde: s.okuma,
+  };
+}
+
+/**
+ * Kuram (model) belirsizliği: bootstrap yalnızca örneklem belirsizliğini ölçer. Burada her
+ * kuramın ağırlığı log-normal gürültüyle (σ≈0.4 → kabaca ×0.5..×2) bozulup tahmin tekrarlanır;
+ * ayrıca ana akım ve eleştirel mercekler ayrı koşturulur. Geniş bant = sonuç kuram
+ * varsayımlarına duyarlı; kalibrasyon veya gerçek veri olmadan karar verme.
+ */
+export function modelUncertainty(message, opts = {}, K = opts.uncertaintyRuns || 24) {
+  const r = rng(((opts.seed ?? 42) * 7919 + 17) >>> 0);
+  const gauss = () => Math.sqrt(-2 * Math.log(r() || 1e-9)) * Math.cos(2 * Math.PI * r());
+  const base = { ...opts, n: Math.min(opts.n || 600, 600), bootstrap: 0, segmentBy: [], modelUncertainty: false, keepPeople: false };
+  const keys = ['erisim_yuzde', 'ortalama_tutum', 'olumlu_yuzde', 'paylasim_yuzde', 'benimseme_yuzde'];
+  const runs = Object.fromEntries(keys.map((k) => [k, []]));
+  for (let i = 0; i < K; i++) {
+    const weightScale = Object.fromEntries(THEORIES.filter((t) => !t.core).map((t) => [t.id, Math.exp(0.4 * gauss())]));
+    const s = predict(message, { ...base, weightScale }).sonuc;
+    for (const k of keys) runs[k].push(s[k]);
+  }
+  const band = {};
+  for (const k of keys) {
+    const a = runs[k].sort((x, y) => x - y);
+    band[k] = [a[Math.floor(0.05 * (a.length - 1))], a[Math.ceil(0.95 * (a.length - 1))]];
+  }
+  const lens = (l) => predict(message, { ...base, lens: l }).sonuc;
+  const ma = lens('ana_akim'), el = lens('elestirel');
+  const width = band.ortalama_tutum[1] - band.ortalama_tutum[0];
+  return {
+    bant_ga90: band,
+    mercek_karsilastirma: {
+      ana_akim: { erisim_yuzde: ma.erisim_yuzde, ortalama_tutum: ma.ortalama_tutum, olumlu_yuzde: ma.olumlu_yuzde },
+      elestirel: { erisim_yuzde: el.erisim_yuzde, ortalama_tutum: el.ortalama_tutum, olumlu_yuzde: el.olumlu_yuzde },
+    },
+    duyarlilik: width > 0.25 ? 'yüksek — sonuç kuram varsayımlarına çok bağlı' : width > 0.1 ? 'orta' : 'düşük — sonuç kuram ağırlıklarına dayanıklı',
+    yorum: Math.sign(band.ortalama_tutum[0]) === Math.sign(band.ortalama_tutum[1])
+      ? 'tutumun yönü kuram varsayımlarından bağımsız olarak tutarlı'
+      : 'tutumun YÖNÜ bile kuram varsayımlarına bağlı — veriyle kalibre etmeden yorumlama',
   };
 }
 
