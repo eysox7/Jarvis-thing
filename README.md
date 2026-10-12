@@ -166,10 +166,25 @@ Rastgele fayda kuramı (McFadden): kişi i seçenek j'den `U_ij = ASC_j + Σ θ_
 | Siyaset | mekânsal yakınlık (Downs), yönsel oy (Rabinowitz–Macdonald), parti kimliği (Michigan), geriye dönük ekonomik oy (Fiorina), sistem güveni (Easton), iktidar yorgunluğu (Paldam), lider valensi (Stokes), stratejik oy (Duverger), katılmama (Riker–Ordeshook); konu önemi bağlamı |
 | Ticaret | log-fiyat × gelir, referans fiyat / kayıp kaçınma (Kahneman–Tversky, Thaler), indirim belirginliği, taksit (likidite kısıtı), kalite, marka (sezgisel işleme), sosyal kanıt (Cialdini), etnosentrizm, sürdürülebilirlik, statüko (Samuelson–Zeckhauser), dijital erişim (TAM), satın almama |
 | Gündelik | beklenen fayda, maliyet, risk kaçınma, şimdiki zaman yanlılığı (Laibson), sosyal norm ve algılanan kontrol (Ajzen), varsayılan etkisi (Johnson–Goldstein), alışkanlık, kayıp çerçevesi (Tversky–Kahneman), kıtlık (Cialdini), sıfır fiyat etkisi (Shampanier–Mazar–Ariely), otoriteye güven |
-| Hepsi | geçmiş davranış / sadakat (durum bağımlılığı), kampanya etkisi (kitle motorunun 20 kuramından) |
+| Hepsi | **iletişim kuramları** (aşağıda), geçmiş davranış / sadakat (durum bağımlılığı), ek kampanya etkisi |
 
 Nüfus tahmininin yanında **tek kişi** tahmini de yapılır (`decision_person`): betimlenen kişinin
 seçim olasılıkları, kararını en çok hangi kuramların belirlediği ve hangi bilgilerin eksik olduğu.
+
+### İletişim kuramları modelin içinde
+
+Kitle motorunun 20 iletişim kuramı ayrı bir rapor değil, karar faydasının parçasıdır. Her seçeneğin
+kamusal iletişimi (parti mesajı, marka reklamı, kurum önerisi; gündelik kararlarda sosyal çevrenin
+ağızdan ağıza anlatımı) **kararı verecek aynı personalar** üzerinde kuramlarla koşturulur ve kişi ×
+seçenek düzeyinde üç terim olarak faydaya girer; ağırlıkları veriden öğrenilir:
+
+- **maruziyet ve gündem** — Lasswell, gündem belirleme, propaganda modeli, dijital uçurum, iki aşamalı akış
+- **iletişimin ürettiği tutum** — ELM, çerçeveleme, kaynak güvenilirliği, seçici maruziyet, ekme, tepkisellik, hegemonya
+- **okuma konumu** — Hall'un egemen / müzakereci / karşıt okuması
+
+Suskunluk sarmalı ayrıca anket birleştirmede çekingen seçmen düzeltmesi olarak uygulanır. Seçenek
+`iletisim` alanıyla kendi mesajını (kurum, kanal, çerçeve, duruş, tekrar, metin) tanımlayabilir;
+verilmezse seçenek özelliklerinden türetilir.
 
 ### Doğruluk nereden gelir
 
@@ -212,8 +227,9 @@ otomatik eşlenir. Seçim, seçenek kimliği ya da adıyla eşleşebilir.
 Gerçek kampanya verisi olmadan dürüst ölçüm, bilinen bir gerçek modelden veri üretip görülmemiş
 veride teorik tavanla kıyaslamaktır:
 
-- n=1600'de üç alanın ortalamasında teorik tavana göre yakalanan tahmin kazancı ~%83 (siyaset ~%97,
-  isabet tavana ~1 puan yakın). Az veride (n≈100) ticarette model çoğunluk tahmininin önüne geçemiyor —
+- İletişim kuramlarının entegrasyonu (n=1600, gerçek davranış iletişim etkisi içerirken): tavana göre
+  yakalanan tahmin kazancı %61 → %72; ticarette %61 → %87, siyasette %95 → %97; ortalama isabet
+  %67.1 → %67.6 (tavan %68.1). Az veride (n≈100) ticarette model çoğunluk tahmininin önüne geçemiyor —
   bu kadar veriyle beklenen bir sınır.
 - Geçmiş oy eklenince isabet ~%65 → ~%85.
 - Conjoint verisinden fiyat esnekliği ve fiyat senaryosunun etkisi gerçeğe çok yakın geri kazanılır.

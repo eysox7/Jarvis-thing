@@ -47,8 +47,23 @@ export function aggregatePolls(polls, o = {}) {
     const between = P.length > 1 ? Math.sqrt(P.reduce((s, p) => s + p.w * (p.sh[k] - est[k]) ** 2, 0) / Wt / Math.max(1, Wt * Wt / Wt2 - 1)) : 0;
     return [k, r1(196 * Math.sqrt(sampling ** 2 + between ** 2))];
   }));
+  // Suskunluk sarmalı (Noelle-Neumann): tercihini açıkça söyleme eğilimi düşük seçeneklerin
+  // destekçileri anketlerde eksik görünür. ifadeOrani kitle motorundan gelir; düzeltme ılımlı (γ).
+  let raw = null;
+  if (o.ifadeOrani) {
+    const rates = ids.map((k) => o.ifadeOrani[k]).filter((v) => v > 0);
+    if (rates.length) {
+      const mean = rates.reduce((a, b) => a + b, 0) / rates.length, g = o.suskunlukGucu ?? 0.35;
+      raw = Object.fromEntries(ids.map((k) => [k, r1(est[k] * 100)]));
+      const adj = Object.fromEntries(ids.map((k) => [k, est[k] * (o.ifadeOrani[k] > 0 ? Math.pow(mean / o.ifadeOrani[k], g) : 1)]));
+      const t = ids.reduce((acc, k) => acc + adj[k], 0) || 1;
+      est = Object.fromEntries(ids.map((k) => [k, adj[k] / t]));
+    }
+  }
   return {
     paylar: Object.fromEntries(ids.map((k) => [k, r1(est[k] * 100)])),
+    ham_paylar: raw || undefined,
+    suskunluk_duzeltmesi: raw ? Object.fromEntries(ids.map((k) => [k, r1(est[k] * 100 - raw[k])])) : undefined,
     hata_payi_95: moe,
     anket_sayisi: P.length, etkin_orneklem: Math.round(nEff),
     kurulus_yanliligi_puan: Object.keys(effects).length ? Object.fromEntries(houses.map((h) => [h, Object.fromEntries(ids.map((k) => [k, r1(effects[h][k] * 100)]))])) : undefined,

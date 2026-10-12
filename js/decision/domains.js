@@ -9,6 +9,8 @@
 //   f   persona özellikleri (personas.features)   p  ham persona
 //   a   seçenek {id, ad, tur?, ...özellikler}      ctx  seçim bağlamı (+ türetilmiş alanlar)
 
+import { comm } from './communication.js';
+
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const num = (v, d = 0) => (Number.isFinite(+v) ? +v : d);
 const IDEO = { sol: -1, merkez: 0, sag: 1 };
@@ -154,6 +156,20 @@ export const ILETISIM = {
   id: 'iletisim', ad: 'İletişim/kampanya etkisi', kuram: 'Kitle motoru (20 iletişim kuramı)', onsel: 1.5,
   z: (f, p, a, ctx, i) => (ctx.iletisim && ctx.iletisim[a.id] ? ctx.iletisim[a.id][i] || 0 : 0),
 };
+
+/**
+ * İletişim kuramları (kitle motorunun 20 kuramı) her alanda karar faydasının parçasıdır:
+ * kişinin her seçeneğin kamusal iletişimine maruziyeti, o iletişimin kişide ürettiği tutum ve
+ * mesajı egemen/karşıt okuma konumu. Değerler communication.js'de aynı personalar için hesaplanır.
+ */
+export const ILETISIM_TERIMLERI = [
+  { id: 'iletisim_maruziyet', ad: 'Mesaja maruziyet ve gündem', kuram: 'Lasswell; gündem belirleme (McCombs & Shaw); propaganda modeli; dijital uçurum; iki aşamalı akış', onsel: 0.7,
+    z: (f, p, a) => comm(p, a, 'm') },
+  { id: 'iletisim_tutum', ad: 'İletişimin ürettiği tutum', kuram: 'ELM; çerçeveleme; kaynak güvenilirliği; seçici maruziyet; ekme; tepkisellik; hegemonya', onsel: 1.4,
+    z: (f, p, a) => comm(p, a, 't') },
+  { id: 'hall_okuma', ad: 'Mesajın okunma konumu', kuram: 'Kodlama/kodaçımlama (Stuart Hall); kültürel hegemonya (Gramsci)', onsel: 0.9,
+    z: (f, p, a) => comm(p, a, 'o') },
+];
 
 /**
  * Geçmiş davranış (durum bağımlılığı): önceki oy / marka / davranış en güçlü tek yordayıcıdır

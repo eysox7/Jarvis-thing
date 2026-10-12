@@ -168,8 +168,8 @@ function learnNow() {
   const box = el('div', { class: 'aud-out', id: 'decLearnOut' });
   box.append(el('div', { class: 'kpis' },
     el('div', { class: 'kpi' }, el('div', { class: 'kpi-v', text: `%${cv.isabet_yuzde}` }), el('div', { class: 'kpi-l', text: 'isabet (5-katlı, görülmemiş veri)' })),
-    el('div', { class: 'kpi' }, el('div', { class: 'kpi-v', text: `%${cv.kuram_isabet_yuzde} / %${cv.cogunluk_isabet_yuzde}` }), el('div', { class: 'kpi-l', text: 'yalnız kuram / çoğunluk tahmini' })),
-    el('div', { class: 'kpi' }, el('div', { class: 'kpi-v', text: cv.log_kayip }), el('div', { class: 'kpi-l', text: `log-kayıp (kuram ${cv.kuram_log_kayip})` })),
+    el('div', { class: 'kpi' }, el('div', { class: 'kpi-v', text: `%${cv.cogunluk_isabet_yuzde}` }), el('div', { class: 'kpi-l', text: 'referans: herkese en sık seçenek' })),
+    el('div', { class: 'kpi' }, el('div', { class: 'kpi-v', text: cv.log_kayip }), el('div', { class: 'kpi-l', text: `log-kayıp (referans ${cv.cogunluk_log_kayip})` })),
     el('div', { class: 'kpi' }, el('div', { class: 'kpi-v', text: cv.kalibrasyon_hatasi_ece }), el('div', { class: 'kpi-l', text: 'kalibrasyon hatası (ECE)' }))));
   if (prep.uyarilar.length) box.append(el('div', { class: 'muted small', text: prep.uyarilar.join(' · ') }));
   box.append(el('h4', { text: 'Kuramlar bu veride' }));

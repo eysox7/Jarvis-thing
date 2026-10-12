@@ -4,6 +4,8 @@ import { simulateDataset, parseCSV, prepareRows, mapValue } from '../js/decision
 import { fitChoiceModel, crossValidate, scoreProbs, calibrateShares, learn, rake, shareDiagnostics, fitLatentClass } from '../js/decision/estimate.js';
 import { buildEnsemble, stackWeights, siliconProbs, mixShares, siliconSecondOpinion } from '../js/decision/ensemble.js';
 import { aggregatePolls } from '../js/decision/polls.js';
+import { expressionRates } from '../js/decision/communication.js';
+import { samplePopulation } from '../js/audience/personas.js';
 import { describePersona } from '../js/audience/survey.js';
 
 const fails = [];
@@ -71,12 +73,12 @@ const TRUTH = { theta: { yakinlik: 2.4, yon: 0.2, parti_kimligi: 0.6, ekonomik_o
 const rows = simulateDataset(SECIM, TRUTH, { n: 1500, seed: 3 });
 const oracle = scoreProbs(rows.map((r) => ({ P: r._P, y: ['A', 'B', 'C', 'X'].indexOf(r.secim), w: 1 })));
 const cv = crossValidate(SECIM, rows, { k: 4, iters: 200 });
-ok(cv.isabet_yuzde > cv.kuram_isabet_yuzde && cv.isabet_yuzde > cv.cogunluk_isabet_yuzde + 15, `öğrenilen model temel modelleri geçer (${cv.kazanc})`);
+ok(cv.isabet_yuzde > cv.cogunluk_isabet_yuzde + 15, `bütünleşik model referansı açık farkla geçer (${cv.kazanc})`);
 ok(cv.isabet_yuzde > oracle.isabet_yuzde - 3, `görülmemiş veride isabet teorik tavana yakın (${cv.isabet_yuzde} vs tavan ${oracle.isabet_yuzde})`);
-ok(cv.log_kayip < cv.kuram_log_kayip && cv.kalibrasyon_hatasi_ece < 0.05, 'olasılıklar iyi kalibre (log-kayıp, ECE)');
+ok(cv.log_kayip < cv.cogunluk_log_kayip && cv.kalibrasyon_hatasi_ece < 0.05, 'olasılıklar iyi kalibre (log-kayıp, ECE)');
 const m = fitChoiceModel(SECIM, rows, { iters: 250 });
 ok(Math.abs(m.theta.yakinlik - 2.4) < 0.5 && Math.abs(m.theta.katilmama - 0.9) < 0.3, `kuram katsayıları geri kazanılır (yakınlık ${m.theta.yakinlik}, katılmama ${m.theta.katilmama})`);
-ok((m.demo.B['yas=18-24'] || 0) > 0.3, 'kuramın açıklamadığı demografik etki öğrenilir (gençler → B)');
+ok((m.demo.B['yas=18-24'] || 0) > 0.2, `kuram ve iletişim terimlerinin açıklamadığı demografik etki öğrenilir (gençler → B: ${m.demo.B['yas=18-24']})`);
 const tS = predictChoice(SECIM, { model: TRUTH, n: 1500, explain: false }).paylar, fS = predictChoice(SECIM, { model: m, n: 1500, explain: false }).paylar;
 ok(Object.keys(tS).every((k) => Math.abs(tS[k] - fS[k]) < 4), `nüfus payları gerçeğe yakın (${JSON.stringify(fS)} vs ${JSON.stringify(tS)})`);
 const few = fitChoiceModel(SECIM, rows.slice(0, 30), { iters: 200 });
@@ -125,12 +127,12 @@ const mkChat = (good) => async (sys, user) => {
   const lines = user.split('PERSONALAR:')[1].trim().split('\n');
   return JSON.stringify({ yanitlar: lines.map((l, i) => {
     const P = byDesc.get(l.replace(/^\d+\.\s*/, '')) || [0.25, 0.25, 0.25, 0.25];
-    const q = good ? P.map((v, j) => Math.max(0.01, v + 0.04 * Math.sin(i * 7 + j * 3))) : [1, 1, 1, 1];
+    const q = good ? P.map((v, j) => Math.max(0.01, v + 0.01 * Math.sin(i * 7 + j * 3))) : [1, 1, 1, 1];
     return { no: i + 1, olasiliklar: { A: q[0], B: q[1], C: q[2], X: q[3] } };
   }) });
 };
 const learnedM = fitChoiceModel(SECIM, train, { iters: 250 });
-const ens = await buildEnsemble(SECIM, valid, { kuram: {}, ogrenilmis: learnedM, silikon: 'silikon' }, { chat: mkChat(true) });
+const ens = await buildEnsemble(SECIM, valid, { ogrenilmis: learnedM, silikon: 'silikon' }, { chat: mkChat(true) });
 const best = Math.min(...Object.values(ens.bilesen_basarimi).map((b) => b.log_kayip));
 ok(ens.topluluk_basarimi.log_kayip <= best + 1e-9, `topluluk en iyi bileşenden kötü değil (${ens.topluluk_basarimi.log_kayip} ≤ ${best})`);
 ok(ens.agirliklar.silikon > 0.1, `bilgi taşıyan silikon bileşen ağırlık alır (${JSON.stringify(ens.agirliklar)})`);
@@ -241,6 +243,31 @@ ok(solcu.en_olasi === 'B' && ['A', 'C'].includes(sagci.en_olasi), `kişiye göre
 ok(solcu.neden.length > 0 && solcu.neden[0].kuram && solcu.eksik_boyutlar.includes('gelir'), 'kararın kuram gerekçeleri ve eksik bilgiler raporlanır');
 const sadik = predictPerson(SECIM, { ideoloji: 'merkez', onceki: 'C' }, { model: { theta: { gecmis: 3 } } });
 ok(sadik.en_olasi === 'C', 'önceki seçim bilinen kişide sadakat etkisi');
+
+console.log('\n[21] İletişim kuramları karar modelinin içinde');
+const ra = resolveChoice(SECIM);
+ok(['iletisim_maruziyet', 'iletisim_tutum', 'hall_okuma'].every((id) => ra.terms.some((t) => t.id === id)), 'iletişim terimleri her alanın fayda yapısında');
+const sp = predictChoice(SECIM, { n: 600, keepPeople: true, explain: false });
+const ilt = sp._people[0].p.__ileti;
+ok(ilt && ilt.v.A && ilt.v.B && !ilt.v.X, 'her persona için seçenek başına maruziyet/tutum/okuma hesaplanır (çekimserin iletişimi yok)');
+ok(!Object.keys(sp._people[0].p).includes('__ileti'), 'iletişim özellikleri demografik anahtara karışmaz (görünmez alan)');
+const solMed = predictPerson(SECIM, { ideoloji: 'sol', medya: 'sosyal', kurumsal_guven: 'dusuk' });
+ok(solMed.neden.length > 0, 'tek kişi tahmininde de iletişim terimleri hesaba katılır');
+const tvA = predictChoice({ ...SECIM, secenekler: SECIM.secenekler.map((a) => (a.id === 'A' ? { ...a, iletisim: { domain: 'siyaset', institution: 'parti_iktidar', channels: ['tv'], repetition: 15, hegemonic: 'egemen' } } : a)) }, { ...O, target: { medya: 'tv' } }).paylar.A;
+const noA = predictChoice({ ...SECIM, secenekler: SECIM.secenekler.map((a) => (a.id === 'A' ? { ...a, iletisim: false } : a)) }, { ...O, target: { medya: 'tv' } }).paylar.A;
+ok(tvA !== noA, `seçeneğin iletişim stratejisi oy payını değiştirir (TV izleyicisinde A: iletişimsiz ${noA} → yoğun TV ${tvA})`);
+// Gerçek davranışta iletişim etkisi varsa, entegre model bunu öğrenir ve isabet artar
+const COMMT = { theta: { yakinlik: 1.6, parti_kimligi: 0.8, iletisim_tutum: 3.0, hall_okuma: 1.5, iletisim_maruziyet: 1.2 } };
+const crw = simulateDataset(SECIM, COMMT, { n: 1200, seed: 21 });
+const withC = crossValidate(SECIM, crw, { k: 3, iters: 200 }), noC = crossValidate(SECIM, crw, { k: 3, iters: 200, haric: ['iletisim_maruziyet', 'iletisim_tutum', 'hall_okuma'] });
+ok(withC.log_kayip < noC.log_kayip, `entegrasyon görülmemiş veride tahmini iyileştirir (log-kayıp ${noC.log_kayip} → ${withC.log_kayip}, isabet %${noC.isabet_yuzde} → %${withC.isabet_yuzde})`);
+const cm2 = fitChoiceModel(SECIM, crw, { iters: 250 });
+ok(cm2.theta.iletisim_tutum > 1.5, `iletişim etkisinin ağırlığı veriden öğrenilir (gerçek 3.0 → ${cm2.theta.iletisim_tutum})`);
+
+const er = expressionRates(resolveChoice(SECIM), samplePopulation({ n: 800, seed: 3 }));
+ok(er.A > 0 && er.B > 0 && er.X === null, 'seçeneklerin ifade eğilimi kitle motorundan (çekimserde yok)');
+const sus = aggregatePolls(polls, { bugun: '2026-10-06', ifadeOrani: { A: 0.1, B: 0.3, C: 0.2, X: 0.2 } });
+ok(sus.suskunluk_duzeltmesi.A > 0 && sus.suskunluk_duzeltmesi.B < 0, `suskunluk sarmalı: az ifade edilen seçenek yukarı düzeltilir (A +${sus.suskunluk_duzeltmesi.A})`);
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }

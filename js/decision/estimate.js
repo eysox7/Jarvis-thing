@@ -9,6 +9,7 @@
 
 import { features, DIMENSIONS, rng } from '../audience/personas.js';
 import { resolveChoice, coefficients, zMatrix, predictChoice, rowResolved, rowProbabilities } from './model.js';
+import { ensureComm } from './communication.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 const pct = (x) => Math.round(x * 1000) / 10;
@@ -16,6 +17,7 @@ const pct = (x) => Math.round(x * 1000) / 10;
 /** Satırlara z matrislerini önceden hesaplar (öğrenme döngüsünde tekrar hesaplanmasın). */
 function precompute(resolved, rows) {
   const altIndex = Object.fromEntries(resolved.alts.map((a, j) => [a.id, j]));
+  ensureComm(resolved, rows.map((r) => r.p));
   return rows.map((r, i) => {
     const f = features(r.p);
     const { r: rr, mask } = rowResolved(resolved, r);
@@ -33,7 +35,8 @@ export function fitChoiceModel(spec, rows, o = {}) {
   const data = precompute(resolved, rows);
   if (data.length < 10) throw new Error('öğrenme için en az 10 geçerli gözlem gerekli');
   const J = resolved.alts.length;
-  const terms = resolved.terms.filter((t) => t.id !== 'iletisim');
+  // haric: kıyas (ablasyon) için dışarıda bırakılan terimler; kampanya terimi yalnızca kampanya varsa
+  const terms = resolved.terms.filter((t) => t.id !== 'iletisim' && !(o.haric || []).includes(t.id));
   const K = terms.length;
   const tIdx = terms.map((t) => resolved.terms.indexOf(t));
   const prior = coefficients(resolved, o.baslangic || {});
@@ -188,10 +191,8 @@ export function scoreProbs(list) {
 }
 
 /**
- * k-katlı çapraz doğrulama. Üç modeli kıyaslar:
- *   kuram  — yalnızca kuram öncülleri (veri kullanmadan)
- *   cogunluk — herkese en sık seçeneği tahmin eden saf temel çizgi
- *   ogrenilmis — kuram öncüllü MAP + demografik etkiler (bu sistemin önerdiği model)
+ * k-katlı çapraz doğrulama: bütünleşik modelin (kuram terimleri + iletişim kuramları + demografi,
+ * veriyle öğrenilmiş) görülmemiş verideki başarımı; tek referans çizgisi "herkese en sık seçenek".
  */
 export function crossValidate(spec, rows, o = {}) {
   const k = Math.max(2, Math.min(o.k || 5, 10));
@@ -201,7 +202,7 @@ export function crossValidate(spec, rows, o = {}) {
   const uniq = [...new Set(gid)];
   for (let i = uniq.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [uniq[i], uniq[j]] = [uniq[j], uniq[i]]; }
   const foldOf = new Map(uniq.map((g, q) => [g, q % k]));
-  const learned = [], theory = [], major = [];
+  const learned = [], major = [];
   // Büyük veride iç ayar bir kez yapılır (iyimserlik ihmal edilebilir, süre 5 kat kısalır)
   const sharedSigma = o.demoSigma === 'oto' && rows.length > 2000 ? tuneDemoSigma(spec, rows.filter((_, i) => foldOf.get(gid[i]) !== 0), o) : null;
   for (let f = 0; f < k; f++) {
@@ -212,7 +213,6 @@ export function crossValidate(spec, rows, o = {}) {
     const sigma = sharedSigma ?? (o.demoSigma === 'oto' ? tuneDemoSigma(spec, train, o) : o.demoSigma);
     const model = C > 1 ? fitLatentClass(spec, train, { ...o, C, demoSigma: sigma }) : fitChoiceModel(spec, train, { ...o, demoSigma: sigma, iters: o.iters ?? 250 });
     learned.push(...rowProbs(spec, model, test));
-    theory.push(...rowProbs(spec, {}, test));
     const counts = {};
     for (const t of train) counts[t.secim] = (counts[t.secim] || 0) + t.w;
     const alts = resolveChoice(spec).alts, tot = train.reduce((s, t) => s + t.w, 0);
@@ -220,13 +220,12 @@ export function crossValidate(spec, rows, o = {}) {
     const altIndex = Object.fromEntries(alts.map((a, j) => [a.id, j]));
     major.push(...test.map((t) => ({ P: Pm, y: altIndex[t.secim], w: t.w })));
   }
-  const L = scoreProbs(learned), Tm = scoreProbs(theory), M = scoreProbs(major);
+  const L = scoreProbs(learned), M = scoreProbs(major);
   return {
     kat: k, gozlem: rows.length,
     ...L,
-    kuram_isabet_yuzde: Tm.isabet_yuzde, kuram_log_kayip: Tm.log_kayip,
     cogunluk_isabet_yuzde: M.isabet_yuzde, cogunluk_log_kayip: M.log_kayip,
-    kazanc: `isabet ${L.isabet_yuzde}% (kuram ${Tm.isabet_yuzde}%, çoğunluk ${M.isabet_yuzde}%); log-kayıp ${L.log_kayip} (kuram ${Tm.log_kayip}, çoğunluk ${M.log_kayip})`,
+    kazanc: `isabet ${L.isabet_yuzde}% (çoğunluk tahmini ${M.isabet_yuzde}%); log-kayıp ${L.log_kayip} (çoğunluk ${M.log_kayip})`,
   };
 }
 

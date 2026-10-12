@@ -1,8 +1,7 @@
 // Topluluk (ensemble) tahmini: birbirinden bağımsız hata yapan yöntemleri birleştirmek tek
 // başına en iyisinden daha isabetlidir — ama yalnızca ağırlıklar görülmemiş veride öğrenilirse.
 // Bileşenler:
-//   kuram      — kuram öncülleri (domains.js)
-//   ogrenilmis — kurum verisinden MAP model (estimate.js)
+//   ogrenilmis — kurum verisinden öğrenilmiş bütünleşik model (kuram + iletişim kuramları + demografi)
 //   silikon    — dil modeline personaları canlandırtarak seçim sordurma ("silicon sampling",
 //                Argyle vd. 2023: LLM persona yanıtları alt grup oy dağılımlarını yeniden üretebilir)
 // Ağırlıklar: doğrulama gözlemlerinde log-kaybı en aza indiren olasılık karışımı (doğrusal havuz).

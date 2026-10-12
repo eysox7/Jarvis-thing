@@ -19,6 +19,7 @@ import { parseCSV, prepareRows } from './decision/data.js';
 import { learn, calibrateShares, shareDiagnostics } from './decision/estimate.js';
 import { buildEnsemble, siliconProbs, mixShares, siliconSecondOpinion } from './decision/ensemble.js';
 import { aggregatePolls } from './decision/polls.js';
+import { expressionRates } from './decision/communication.js';
 import { samplePopulation } from './audience/personas.js';
 import { DIMENSIONS } from './audience/personas.js';
 
@@ -736,7 +737,7 @@ def({
 
 def({
   name: 'decision_ensemble',
-  desc: 'Senaryonun verisinin %25\'inde kuram, öğrenilmiş model ve (istenirse) dil modeli persona simülasyonunu (silikon örneklem) karşılaştırıp topluluk ağırlıklarını öğrenir; nüfus tahmini bu ağırlıklarla yapılır. silikon=true model çağrısı yapar.',
+  desc: 'Senaryonun verisinin %25\'inde bütünleşik öğrenilmiş model ile dil modeli persona simülasyonunu (silikon örneklem) birleştirip topluluk ağırlıklarını öğrenir; nüfus tahmini bu ağırlıklarla yapılır. silikon=true model çağrısı yapar.',
   params: { senaryo: 'string (zorunlu)', silikon: 'boolean — LLM persona bileşenini ekle', dogrulama_satir: 'number — kaç satırla (varsayılan 40, silikonda maliyet!)' },
   run: async (a, ctx) => {
     const { spec, id } = scenarioOf({ senaryo: a.senaryo });
@@ -745,7 +746,7 @@ def({
     const cut = Math.floor(ds.rows.length * 0.75);
     const train = ds.rows.slice(0, cut), valid = ds.rows.slice(cut, cut + Math.min(Number(a.dogrulama_satir) || 40, 200));
     const learned = learn(spec, train, { cv: false });
-    const comps = { kuram: {}, ogrenilmis: learned };
+    const comps = { ogrenilmis: learned };
     if (a.silikon) comps.silikon = 'silikon';
     const ens = await buildEnsemble(spec, valid, comps, { chat: chatFn(ctx) });
     const full = { ...(decDb().models[id] || learn(spec, ds.rows, { cv: false })) };
@@ -754,7 +755,7 @@ def({
       const sp = (await siliconProbs(spec, panel, chatFn(ctx))).filter(Boolean);
       const alts = resolveChoice(spec).alts;
       const sh = Object.fromEntries(alts.map((x, j) => [x.id, Math.round(sp.reduce((s, P) => s + P[j], 0) / sp.length * 1000) / 10]));
-      full.topluluk = { agirliklar: { ogrenilmis: ens.agirliklar.ogrenilmis + ens.agirliklar.kuram, silikon: ens.agirliklar.silikon }, silikon_paylari: sh };
+      full.topluluk = { agirliklar: { ogrenilmis: ens.agirliklar.ogrenilmis, silikon: ens.agirliklar.silikon }, silikon_paylari: sh };
     }
     S.saveModel(id, full);
     return { senaryo: id, agirliklar: ens.agirliklar, bilesen_basarimi: ens.bilesen_basarimi, topluluk_basarimi: ens.topluluk_basarimi, dogrulama_satiri: valid.length };
@@ -763,16 +764,18 @@ def({
 
 def({
   name: 'decision_polls',
-  desc: 'Birden çok anketi örneklem büyüklüğü, tazelik ve kuruluş yanlılığına göre birleştirir (hata payıyla); senaryo verilirse birleşik paylara kalibre edip kaydeder. Anket uydurma — yalnızca kullanıcının verdiği anketleri kullan.',
+  desc: 'Birden çok anketi örneklem büyüklüğü, tazelik ve kuruluş yanlılığına göre birleştirir (hata payıyla); senaryo verilirse suskunluk sarmalı (çekingen seçmen) düzeltmesi uygular ve birleşik paylara kalibre edip kaydeder. Anket uydurma — yalnızca kullanıcının verdiği anketleri kullan.',
   params: {
     anketler: 'object[] (zorunlu) — her biri {kurulus, tarih: "YYYY-AA-GG", n, paylar: {seçenek_id: yüzde}}',
     senaryo: 'string — verilirse birleşik paylara kalibre edilir',
     yari_omur_gun: 'number — tazelik yarı ömrü (varsayılan 14)',
   },
   run: (a) => {
-    const agg = aggregatePolls(a.anketler, { yariOmurGun: Number(a.yari_omur_gun) || 14 });
-    if (!a.senaryo) return agg;
+    if (!a.senaryo) return aggregatePolls(a.anketler, { yariOmurGun: Number(a.yari_omur_gun) || 14 });
     const { spec, id, model } = scenarioOf({ senaryo: a.senaryo });
+    // Suskunluk sarmalı: seçeneklerin ifade eğilimi aynı persona nüfusunda kitle motorundan
+    const ifadeOrani = expressionRates(resolveChoice(spec), samplePopulation({ n: 1500, seed: 42 }));
+    const agg = aggregatePolls(a.anketler, { yariOmurGun: Number(a.yari_omur_gun) || 14, ifadeOrani });
     const m = calibrateShares(spec, agg.paylar, { model });
     S.saveModel(id, { ...(model || {}), ...m, anket_birlesimi: agg });
     return { ...agg, kalibre_edilen_senaryo: id, ulasilan: m.son_paylar };

@@ -101,7 +101,8 @@ export function predict(message, opts = {}) {
   if (opts.weightScale) for (const k in W) W[k] *= opts.weightScale[k] ?? 1;
   const icpt = cal.intercepts || {};
 
-  const pop = samplePopulation({ n, seed, marginals: opts.marginals, target: opts.target });
+  // Karar motoru aynı personaları verir (kişi × seçenek iletişim etkisi); yoksa nüfus örneklenir
+  const pop = opts.population || samplePopulation({ n, seed, marginals: opts.marginals, target: opts.target });
   if (!pop.length) throw new Error('hedef kitle tanımına uyan persona örneklenemedi');
 
   const active = THEORIES.filter((t) => W[t.id]);

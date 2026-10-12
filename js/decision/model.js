@@ -7,7 +7,8 @@
 
 import { samplePopulation, features, DIMENSIONS } from '../audience/personas.js';
 import { predict as audiencePredict } from '../audience/engine.js';
-import { DECISION_DOMAINS, ILETISIM, GECMIS, isAbstain } from './domains.js';
+import { DECISION_DOMAINS, ILETISIM, GECMIS, ILETISIM_TERIMLERI, isAbstain } from './domains.js';
+import { ensureComm } from './communication.js';
 import { rng } from '../audience/personas.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
@@ -22,7 +23,7 @@ export function resolveChoice(spec = {}) {
   if (new Set(alts.map((a) => a.id)).size !== alts.length) throw new Error('seçenek kimlikleri benzersiz olmalı');
   const ctx = { ...(spec.baglam || spec.context || {}) };
   if (domain.hazirla) Object.assign(ctx, domain.hazirla(alts, ctx));
-  const terms = [...domain.terimler, ILETISIM, GECMIS];
+  const terms = [...domain.terimler, ...ILETISIM_TERIMLERI, ILETISIM, GECMIS];
   return { domain, alts, ctx, terms };
 }
 
@@ -65,6 +66,7 @@ export function rowProbabilities(spec, model, rows) {
   const resolved = resolveChoice(spec);
   const cls = classCoefs(resolved, model || {});
   const altIndex = Object.fromEntries(resolved.alts.map((a, j) => [a.id, j]));
+  ensureComm(resolved, rows.map((r) => r.p));
   return rows.map((r, i) => {
     const f = features(r.p);
     const { r: rr, mask } = rowResolved(resolved, r);
@@ -156,7 +158,7 @@ function assignPast(resolved, coef, pop, prevShares, seed = 42) {
   const target = labels.map((k) => Number(prevShares[k]) / tot);
   const noPast = { ...coef, theta: { ...coef.theta, gecmis: 0 } };
   const base = pop.map((p, i) => {
-    const P = personProbs(resolved, noPast, features(p), { ...p, onceki: undefined }, i).P;
+    const P = personProbs(resolved, noPast, features(p), p, i).P;   // p.onceki henüz atanmadı
     return labels.map((k) => { const j = resolved.alts.findIndex((a) => a.id === k); return j >= 0 ? P[j] + 0.02 : 0.1; });
   });
   const mult = labels.map(() => 1);
@@ -189,6 +191,7 @@ export function predictChoice(spec, opts = {}) {
   const pop = samplePopulation(popOpts);
   if (!pop.length) throw new Error('hedef kitleye uyan persona örneklenemedi');
   resolved.ctx.iletisim = campaignEffects(resolved, spec.kampanya, popOpts);
+  ensureComm(resolved, pop);
   if (resolved.ctx.onceki_paylar) assignPast(resolved, coef, pop, resolved.ctx.onceki_paylar, popOpts.seed);
 
   const J = resolved.alts.length;
@@ -319,6 +322,7 @@ export function whatIf(spec, changes, opts = {}) {
 export function predictPerson(spec, persona, opts = {}) {
   const resolved = resolveChoice(spec);
   const p = { ...persona };
+  ensureComm(resolved, [p]);
   const f = features(p);
   const cls = classCoefs(resolved, opts.model);
   const zs = zMatrix(resolved, f, p, 0);

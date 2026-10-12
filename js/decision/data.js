@@ -5,6 +5,7 @@
 
 import { DIMENSIONS, samplePopulation, features, rng } from '../audience/personas.js';
 import { resolveChoice, classCoefs, personProbs, rowResolved } from './model.js';
+import { ensureComm } from './communication.js';
 
 const fold = (s) => String(s ?? '').trim().toLocaleLowerCase('tr')
   .replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c')
@@ -132,6 +133,7 @@ export function simulateDataset(spec, trueModel, { n = 2000, seed = 7, target, m
   const cls = classCoefs(resolved, trueModel);
   const pop = samplePopulation({ n, seed, target, marginals });
   const r = rng(seed * 31 + 5);
+  ensureComm(resolved, pop);
   const out = [];
   pop.forEach((p, i) => {
     // Gizli sınıflı gerçek modelde kişi sınıfını bir kez "çeker"; tüm görevlerinde o sınıfla seçer

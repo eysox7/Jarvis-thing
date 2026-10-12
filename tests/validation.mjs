@@ -206,10 +206,14 @@ for (const [ad, spec, vary] of decCases) {
   for (const n of SIZES) {
     const rows = all.slice(0, n);
     const cv = crossValidate(spec, rows, { k: 3, iters: 180, demoSigma: 'oto' });
+    // Önceki sistem: iletişim kuramları karar modelinde yok (yalnızca kampanya varsa)
+    const cvOld = crossValidate(spec, rows, { k: 3, iters: 180, demoSigma: 'oto', haric: ['iletisim_maruziyet', 'iletisim_tutum', 'hall_okuma'] });
     const orc = scoreProbs(rows.map((r) => ({ P: r._P, y: ids.indexOf(r.secim), w: 1 })));
     const gain = (cv.cogunluk_log_kayip - cv.log_kayip) / Math.max(1e-6, cv.cogunluk_log_kayip - orc.log_kayip);
-    decRows.push({ alan: ad, n, isabet: cv.isabet_yuzde, tavan_isabet: orc.isabet_yuzde, kuram_isabet: cv.kuram_isabet_yuzde, cogunluk_isabet: cv.cogunluk_isabet_yuzde,
-      log_kayip: cv.log_kayip, tavan_log_kayip: orc.log_kayip, ece: cv.kalibrasyon_hatasi_ece, yakalanan_kazanc_yuzde: Math.round(gain * 100) });
+    const gainOld = (cvOld.cogunluk_log_kayip - cvOld.log_kayip) / Math.max(1e-6, cvOld.cogunluk_log_kayip - orc.log_kayip);
+    decRows.push({ alan: ad, n, isabet: cv.isabet_yuzde, onceki_isabet: cvOld.isabet_yuzde, tavan_isabet: orc.isabet_yuzde, cogunluk_isabet: cv.cogunluk_isabet_yuzde,
+      log_kayip: cv.log_kayip, onceki_log_kayip: cvOld.log_kayip, tavan_log_kayip: orc.log_kayip, ece: cv.kalibrasyon_hatasi_ece,
+      yakalanan_kazanc_yuzde: Math.round(gain * 100), onceki_kazanc_yuzde: Math.round(gainOld * 100) });
   }
   // Nüfus payı hatası (en büyük örneklemde öğrenilen model vs gerçek)
 }
@@ -235,6 +239,10 @@ const lcOrc = scoreProbs(lrows.map((r) => ({ P: r._P, y: ['P', 'O', 'Y', 'N'].in
 const lcGain = { tek_sinif_ll: lc1.log_kayip, iki_sinif_ll: lc2.log_kayip, tavan_ll: lcOrc.log_kayip, tek_sinif_isabet: lc1.isabet_yuzde, iki_sinif_isabet: lc2.isabet_yuzde, tavan_isabet: lcOrc.isabet_yuzde };
 const bigRows = decRows.filter((d) => d.n === Math.max(...SIZES));
 const meanCaptured = Math.round(bigRows.reduce((s, d) => s + d.yakalanan_kazanc_yuzde, 0) / bigRows.length);
+const meanCapturedOld = Math.round(bigRows.reduce((s, d) => s + d.onceki_kazanc_yuzde, 0) / bigRows.length);
+const meanAcc = Math.round(bigRows.reduce((s, d) => s + d.isabet, 0) / bigRows.length * 10) / 10;
+const meanAccOld = Math.round(bigRows.reduce((s, d) => s + d.onceki_isabet, 0) / bigRows.length * 10) / 10;
+const meanCeil = Math.round(bigRows.reduce((s, d) => s + d.tavan_isabet, 0) / bigRows.length * 10) / 10;
 
 /* ===================== rapor ===================== */
 const summary = {
@@ -245,7 +253,7 @@ const summary = {
   kararlilik: { en_buyuk_tutum_sd: maxTutumSd },
   performans: perf,
   mercek: { yon_catisan_senaryo: lensDiv.filter((x) => x.yon_catisiyor).length, toplam: lensDiv.length },
-  karar: { en_buyuk_n_yakalanan_kazanc_yuzde: meanCaptured, gecmis: pastGain, gizli_sinif: lcGain },
+  karar: { en_buyuk_n_yakalanan_kazanc_yuzde: meanCaptured, onceki_sistem_kazanc_yuzde: meanCapturedOld, ort_isabet: meanAcc, onceki_ort_isabet: meanAccOld, ort_tavan: meanCeil, gecmis: pastGain, gizli_sinif: lcGain },
 };
 const report = { summary, dir, calib, covRows, stab, lensDiv, decRows };
 
@@ -265,7 +273,8 @@ const md = [
   `| E. Tahmin süresi (n=2000, bootstrap) | **${perf.predict_2000_ms} ms** | < 500 ms |`,
   `| E. Tahmin + model belirsizliği | **${perf.predict_belirsizlikli_ms} ms** | < 2000 ms |`,
   `| F. Ana akım ve eleştirel mercekte tutum yönü çatışan senaryo | **${summary.mercek.yon_catisan_senaryo}/${lensDiv.length}** | (bilgi) |`,
-  `| G. Karar: tavana göre yakalanan tahmin kazancı (n=${Math.max(...SIZES)}, 3 alan ort.) | **%${meanCaptured}** | > %80 |`,
+  `| G. Karar isabeti (n=${Math.max(...SIZES)}, 3 alan ort.): iletişimsiz önceki sistem → bütünleşik (tavan) | **%${meanAccOld} → %${meanAcc}** (%${meanCeil}) | tavana yakın |`,
+  `| G. Tavana göre yakalanan tahmin kazancı: önceki → bütünleşik | **%${meanCapturedOld} → %${meanCaptured}** | > %80 |`,
   `| G. Geçmiş oy eklenince isabet | **%${pastGain.gecmissiz_isabet} → %${pastGain.gecmisli_isabet}** | artış |`,
   `| G. Gizli sınıf (panel) log-kayıp: tek → iki sınıf (tavan) | **${lcGain.tek_sinif_ll} → ${lcGain.iki_sinif_ll}** (${lcGain.tavan_ll}) | düşüş |`,
   ``,
@@ -301,9 +310,12 @@ const md = [
   ``,
   `## G. Karar doğruluğu — öğrenme eğrisi (görülmemiş veri, 3-katlı)`,
   ``,
-  `| Alan | n | isabet | tavan | yalnız kuram | çoğunluk | log-kayıp | tavan LL | ECE | yakalanan kazanç |`,
-  `|---|---|---|---|---|---|---|---|---|---|`,
-  ...decRows.map((d) => `| ${d.alan} | ${d.n} | %${d.isabet} | %${d.tavan_isabet} | %${d.kuram_isabet} | %${d.cogunluk_isabet} | ${d.log_kayip} | ${d.tavan_log_kayip} | ${d.ece} | %${d.yakalanan_kazanc_yuzde} |`),
+  `Gerçek davranış; kuram terimleri, iletişim etkileri ve demografi içeren bilinmeyen bir modelden üretildi.`,
+  `"Önceki" = iletişim kuramları karar modelinde yokken; "bütünleşik" = şimdiki sistem.`,
+  ``,
+  `| Alan | n | isabet önceki → bütünleşik | tavan | çoğunluk | log-kayıp önceki → bütünleşik | tavan LL | ECE | yakalanan kazanç önceki → bütünleşik |`,
+  `|---|---|---|---|---|---|---|---|---|`,
+  ...decRows.map((d) => `| ${d.alan} | ${d.n} | %${d.onceki_isabet} → **%${d.isabet}** | %${d.tavan_isabet} | %${d.cogunluk_isabet} | ${d.onceki_log_kayip} → **${d.log_kayip}** | ${d.tavan_log_kayip} | ${d.ece} | %${d.onceki_kazanc_yuzde} → **%${d.yakalanan_kazanc_yuzde}** |`),
   ``,
   `Geçmiş davranış: isabet %${pastGain.gecmissiz_isabet} → %${pastGain.gecmisli_isabet}, log-kayıp ${pastGain.gecmissiz_ll} → ${pastGain.gecmisli_ll}.`,
   `Gizli sınıf (300 kişi × 6 görev): isabet %${lcGain.tek_sinif_isabet} → %${lcGain.iki_sinif_isabet} (tavan %${lcGain.tavan_isabet}); log-kayıp ${lcGain.tek_sinif_ll} → ${lcGain.iki_sinif_ll} (tavan ${lcGain.tavan_ll}).`,
