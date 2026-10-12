@@ -688,13 +688,14 @@ def({
   params: {
     senaryo: 'string (zorunlu)', kuram_guveni: 'number — kuram öncülünün sıkılığı σ (varsayılan 1; küçük = kurama daha bağlı)',
     siniflar: '1 | 2 | 3 | "oto" — gizli tercih sınıfları (panel/conjoint verisinde anlamlı; varsayılan: kişi kimliği varsa "oto", yoksa 1)',
+    etkilesim: 'boolean — kuram terimi × demografi etkileşimlerini de öğren (büyük veri için; varsayılan kapalı)',
   },
   run: (a) => {
     const { spec, id } = scenarioOf({ senaryo: a.senaryo });
     const ds = decDb().datasets[id];
     if (!ds?.rows?.length) throw new Error('bu senaryoda veri yok; önce decision_data_import');
     const panel = ds.rows.some((r) => r.kisi !== undefined);
-    const model = learn(spec, ds.rows, { kuramGuveni: Number(a.kuram_guveni) || 1, siniflar: a.siniflar ?? (panel ? 'oto' : 1) });
+    const model = learn(spec, ds.rows, { kuramGuveni: Number(a.kuram_guveni) || 1, siniflar: a.siniflar ?? (panel ? 'oto' : 1), etkilesim: a.etkilesim === true });
     S.saveModel(id, model);
     const diag = shareDiagnostics(spec, ds.rows, model);
     return { senaryo: id, dogrulama: model.cv, kuramlar: model.kuramlar, gizli_siniflar: model.siniflar?.map((c) => ({ pay: c.pay, etiket: c.etiket })), sinif_secimi: model.sinif_secimi, paylar: diag };

@@ -46,8 +46,14 @@ export function fitChoiceModel(spec, rows, o = {}) {
     for (const k of seen) demoKeys.push(k);
   }
   const D = demoKeys.length, dIdx = Object.fromEntries(demoKeys.map((k, i) => [k, i]));
-  const nP = K + (J - 1) + (J - 1) * D;
+  // Kuram terimi × demografi etkileşimleri (kuramın varsaymadığı moderasyon), daha sıkı öncül
+  // İsteğe bağlı: her boyut değeri için sapma ana katsayıyla kısmen eşdoğrusal olduğundan
+  // varsayılan kapalı (ana kuram katsayılarının yorumlanabilirliği ve gizli sınıf ayrışması korunur).
+  const useInt = D > 0 && o.etkilesim === true;
+  const intBase = K + (J - 1) + (J - 1) * D;
+  const nP = intBase + (useInt ? K * D : 0);
   const mu = new Float64Array(nP), sig = new Float64Array(nP).fill(sigD);
+  for (let q = intBase; q < nP; q++) sig[q] = sigD * 0.6;
   terms.forEach((t, k) => { mu[k] = prior.theta[t.id] ?? t.onsel; sig[k] = sigT; });
   for (let j = 1; j < J; j++) sig[K + j - 1] = sigA;
   const x = Float64Array.from(mu);
@@ -57,11 +63,13 @@ export function fitChoiceModel(spec, rows, o = {}) {
 
   const W = data.reduce((s, d) => s + d.w, 0);
   const V = new Float64Array(J), P = new Float64Array(J);
+  const th = new Float64Array(K);
   const probs = (d, i) => {
+    for (let k = 0; k < K; k++) { let t = x[k]; if (useInt) for (const q of di[i]) t += x[intBase + k * D + q]; th[k] = t; }
     for (let j = 0; j < J; j++) {
       let v = ascOf(j);
       for (const q of di[i]) v += demoOf(j, q);
-      for (let k = 0; k < K; k++) v += x[k] * d.zs[tIdx[k]][j];
+      for (let k = 0; k < K; k++) v += th[k] * d.zs[tIdx[k]][j];
       V[j] = d.mask && !d.mask[j] ? -Infinity : v;
     }
     let m = -Infinity; for (let j = 0; j < J; j++) if (V[j] > m) m = V[j];
@@ -82,7 +90,9 @@ export function fitChoiceModel(spec, rows, o = {}) {
       for (let k = 0; k < K; k++) {
         const z = d.zs[tIdx[k]];
         let zbar = 0; for (let j = 0; j < J; j++) zbar += P[j] * z[j];
-        g[k] += d.w * (z[d.y] - zbar);
+        const rk = d.w * (z[d.y] - zbar);
+        g[k] += rk;
+        if (useInt && rk) for (const q of di[i]) g[intBase + k * D + q] += rk;
       }
       for (let j = 1; j < J; j++) {
         const r = d.w * ((d.y === j ? 1 : 0) - P[j]);
@@ -132,9 +142,18 @@ export function fitChoiceModel(spec, rows, o = {}) {
       demo[resolved.alts[j].id] = m;
     }
   }
+  let etk = null;
+  if (useInt) {
+    etk = {};
+    terms.forEach((t, k) => {
+      const m = {};
+      demoKeys.forEach((key, q) => { const v = x[intBase + k * D + q]; if (Math.abs(v) > 0.05) m[key] = r3(v); });
+      if (Object.keys(m).length) etk[t.id] = m;
+    });
+  }
   return {
-    alan: resolved.domain.id, kaynak: `veriden öğrenilmiş (${data.length} gözlem, kuram öncüllü MAP)`,
-    theta, asc, demo, n: data.length, log_olabilirlik: r3(ll),
+    alan: resolved.domain.id, kaynak: `veriden öğrenilmiş (${data.length} gözlem, kuram öncüllü MAP${useInt ? ' + etkileşimler' : ''})`,
+    theta, asc, demo, etk, n: data.length, log_olabilirlik: r3(ll),
     kuramlar: kuramlar.sort((a, b) => Math.abs(b.ogrenilen) - Math.abs(a.ogrenilen)),
   };
 }

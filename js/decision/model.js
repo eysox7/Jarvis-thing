@@ -35,7 +35,16 @@ export function coefficients(resolved, model = {}, overrides = {}) {
   for (const a of resolved.alts) asc[a.id] = Number.isFinite(+a.asc) ? +a.asc : 0;
   Object.assign(asc, model.asc || {}, overrides.asc || {});
   // Veriden öğrenilmiş seçeneğe özgü demografik etkiler: demo[altId]['boyut=değer'] = katsayı
-  return { theta, asc, demo: model.demo || null };
+  // ve kuram terimi × demografi etkileşimleri: etk[terimId]['boyut=değer'] = katsayı sapması
+  return { theta, asc, demo: model.demo || null, etk: model.etk || null };
+}
+
+/** Kişiye özgü kuram katsayısı: θ_k + Σ etkileşim sapmaları (öğrenilmiş modelde). */
+export function thetaFor(coef, termId, p) {
+  let t = coef.theta[termId] || 0;
+  const e = coef.etk && coef.etk[termId];
+  if (e) for (const k in p) { const c = e[k + '=' + p[k]]; if (c) t += c; }
+  return t;
 }
 
 /**
@@ -64,7 +73,7 @@ export function rowProbabilities(spec, model, rows) {
     for (const { pay, coef } of cls) {
       const V = rr.alts.map((a, j) => {
         let v = (coef.asc[a.id] || 0) + (coef.demo ? demoUtility(coef.demo, a.id, r.p) : 0);
-        rr.terms.forEach((t, k) => { v += (coef.theta[t.id] || 0) * zs[k][j]; });
+        rr.terms.forEach((t, k) => { v += (coef.etk ? thetaFor(coef, t.id, r.p) : coef.theta[t.id] || 0) * zs[k][j]; });
         return mask && !mask[j] ? -Infinity : v;
       });
       const m = Math.max(...V), e = V.map((v) => Math.exp(v - m)), s = e.reduce((a, b) => a + b, 0);
@@ -91,7 +100,7 @@ export function personProbs(resolved, coef, f, p, i = 0, zs = null) {
     let v = (coef.asc[alts[j].id] || 0) + (coef.demo ? demoUtility(coef.demo, alts[j].id, p) : 0);
     for (let k = 0; k < terms.length; k++) {
       const z = zs ? zs[k][j] : terms[k].z(f, p, alts[j], ctx, i);
-      v += (coef.theta[terms[k].id] || 0) * z;
+      v += (coef.etk ? thetaFor(coef, terms[k].id, p) : coef.theta[terms[k].id] || 0) * z;
     }
     V[j] = v;
   }
@@ -239,7 +248,7 @@ export function predictChoice(spec, opts = {}) {
       for (const x of people) {
         const V = resolved.alts.map((a, j) => {
           let v = (coef.asc[a.id] || 0) + (coef.demo ? demoUtility(coef.demo, a.id, x.p) : 0);
-          for (let q = 0; q < resolved.terms.length; q++) if (q !== k) v += (coef.theta[resolved.terms[q].id] || 0) * x.zs[q][j];
+          for (let q = 0; q < resolved.terms.length; q++) if (q !== k) v += (coef.etk ? thetaFor(coef, resolved.terms[q].id, x.p) : coef.theta[resolved.terms[q].id] || 0) * x.zs[q][j];
           return v;
         });
         const m = Math.max(...V), e = V.map((v) => Math.exp(v - m)), sum = e.reduce((a, b) => a + b, 0);

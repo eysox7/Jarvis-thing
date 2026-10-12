@@ -195,6 +195,15 @@ const kul = predictChoice({ ...SECIM, baglam: { ...SECIM.baglam, konu_onemi: { e
 const gap = (r) => r.segmentler.dindarlik.yuksek.A - r.segmentler.dindarlik.dusuk.A;
 ok(gap(kul) > gap(eko), `kültür ekseni önem kazanınca dindarlık ayrışması büyür (${gap(eko).toFixed(1)} → ${gap(kul).toFixed(1)} puan)`);
 
+console.log('\n[16] Öğrenilen etkileşimler');
+const INT = { theta: { fiyat: 1.8, kalite: 1.5, marka: 1.2 }, etk: { fiyat: { 'yas=18-24': 1.5, 'yas=65+': -1.0 } } };
+const irows = simulateDataset(TELEFON, INT, { n: 1200, seed: 12, vary });
+const im = fitChoiceModel(TELEFON, irows, { etkilesim: true, demoSigma: 0.8, iters: 300 });
+ok(im.etk && (im.etk.fiyat?.['yas=18-24'] || 0) > 0.3, `gençlerde fazladan fiyat duyarlılığı öğrenilir (${im.etk?.fiyat?.['yas=18-24']})`);
+const iy = whatIf(TELEFON, { secenekler: { Y: { fiyat: 9000 } } }, { model: im, n: 800, target: { yas: '18-24' } }).degisim_puan.Y;
+const io = whatIf(TELEFON, { secenekler: { Y: { fiyat: 9000 } } }, { model: im, n: 800, target: { yas: '65+' } }).degisim_puan.Y;
+ok(iy > io, `fiyat indirimi gençlerde daha etkili (${iy} > ${io})`);
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ karar testleri geçti');
