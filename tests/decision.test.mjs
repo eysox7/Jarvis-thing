@@ -3,6 +3,7 @@ import { predictChoice, whatIf, resolveChoice, rowProbabilities } from '../js/de
 import { simulateDataset, parseCSV, prepareRows, mapValue } from '../js/decision/data.js';
 import { fitChoiceModel, crossValidate, scoreProbs, calibrateShares, learn, rake, shareDiagnostics, fitLatentClass } from '../js/decision/estimate.js';
 import { buildEnsemble, stackWeights, siliconProbs, mixShares } from '../js/decision/ensemble.js';
+import { aggregatePolls } from '../js/decision/polls.js';
 import { describePersona } from '../js/audience/survey.js';
 
 const fails = [];
@@ -170,6 +171,20 @@ const cvOne = crossValidate(TELEFON, lrows, { k: 2, siniflar: 1, iters: 200 }), 
 ok(cvTwo.log_kayip < cvOne.log_kayip, `görülmemiş kişilerde gizli sınıf modeli tek sınıftan iyi (log-kayıp ${cvTwo.log_kayip} < ${cvOne.log_kayip})`);
 const pc = predictChoice(TELEFON, { model: lcm, n: 800, explain: false });
 ok(pc.gizli_siniflar?.length === 2 && Math.abs(Object.values(pc.paylar).reduce((a, b) => a + b, 0) - 100) < 0.5, 'nüfus tahmini sınıf karışımıyla yapılır');
+
+console.log('\n[14] Anket birleştirme');
+const polls = [
+  { kurulus: 'K1', tarih: '2026-10-01', n: 2000, paylar: { A: 40, B: 30, C: 12, X: 18 } },
+  { kurulus: 'K1', tarih: '2026-09-20', n: 1500, paylar: { A: 41, B: 29, C: 12, X: 18 } },
+  { kurulus: 'K2', tarih: '2026-10-05', n: 1000, paylar: { A: 34, B: 34, C: 13, X: 19 } },
+  { kurulus: 'K2', tarih: '2026-09-25', n: 1000, paylar: { A: 35, B: 33, C: 13, X: 19 } },
+  { kurulus: 'K3', tarih: '2026-06-01', n: 3000, paylar: { A: 50, B: 20, C: 10, X: 20 } },
+];
+const ag = aggregatePolls(polls, { bugun: '2026-10-06' });
+ok(ag.paylar.A > 34 && ag.paylar.A < 41, `birleşik tahmin anketlerin arasında (A %${ag.paylar.A})`);
+ok(ag.agirliklar.find((p) => p.kurulus === 'K3').agirlik < 5, 'eski anket düşük ağırlık alır');
+ok(ag.kurulus_yanliligi_puan.K1.A > 0 && ag.kurulus_yanliligi_puan.K2.A < 0, 'kuruluş yanlılığı tahmin edilir (K1 A lehine, K2 aleyhine)');
+ok(ag.hata_payi_95.A > 0.5 && ag.hata_payi_95.A < 10, `hata payı makul (±${ag.hata_payi_95.A})`);
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }

@@ -29,6 +29,7 @@ const SHELL = [
   './js/decision/data.js',
   './js/decision/estimate.js',
   './js/decision/ensemble.js',
+  './js/decision/polls.js',
   './manifest.webmanifest',
   './icons/icon.svg',
 ];

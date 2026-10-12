@@ -17,6 +17,7 @@ import { DECISION_DOMAINS } from './decision/domains.js';
 import { parseCSV, prepareRows } from './decision/data.js';
 import { learn, calibrateShares, shareDiagnostics } from './decision/estimate.js';
 import { buildEnsemble, siliconProbs, mixShares } from './decision/ensemble.js';
+import { aggregatePolls } from './decision/polls.js';
 import { samplePopulation } from './audience/personas.js';
 import { DIMENSIONS } from './audience/personas.js';
 
@@ -736,6 +737,24 @@ def({
     }
     S.saveModel(id, full);
     return { senaryo: id, agirliklar: ens.agirliklar, bilesen_basarimi: ens.bilesen_basarimi, topluluk_basarimi: ens.topluluk_basarimi, dogrulama_satiri: valid.length };
+  },
+});
+
+def({
+  name: 'decision_polls',
+  desc: 'Birden çok anketi örneklem büyüklüğü, tazelik ve kuruluş yanlılığına göre birleştirir (hata payıyla); senaryo verilirse birleşik paylara kalibre edip kaydeder. Anket uydurma — yalnızca kullanıcının verdiği anketleri kullan.',
+  params: {
+    anketler: 'object[] (zorunlu) — her biri {kurulus, tarih: "YYYY-AA-GG", n, paylar: {seçenek_id: yüzde}}',
+    senaryo: 'string — verilirse birleşik paylara kalibre edilir',
+    yari_omur_gun: 'number — tazelik yarı ömrü (varsayılan 14)',
+  },
+  run: (a) => {
+    const agg = aggregatePolls(a.anketler, { yariOmurGun: Number(a.yari_omur_gun) || 14 });
+    if (!a.senaryo) return agg;
+    const { spec, id, model } = scenarioOf({ senaryo: a.senaryo });
+    const m = calibrateShares(spec, agg.paylar, { model });
+    S.saveModel(id, { ...(model || {}), ...m, anket_birlesimi: agg });
+    return { ...agg, kalibre_edilen_senaryo: id, ulasilan: m.son_paylar };
   },
 });
 
