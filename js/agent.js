@@ -51,6 +51,13 @@ export function buildSystemPrompt() {
       ? `AÇIK GÖREVLER (özet):\n${openTasks.map((t) => `- [${t.id}] ${t.title}${t.due ? ' · son: ' + new Date(t.due).toLocaleString('tr-TR') : ''}`).join('\n')}`
       : 'Açık görev yok.',
     ``,
+    `TAHMİN İŞ AKIŞI (insanların oy / satın alma / gündelik kararları ve kitle tepkisi sorulduğunda):`,
+    `- "Kim kazanır, ne alır, ne yapar, yüzde kaçı…" → decision_* araçları. "Mesaj/kampanya nasıl karşılanır" → audience_*.`,
+    `- Senaryoyu seçenek özellikleriyle kur (decision_catalog özellikleri listeler); bilmediğin özelliği uydurma, ask_user ile sor.`,
+    `- Kullanıcının verisi varsa: decision_scenario_save → decision_data_import → decision_learn. Anketler varsa decision_polls. Önceki seçim/pazar payı biliniyorsa baglam.onceki_paylar.`,
+    `- Sonucu verirken kaynağı söyle: "veriden öğrenilmiş, görülmemiş veride isabet %X" ya da "kuram öncülleri, kalibre değil — yön ve senaryo karşılaştırması için". Kesinlik uydurma.`,
+    `- Seçimde katılım ve geçerli oy paylarını ayrı ver. "Ne olur" sorularında decision_whatif kullan.`,
+    ``,
     `ÇIKTI BİÇİMİ:`,
     PROTOCOL,
   ].filter(Boolean).join('\n');

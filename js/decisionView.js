@@ -118,6 +118,8 @@ function predictNow() {
     el('div', { class: 'small muted', text: `çoğunluk tahmini %${r.dogrulama.temel_isabet_yuzde} · log-kayıp ${r.dogrulama.log_kayip}` })));
   else box.append(el('div', { class: 'mu mid' }, el('div', { class: 'small', text: 'Kuram öncülleriyle tahmin — kurumun verisi yüklenmeden mutlak paylar kalibre değildir. Yönler ve "ne olur" karşılaştırmaları daha güvenilirdir.' })));
   box.append(el('h4', { text: 'Tahmini paylar' }), bars(r.paylar, labels));
+  if (r.gecerli_oy_paylari) box.append(el('h4', { text: `Geçerli oy payları · katılım %${r.katilim_yuzde}` }), bars(r.gecerli_oy_paylari, labels));
+  if (r.gizli_siniflar) box.append(el('div', { class: 'muted small', text: 'Gizli tercih sınıfları: ' + r.gizli_siniflar.map((c) => `${c.etiket || 'sınıf'} %${c.pay_yuzde}`).join(' · ') }));
   box.append(el('div', { class: 'kpis' },
     el('div', { class: 'kpi' }, el('div', { class: 'kpi-v', text: labels[r.kazanan] || r.kazanan }), el('div', { class: 'kpi-l', text: `önde · fark ${r.fark_puan} puan` })),
     el('div', { class: 'kpi' }, el('div', { class: 'kpi-v', text: r.kararsizlik }), el('div', { class: 'kpi-l', text: 'kararsızlık (0 kesin … 1 tam kararsız)' }))));

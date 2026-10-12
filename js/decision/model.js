@@ -7,7 +7,7 @@
 
 import { samplePopulation, features, DIMENSIONS } from '../audience/personas.js';
 import { predict as audiencePredict } from '../audience/engine.js';
-import { DECISION_DOMAINS, ILETISIM, GECMIS } from './domains.js';
+import { DECISION_DOMAINS, ILETISIM, GECMIS, isAbstain } from './domains.js';
 import { rng } from '../audience/personas.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
@@ -210,7 +210,14 @@ export function predictChoice(spec, opts = {}) {
     gizli_siniflar: opts.model?.siniflar ? opts.model.siniflar.map((c) => ({ pay_yuzde: pct(c.pay), etiket: c.etiket })) : undefined,
     dogrulama: opts.model?.cv ? { isabet_yuzde: opts.model.cv.isabet_yuzde, log_kayip: opts.model.cv.log_kayip, temel_isabet_yuzde: opts.model.cv.cogunluk_isabet_yuzde } : undefined,
   };
-  const order = resolved.alts.map((a, j) => [a.id, shares[j]]).sort((x, y) => y[1] - x[1]);
+  // Seçim tahmini biçimi: katılım ve geçerli oy payları (çekimser hariç)
+  const abst = resolved.alts.map((a, j) => (isAbstain(a) ? j : -1)).filter((j) => j >= 0);
+  if (resolved.domain.id === 'siyaset' && abst.length) {
+    const absShare = abst.reduce((s, j) => s + shares[j], 0) / N;
+    result.katilim_yuzde = pct(1 - absShare);
+    result.gecerli_oy_paylari = Object.fromEntries(resolved.alts.map((a, j) => [a, j]).filter(([, j]) => !abst.includes(j)).map(([a, j]) => [a.id, pct(shares[j] / N / Math.max(1e-9, 1 - absShare))]));
+  }
+  const order = resolved.alts.map((a, j) => [a.id, shares[j]]).filter(([id]) => !(result.gecerli_oy_paylari && !(id in result.gecerli_oy_paylari))).sort((x, y) => y[1] - x[1]);
   result.kazanan = order[0][0];
   result.fark_puan = r3((order[0][1] - order[1][1]) / N * 100);
 

@@ -186,6 +186,15 @@ ok(ag.agirliklar.find((p) => p.kurulus === 'K3').agirlik < 5, 'eski anket düş�
 ok(ag.kurulus_yanliligi_puan.K1.A > 0 && ag.kurulus_yanliligi_puan.K2.A < 0, 'kuruluş yanlılığı tahmin edilir (K1 A lehine, K2 aleyhine)');
 ok(ag.hata_payi_95.A > 0.5 && ag.hata_payi_95.A < 10, `hata payı makul (±${ag.hata_payi_95.A})`);
 
+console.log('\n[15] Seçim biçimi ve konu önemi');
+const sb = predictChoice(SECIM, O);
+ok(sb.katilim_yuzde > 70 && Math.abs(Object.values(sb.gecerli_oy_paylari).reduce((a, b) => a + b, 0) - 100) < 0.5 && !('X' in sb.gecerli_oy_paylari), `katılım %${sb.katilim_yuzde} ve geçerli oy payları (çekimser hariç)`);
+ok(sb.kazanan !== 'X', 'kazanan çekimser olamaz');
+const eko = predictChoice({ ...SECIM, baglam: { ...SECIM.baglam, konu_onemi: { ekonomi: 2, kultur: 0.3 } } }, { ...O, segmentBy: ['dindarlik'] });
+const kul = predictChoice({ ...SECIM, baglam: { ...SECIM.baglam, konu_onemi: { ekonomi: 0.3, kultur: 2 } } }, { ...O, segmentBy: ['dindarlik'] });
+const gap = (r) => r.segmentler.dindarlik.yuksek.A - r.segmentler.dindarlik.dusuk.A;
+ok(gap(kul) > gap(eko), `kültür ekseni önem kazanınca dindarlık ayrışması büyür (${gap(eko).toFixed(1)} → ${gap(kul).toFixed(1)} puan)`);
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ karar testleri geçti');

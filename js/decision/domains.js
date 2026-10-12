@@ -23,7 +23,15 @@ export function politicalPosition(f) {
 }
 const partyPos = (a) => ({ ekonomi: num(a.ekonomi ?? a.konum?.ekonomi), kultur: num(a.kultur ?? a.konum?.kultur) });
 const isAbstain = (a) => a.tur === 'cekimser' || a.id === 'oy_kullanmama';
+// Konu önemi (issue salience): kriz döneminde ekonomi ekseni ağır basar. Ortalama 1'e normalize.
+function issueWeights(ctx) {
+  const k = ctx?.konu_onemi;
+  if (!k) return { ekonomi: 1, kultur: 1 };
+  const e = Math.max(0, num(k.ekonomi, 1)), c = Math.max(0, num(k.kultur, 1)), m = (e + c) / 2 || 1;
+  return { ekonomi: e / m, kultur: c / m };
+}
 
+export { isAbstain };
 export const SIYASET = {
   id: 'siyaset', ad: 'Siyasi karar (oy verme)',
   seceneOzellikleri: {
@@ -32,12 +40,12 @@ export const SIYASET = {
     lider: '0..1 lider/aday değerlendirmesi (valens)', anket: '0..1 beklenen oy payı (stratejik oy)',
     tur: '"cekimser" → oy kullanmama seçeneği',
   },
-  baglam: { ekonomi_algisi: '-1 (kötü) .. 1 (iyi) genel ekonomik algı (varsayılan -0.2)', onceki_paylar: '{seçenek_id|etiket: yüzde} önceki seçim sonucu — personalara geçmiş oy atanır' },
+  baglam: { ekonomi_algisi: '-1 (kötü) .. 1 (iyi) genel ekonomik algı (varsayılan -0.2)', konu_onemi: '{ekonomi: ağırlık, kultur: ağırlık} hangi eksen daha belirleyici (ör. kriz: {ekonomi: 2, kultur: 0.6})', onceki_paylar: '{seçenek_id|etiket: yüzde} önceki seçim sonucu — personalara geçmiş oy atanır' },
   terimler: [
     { id: 'yakinlik', ad: 'Mekânsal yakınlık', kuram: 'Downs (1957) — mekânsal oy modeli', onsel: 1.6,
-      z: (f, p, a) => { if (isAbstain(a)) return 0; const v = politicalPosition(f), q = partyPos(a); return -((v.ekonomi - q.ekonomi) ** 2 + (v.kultur - q.kultur) ** 2); } },
+      z: (f, p, a, ctx) => { if (isAbstain(a)) return 0; const v = politicalPosition(f), q = partyPos(a), w = issueWeights(ctx); return -(w.ekonomi * (v.ekonomi - q.ekonomi) ** 2 + w.kultur * (v.kultur - q.kultur) ** 2); } },
     { id: 'yon', ad: 'Yönsel oy', kuram: 'Rabinowitz & Macdonald (1989)', onsel: 0.7,
-      z: (f, p, a) => { if (isAbstain(a)) return 0; const v = politicalPosition(f), q = partyPos(a); return v.ekonomi * q.ekonomi + v.kultur * q.kultur; } },
+      z: (f, p, a, ctx) => { if (isAbstain(a)) return 0; const v = politicalPosition(f), q = partyPos(a), w = issueWeights(ctx); return w.ekonomi * v.ekonomi * q.ekonomi + w.kultur * v.kultur * q.kultur; } },
     { id: 'parti_kimligi', ad: 'Parti kimliği', kuram: 'Campbell vd. (1960) — Michigan modeli', onsel: 1.3,
       z: (f, p, a) => (!isAbstain(a) && a.kimlik && a.kimlik === p.ideoloji ? 0.5 + f.yas : 0) },
     { id: 'ekonomik_oy', ad: 'Geriye dönük ekonomik oy', kuram: 'Fiorina (1981); Lewis-Beck (1988)', onsel: 1.4,

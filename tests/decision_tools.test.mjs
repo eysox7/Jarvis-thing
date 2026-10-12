@@ -58,7 +58,8 @@ await page.click('#btnSend');
 await page.waitForFunction(() => [...document.querySelectorAll('.msg.bot')].some((m) => m.textContent.includes('Karar tahmini hazır')), { timeout: 60000 });
 
 console.log('\n[1] Araçlar');
-ok(['decision_predict', 'decision_learn', 'decision_data_import', 'decision_ensemble'].every((t) => seen[0].messages[0].content.includes(t)), 'sistem mesajında karar araçları');
+ok(['decision_predict', 'decision_learn', 'decision_data_import', 'decision_ensemble', 'decision_polls'].every((t) => seen[0].messages[0].content.includes(t)), 'sistem mesajında karar araçları');
+ok(seen[0].messages[0].content.includes('TAHMİN İŞ AKIŞI'), 'sistem mesajında tahmin iş akışı rehberi');
 const badges = await page.locator('.card[data-tool] .badge.ok').count();
 ok(badges === 6, `altı araç da başarılı (${badges})`);
 
@@ -82,6 +83,7 @@ await page.click('#btnDecPredict');
 await page.waitForSelector('#decPrediction', { timeout: 20000 });
 ok((await page.locator('#decPrediction').textContent()).includes('Görülmemiş veride isabet'), 'öğrenilmiş modelin doğrulama isabeti gösteriliyor');
 ok(await page.locator('#decPrediction .dec-row').count() >= 3, 'pay çubukları çizildi');
+ok((await page.locator('#decPrediction').textContent()).includes('Geçerli oy payları'), 'katılım ve geçerli oy payları gösteriliyor');
 ok(await page.locator('#decPrediction .seg-table tr').count() >= 4, 'ideoloji kırılımı');
 if (process.env.SHOT) await page.locator('#view-decision').screenshot({ path: process.env.SHOT.replace('.png', '-karar.png') });
 await page.selectOption('#decScenario', 'hazir:telefon');
