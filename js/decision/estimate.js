@@ -37,7 +37,7 @@ export function fitChoiceModel(spec, rows, o = {}) {
   const K = terms.length;
   const tIdx = terms.map((t) => resolved.terms.indexOf(t));
   const prior = coefficients(resolved, o.baslangic || {});
-  const sigT = o.kuramGuveni ?? 1.0, sigA = 3, sigD = o.demoSigma ?? 0.5;
+  const sigT = o.kuramGuveni ?? 1.0, sigA = 3, sigD = Number.isFinite(+o.demoSigma) ? +o.demoSigma : 0.25;
 
   // Parametre vektörü: [θ_1..θ_K, ASC_1..ASC_{J-1}, demo...]
   const demoKeys = [];
@@ -179,7 +179,9 @@ export function crossValidate(spec, rows, o = {}) {
     const testI = new Set(rows.map((_, i) => i).filter((i) => foldOf.get(gid[i]) === f));
     const train = rows.filter((_, q) => !testI.has(q)), test = rows.filter((_, q) => testI.has(q));
     const C = Number(o.siniflar) || 1;
-    const model = C > 1 ? fitLatentClass(spec, train, { ...o, C }) : fitChoiceModel(spec, train, { ...o, iters: o.iters ?? 250 });
+    // İç içe doğrulama: düzenlileştirme yalnızca eğitim katında seçilir (raporlanan isabet iyimser olmasın)
+    const sigma = o.demoSigma === 'oto' ? tuneDemoSigma(spec, train, o) : o.demoSigma;
+    const model = C > 1 ? fitLatentClass(spec, train, { ...o, C, demoSigma: sigma }) : fitChoiceModel(spec, train, { ...o, demoSigma: sigma, iters: o.iters ?? 250 });
     learned.push(...rowProbs(spec, model, test));
     theory.push(...rowProbs(spec, {}, test));
     const counts = {};
@@ -197,6 +199,26 @@ export function crossValidate(spec, rows, o = {}) {
     cogunluk_isabet_yuzde: M.isabet_yuzde, cogunluk_log_kayip: M.log_kayip,
     kazanc: `isabet ${L.isabet_yuzde}% (kuram ${Tm.isabet_yuzde}%, çoğunluk ${M.isabet_yuzde}%); log-kayıp ${L.log_kayip} (kuram ${Tm.log_kayip}, çoğunluk ${M.log_kayip})`,
   };
+}
+
+/**
+ * Demografik etkilerin düzenlileştirme sıkılığını (σ) veriden seçer: 2-katlı iç doğrulamada
+ * log-kaybı en düşük aday. Az veride sıkı (aşırı uyum yok), çok veride gevşek (esneklik).
+ */
+export function tuneDemoSigma(spec, rows, o = {}) {
+  const cands = o.sigmaAdaylari || [0.08, 0.18, 0.4];
+  if (rows.length < 40) return cands[0];
+  const half = rows.filter((_, i) => i % 2 === 0), other = rows.filter((_, i) => i % 2 === 1);
+  let best = cands[1], bestLL = Infinity;
+  for (const sg of cands) {
+    let ll = 0;
+    for (const [tr, te] of [[half, other], [other, half]]) {
+      const m = fitChoiceModel(spec, tr, { ...o, demoSigma: sg, iters: Math.min(o.iters ?? 180, 180) });
+      ll += scoreProbs(rowProbs(spec, m, te)).log_kayip;
+    }
+    if (ll < bestLL) { bestLL = ll; best = sg; }
+  }
+  return best;
 }
 
 /**
@@ -261,8 +283,12 @@ export function learn(spec, rows, o = {}) {
     cv2 = crossValidate(spec, rows, { ...o, siniflar: 2, k: 3 });
     C = cv2.log_kayip < cv1.log_kayip - 0.005 ? 2 : 1;
   }
-  const model = C > 1 ? fitLatentClass(spec, rows, { ...o, C }) : fitChoiceModel(spec, rows, o);
-  if (o.cv !== false) model.cv = cv1 && cv2 ? (C === 1 ? cv1 : cv2) : crossValidate(spec, rows, { ...o, siniflar: C });
+  // Varsayılan: düzenlileştirme veriden seçilir ('oto'); çapraz doğrulama bunu katın içinde tekrarlar
+  const sigOpt = o.demoSigma ?? 'oto';
+  const sigma = sigOpt === 'oto' ? tuneDemoSigma(spec, rows, o) : sigOpt;
+  const model = C > 1 ? fitLatentClass(spec, rows, { ...o, C, demoSigma: sigma }) : fitChoiceModel(spec, rows, { ...o, demoSigma: sigma });
+  model.duzenlilestirme = { demografik_sigma: sigma, secim: sigOpt === 'oto' ? 'iç doğrulamayla' : 'elle' };
+  if (o.cv !== false) model.cv = cv1 && cv2 ? (C === 1 ? cv1 : cv2) : crossValidate(spec, rows, { ...o, siniflar: C, demoSigma: sigOpt });
   if (cv1 && cv2) model.sinif_secimi = { tek_sinif_log_kayip: cv1.log_kayip, iki_sinif_log_kayip: cv2.log_kayip, secilen: C };
   return model;
 }

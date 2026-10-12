@@ -18,6 +18,10 @@ import { calibrate } from '../js/audience/calibrate.js';
 import { THEORIES } from '../js/audience/theories.js';
 import { rng } from '../js/audience/personas.js';
 import { SCENARIOS } from '../js/audience/scenarios.js';
+import { simulateDataset } from '../js/decision/data.js';
+import { crossValidate, scoreProbs } from '../js/decision/estimate.js';
+import { predictChoice, resolveChoice } from '../js/decision/model.js';
+import { DECISION_PRESETS } from '../js/decision/presets.js';
 
 const QUICK = process.argv.includes('--quick');
 const N = QUICK ? 600 : 1500;
@@ -176,6 +180,62 @@ const lensDiv = Object.entries(SCENARIOS).map(([id, sc]) => {
   return { senaryo: sc.ad, ana_akim: a, elestirel: e, butunlesik: b, fark: r3(a - e), yon_catisiyor: Math.sign(a) !== Math.sign(e) };
 });
 
+/* ===================== G. Karar doğruluğu ===================== */
+log('G. Karar doğruluğu (öğrenme eğrisi)…');
+// Her alanda "gerçek dünya": kuram katsayıları rastgele bozulmuş + kuramın bilmediği demografik etkiler.
+// Ölçüt: görülmemiş veride isabet / log-kayıp; tavan = gerçek modelin kendisi.
+// Yakalanan kazanç = (çoğunluk LL − model LL) / (çoğunluk LL − tavan LL).
+const RG = rng(77);
+const gG = () => Math.sqrt(-2 * Math.log(RG() || 1e-9)) * Math.cos(2 * Math.PI * RG());
+const decCases = [
+  ['siyaset', DECISION_PRESETS.secim, null],
+  ['ticaret (conjoint fiyatlı)', DECISION_PRESETS.telefon, { P: { fiyat: [35000, 60000] }, O: { fiyat: [15000, 30000] }, Y: { fiyat: [8000, 16000] } }],
+  ['gündelik', DECISION_PRESETS.ulasim, null],
+];
+const SIZES = QUICK ? [150, 600] : [100, 400, 1600];
+const decRows = [];
+for (const [ad, spec, vary] of decCases) {
+  const res = resolveChoice(spec);
+  const truth = {
+    theta: Object.fromEntries(res.terms.filter((t) => t.id !== 'iletisim' && t.id !== 'gecmis').map((t) => [t.id, r3(t.onsel * Math.exp(0.5 * gG()))])),
+    asc: Object.fromEntries(res.alts.map((a) => [a.id, r3(0.5 * gG())])),
+    demo: Object.fromEntries(res.alts.slice(1).map((a) => [a.id, { 'yas=18-24': r3(0.7 * gG()), 'cinsiyet=kadin': r3(0.5 * gG()), 'yerlesim=metropol': r3(0.5 * gG()) }])),
+  };
+  const all = simulateDataset(spec, truth, { n: Math.max(...SIZES), seed: 31, vary });
+  const ids = res.alts.map((a) => a.id);
+  for (const n of SIZES) {
+    const rows = all.slice(0, n);
+    const cv = crossValidate(spec, rows, { k: 3, iters: 180, demoSigma: 'oto' });
+    const orc = scoreProbs(rows.map((r) => ({ P: r._P, y: ids.indexOf(r.secim), w: 1 })));
+    const gain = (cv.cogunluk_log_kayip - cv.log_kayip) / Math.max(1e-6, cv.cogunluk_log_kayip - orc.log_kayip);
+    decRows.push({ alan: ad, n, isabet: cv.isabet_yuzde, tavan_isabet: orc.isabet_yuzde, kuram_isabet: cv.kuram_isabet_yuzde, cogunluk_isabet: cv.cogunluk_isabet_yuzde,
+      log_kayip: cv.log_kayip, tavan_log_kayip: orc.log_kayip, ece: cv.kalibrasyon_hatasi_ece, yakalanan_kazanc_yuzde: Math.round(gain * 100) });
+  }
+  // Nüfus payı hatası (en büyük örneklemde öğrenilen model vs gerçek)
+}
+// Geçmiş oyun katkısı (siyaset, sadakat güçlü)
+log('G2. Geçmiş davranış katkısı…');
+const loyal = { theta: { yakinlik: 1.6, parti_kimligi: 0.8, gecmis: 2.5, katilmama: 1, lider: 1.5, stratejik: 0.4 } };
+const prevSpec = { ...DECISION_PRESETS.secim, baglam: { ...DECISION_PRESETS.secim.baglam, onceki_paylar: { A: 42, B: 27, C: 11, D: 6, X: 14 } } };
+const pp = predictChoice(prevSpec, { model: loyal, n: QUICK ? 600 : 1500, seed: 4, keepPeople: true, explain: false });
+const RP = rng(5);
+const prow = pp._people.map((x) => { let u = RP(), j = 0; while (j < x.P.length - 1 && (u -= x.P[j]) > 0) j++; return { p: x.p, secim: ['A', 'B', 'C', 'D', 'X'][j], w: 1 }; });
+const cvPast = crossValidate(DECISION_PRESETS.secim, prow, { k: 3, iters: 180, demoSigma: 'oto' });
+const cvNoPast = crossValidate(DECISION_PRESETS.secim, prow.map((x) => { const { onceki, ...p } = x.p; return { ...x, p }; }), { k: 3, iters: 180, demoSigma: 'oto' });
+const pastGain = { gecmissiz_isabet: cvNoPast.isabet_yuzde, gecmisli_isabet: cvPast.isabet_yuzde, gecmissiz_ll: cvNoPast.log_kayip, gecmisli_ll: cvPast.log_kayip };
+// Gizli sınıf katkısı (panel conjoint)
+log('G3. Gizli sınıf katkısı…');
+const LCT = { siniflar: [
+  { pay: 0.5, theta: { fiyat: 4.5, kalite: 0.5, marka: 0 }, asc: { P: 0, O: 0, Y: 0.3, N: -0.5 } },
+  { pay: 0.5, theta: { fiyat: 0.4, kalite: 2.5, marka: 3.5 }, asc: { P: 0.5, O: 0, Y: -0.5, N: -1 } }] };
+const lrows = simulateDataset(DECISION_PRESETS.telefon, LCT, { n: QUICK ? 150 : 300, seed: 8, vary: decCases[1][2], gorev: 6 });
+const lc1 = crossValidate(DECISION_PRESETS.telefon, lrows, { k: 3, siniflar: 1, iters: 180 });
+const lc2 = crossValidate(DECISION_PRESETS.telefon, lrows, { k: 3, siniflar: 2, emIters: 4 });
+const lcOrc = scoreProbs(lrows.map((r) => ({ P: r._P, y: ['P', 'O', 'Y', 'N'].indexOf(r.secim), w: 1 })));
+const lcGain = { tek_sinif_ll: lc1.log_kayip, iki_sinif_ll: lc2.log_kayip, tavan_ll: lcOrc.log_kayip, tek_sinif_isabet: lc1.isabet_yuzde, iki_sinif_isabet: lc2.isabet_yuzde, tavan_isabet: lcOrc.isabet_yuzde };
+const bigRows = decRows.filter((d) => d.n === Math.max(...SIZES));
+const meanCaptured = Math.round(bigRows.reduce((s, d) => s + d.yakalanan_kazanc_yuzde, 0) / bigRows.length);
+
 /* ===================== rapor ===================== */
 const summary = {
   tarih: new Date().toISOString(), mod: QUICK ? 'hizli' : 'tam', sure_sn: Math.round((Date.now() - t0) / 1000),
@@ -185,8 +245,9 @@ const summary = {
   kararlilik: { en_buyuk_tutum_sd: maxTutumSd },
   performans: perf,
   mercek: { yon_catisan_senaryo: lensDiv.filter((x) => x.yon_catisiyor).length, toplam: lensDiv.length },
+  karar: { en_buyuk_n_yakalanan_kazanc_yuzde: meanCaptured, gecmis: pastGain, gizli_sinif: lcGain },
 };
-const report = { summary, dir, calib, covRows, stab, lensDiv };
+const report = { summary, dir, calib, covRows, stab, lensDiv, decRows };
 
 const md = [
   `# Kitle tahmini — doğrulama raporu`,
@@ -204,6 +265,9 @@ const md = [
   `| E. Tahmin süresi (n=2000, bootstrap) | **${perf.predict_2000_ms} ms** | < 500 ms |`,
   `| E. Tahmin + model belirsizliği | **${perf.predict_belirsizlikli_ms} ms** | < 2000 ms |`,
   `| F. Ana akım ve eleştirel mercekte tutum yönü çatışan senaryo | **${summary.mercek.yon_catisan_senaryo}/${lensDiv.length}** | (bilgi) |`,
+  `| G. Karar: tavana göre yakalanan tahmin kazancı (n=${Math.max(...SIZES)}, 3 alan ort.) | **%${meanCaptured}** | > %80 |`,
+  `| G. Geçmiş oy eklenince isabet | **%${pastGain.gecmissiz_isabet} → %${pastGain.gecmisli_isabet}** | artış |`,
+  `| G. Gizli sınıf (panel) log-kayıp: tek → iki sınıf (tavan) | **${lcGain.tek_sinif_ll} → ${lcGain.iki_sinif_ll}** (${lcGain.tavan_ll}) | düşüş |`,
   ``,
   `## A. Yön paketi`,
   ``,
@@ -234,6 +298,15 @@ const md = [
   `## E. Performans (bu makine)`,
   ``,
   ...Object.entries(perf).map(([k, v]) => `- ${k}: ${v} ms`),
+  ``,
+  `## G. Karar doğruluğu — öğrenme eğrisi (görülmemiş veri, 3-katlı)`,
+  ``,
+  `| Alan | n | isabet | tavan | yalnız kuram | çoğunluk | log-kayıp | tavan LL | ECE | yakalanan kazanç |`,
+  `|---|---|---|---|---|---|---|---|---|---|`,
+  ...decRows.map((d) => `| ${d.alan} | ${d.n} | %${d.isabet} | %${d.tavan_isabet} | %${d.kuram_isabet} | %${d.cogunluk_isabet} | ${d.log_kayip} | ${d.tavan_log_kayip} | ${d.ece} | %${d.yakalanan_kazanc_yuzde} |`),
+  ``,
+  `Geçmiş davranış: isabet %${pastGain.gecmissiz_isabet} → %${pastGain.gecmisli_isabet}, log-kayıp ${pastGain.gecmissiz_ll} → ${pastGain.gecmisli_ll}.`,
+  `Gizli sınıf (300 kişi × 6 görev): isabet %${lcGain.tek_sinif_isabet} → %${lcGain.iki_sinif_isabet} (tavan %${lcGain.tavan_isabet}); log-kayıp ${lcGain.tek_sinif_ll} → ${lcGain.iki_sinif_ll} (tavan ${lcGain.tavan_ll}).`,
   ``,
   `## F. Mercek ayrışması`,
   ``,
