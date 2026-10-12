@@ -2,6 +2,7 @@
 import { samplePopulation, DIMENSIONS } from '../js/audience/personas.js';
 import { predict, compare, optimize, normalizeMessage } from '../js/audience/engine.js';
 import { THEORIES, lensWeights } from '../js/audience/theories.js';
+import { calibrate } from '../js/audience/calibrate.js';
 
 const fails = [];
 const ok = (c, m) => { console.log((c ? '  ✔ ' : '  ✖ ') + m); if (!c) fails.push(m); };
@@ -83,6 +84,27 @@ const cmp = compare([{ ad: 'A', frame: 'kazanc', domain: 'saglik' }, { ad: 'B', 
 ok(['A', 'B'].includes(cmp.kazanan) && cmp.siralama.length === 2, 'compare kazananı seçer');
 const opt = optimize({ domain: 'ticaret', institution: 'kobi' }, { n: 200, frames: ['kazanc', 'korku'], channelSets: [['sosyal'], ['tv']] });
 ok(opt.en_iyi.length === 4 && opt.en_iyi[0].skor >= opt.en_iyi[3].skor, 'optimize ızgarayı sıralar');
+
+console.log('\n[6] Kurum verisiyle kalibrasyon');
+const truth = { intercepts: { exp: -1.2, shift: 0.6 } };
+const cmsgs = [
+  { domain: 'saglik', institution: 'belediye', frame: 'kayip', channels: ['sosyal'] },
+  { domain: 'saglik', institution: 'belediye', frame: 'kazanc', channels: ['tv'] },
+  { domain: 'kamu_hizmeti', institution: 'belediye', frame: 'sorumluluk', channels: ['sms'] },
+];
+const cobs = cmsgs.map((m) => {
+  const o = predict(m, { n: 300, bootstrap: 0, calibration: truth }).sonuc;
+  return { message: m, observed: { erisim_yuzde: o.erisim_yuzde, ortalama_tutum: o.ortalama_tutum } };
+});
+const cal = calibrate(cobs, { rounds: 2 });
+ok(cal.fit.sonra_rmse < cal.fit.once_rmse / 3, `kalibrasyon hatayı düşürür (RMSE ${cal.fit.once_rmse} → ${cal.fit.sonra_rmse})`);
+ok(cal.intercepts.exp < -0.5, `erişim sabiti doğru yöne gider (${cal.intercepts.exp})`);
+const after = predict(cmsgs[0], { n: 300, bootstrap: 0, calibration: cal }).sonuc.erisim_yuzde;
+ok(Math.abs(after - cobs[0].observed.erisim_yuzde) < 6, `kalibre tahmin gözleme yakın (${after} vs ${cobs[0].observed.erisim_yuzde})`);
+const one = calibrate(cobs.slice(0, 1));
+ok(!one.fit.agirliklar_ayarlandi && one.fit.not, 'az veride kuram ağırlıklarına dokunulmaz ve uyarılır');
+ok(throws(() => calibrate([{ message: {}, observed: { uydurma: 3 } }])), 'bilinmeyen metrik reddedilir');
+ok(throws(() => calibrate([])), 'boş gözlem reddedilir');
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }

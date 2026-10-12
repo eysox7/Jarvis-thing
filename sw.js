@@ -17,6 +17,7 @@ const SHELL = [
   './js/audience/personas.js',
   './js/audience/theories.js',
   './js/audience/institutions.js',
+  './js/audience/calibrate.js',
   './manifest.webmanifest',
   './icons/icon.svg',
 ];

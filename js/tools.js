@@ -7,6 +7,7 @@ import { calcExpression, parseWhen, fmtDate, truncate } from './util.js';
 import { predict, compare, optimize, DOMAINS, CHANNELS, FRAMES } from './audience/engine.js';
 import { INSTITUTIONS } from './audience/institutions.js';
 import { THEORIES } from './audience/theories.js';
+import { calibrate, CALIBRATION_METRICS } from './audience/calibrate.js';
 import { DIMENSIONS } from './audience/personas.js';
 
 const T = {};
@@ -471,6 +472,27 @@ def({
   run: (a) => {
     const { msg, opts } = audienceInput(a);
     return optimize(msg, { ...opts, n: Math.min(Number(a.n) || 600, 1500) }, a.metrik || 'ortalama_tutum');
+  },
+});
+
+def({
+  name: 'audience_calibrate',
+  desc: 'Kurumun geçmiş kampanyalarındaki GERÇEK sonuçlarla (anket, erişim, dönüşüm) modeli kalibre eder ve kaydeder; sonraki tahminler bu kuruma göre ayarlanır. Gözlem uydurma — yalnızca kullanıcının verdiği veriyi kullan.',
+  params: {
+    kurum: 'string — kalibrasyonun bağlanacağı kurum id (boşsa genel kalibrasyon)',
+    gozlemler: `object[] (zorunlu) — her biri {mesaj: {audience_predict mesaj alanları}, hedef?: {...}, gozlenen: {${CALIBRATION_METRICS.join(', ')}}}`,
+    mercek: '"butunlesik" | "ana_akim" | "elestirel"',
+  },
+  run: (a) => {
+    if (!Array.isArray(a.gozlemler) || !a.gozlemler.length) throw new Error('gozlemler dizisi zorunlu');
+    const key = a.kurum || '_genel';
+    const obs = a.gozlemler.map((g) => {
+      const { msg, opts } = audienceInput({ ...(g.mesaj || g.message || {}), kurum: (g.mesaj || {}).kurum || a.kurum });
+      return { message: msg, opts: { marginals: opts.marginals }, hedef: g.hedef, gozlenen: g.gozlenen || g.observed };
+    });
+    const cal = calibrate(obs, { lens: a.mercek });
+    S.setCalibration(key, { ...cal, at: Date.now() });
+    return { kalibrasyon: key, ...cal };
   },
 });
 
