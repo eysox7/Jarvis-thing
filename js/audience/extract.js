@@ -16,7 +16,7 @@ function hits(text, roots) {
 }
 
 const DOMAIN_LEX = {
-  siyaset: ['seçim', 'parti', 'meclis', 'oy ', 'oyunu', 'milletvekil', 'iktidar', 'muhalefet', 'cumhurbaşkan', 'hükümet', 'siyas', 'demokrasi', 'anayasa'],
+  siyaset: ['seçim', 'parti', 'meclis', 'oy ', 'oyunu', 'milletvekil', 'iktidar', 'muhalefet', 'cumhurbaşkan', 'hükümet', 'siyas', 'demokrasi', 'anayasa', 'sandık', 'irade', 'miting', 'yolsuzluk', 'ihale', 'kamuoyu', 'bakan'],
   saglik: ['sağlık', 'aşı', 'hastal', 'hastane', 'doktor', 'tedavi', 'virüs', 'salgın', 'kanser', 'ilaç', 'tansiyon', 'diyabet', 'check-up', 'tarama'],
   ticaret: ['indirim', 'kampanya', 'satın', 'sipariş', 'ürün', 'mağaza', 'fiyat', 'kargo', 'sepet', 'müşteri', 'marka'],
   egitim: ['okul', 'öğrenci', 'öğretmen', 'eğitim', 'sınav', 'burs', 'kurs', 'üniversite', 'ders', 'mezun'],

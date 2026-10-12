@@ -10,6 +10,7 @@ import { THEORIES } from './audience/theories.js';
 import { calibrate, CALIBRATION_METRICS } from './audience/calibrate.js';
 import { runSurvey } from './audience/survey.js';
 import { extractMessage } from './audience/extract.js';
+import { SCENARIOS } from './audience/scenarios.js';
 import { chatWithFallback } from './providers.js';
 import { DIMENSIONS } from './audience/personas.js';
 
@@ -527,7 +528,7 @@ def({
 def({
   name: 'audience_catalog',
   desc: 'Kitle tahmininde kullanılabilen alanları, çerçeveleri, kanalları, kurum türlerini, kayıtlı kurumları, persona boyutlarını ve kuramları listeler.',
-  params: { bolum: '"alanlar" | "cerceveler" | "kanallar" | "kurumlar" | "boyutlar" | "kuramlar" (boşsa hepsi, kısa)' },
+  params: { bolum: '"alanlar" | "cerceveler" | "kanallar" | "kurumlar" | "boyutlar" | "kuramlar" | "senaryolar" (boşsa hepsi, kısa)' },
   run: (a) => {
     const aud = S.db().audience || { institutions: {} };
     const all = {
@@ -540,9 +541,10 @@ def({
       },
       boyutlar: Object.fromEntries(Object.entries(DIMENSIONS).map(([k, v]) => [k, Object.keys(v.base)])),
       kuramlar: THEORIES.map((t) => ({ id: t.id, ad: t.ad, kurucu: t.kurucu, gelenek: t.gelenek, ozet: t.ozet })),
+      senaryolar: SCENARIOS,
     };
     if (a.bolum && all[a.bolum]) return { [a.bolum]: all[a.bolum] };
-    return { ...all, kuramlar: THEORIES.map((t) => `${t.id} (${t.gelenek})`) };
+    return { ...all, kuramlar: THEORIES.map((t) => `${t.id} (${t.gelenek})`), senaryolar: Object.fromEntries(Object.entries(SCENARIOS).map(([k, v]) => [k, v.ad])) };
   },
 });
 

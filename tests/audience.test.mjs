@@ -5,6 +5,7 @@ import { THEORIES, lensWeights } from '../js/audience/theories.js';
 import { calibrate } from '../js/audience/calibrate.js';
 import { extractMessage } from '../js/audience/extract.js';
 import { runSurvey, describePersona } from '../js/audience/survey.js';
+import { SCENARIOS } from '../js/audience/scenarios.js';
 
 const fails = [];
 const ok = (c, m) => { console.log((c ? '  ✔ ' : '  ✖ ') + m); if (!c) fails.push(m); };
@@ -141,6 +142,13 @@ ok(sv.ajan_ozet.okuma_yuzde.karsit > 0 && sv.uyum.tutum_korelasyonu !== null, 'a
 ok(sv.uyum.tutum_korelasyonu > 0, `kuram motoru ile ajanlar aynı yönde (r=${sv.uyum.tutum_korelasyonu})`);
 let threw = false; try { await runSurvey({}, { chat: async () => 'json değil' }); } catch { threw = true; }
 ok(threw, 'bozuk model yanıtı açık hata verir');
+
+console.log('\n[9] Hazır senaryolar (her alan)');
+for (const [k, sc] of Object.entries(SCENARIOS)) {
+  let r; try { r = predict({ metin: sc.metin, institution: sc.kurum, channels: sc.kanallar }, { n: 300, bootstrap: 0 }); } catch (e) { ok(false, `${k}: ${e.message}`); continue; }
+  ok(r.sonuc.erisim_yuzde > 0 && r.cikarim, `${sc.ad} → ${r.mesaj.alan}, tutum ${r.sonuc.ortalama_tutum}`);
+}
+ok(predict({ domain: 'genel' }, { n: 200, bootstrap: 0 }).sonuc.erisim_yuzde > 0, 'alan bağımsız "genel" alan çalışır');
 
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }

@@ -22,11 +22,13 @@ export function normalizeMessage(msg = {}) {
   const text = msg.text || msg.metin || '';
   const ex = text ? extractMessage(text) : { message: {}, kanit: null };
   const E = ex.message;
-  const domain = msg.domain || msg.alan || E.domain || 'kamu_hizmeti';
+  const inst = resolveInstitution(msg.institution ?? msg.kurum);
+  // Alan verilmedi ve metinden çıkmadıysa: kurumun en uzman olduğu alan, o da yoksa genel.
+  const topExpertise = Object.entries(inst.uzmanlik || {}).filter(([k]) => DOMAINS[k]).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const domain = msg.domain || msg.alan || E.domain || topExpertise || 'genel';
   if (!DOMAINS[domain]) throw new Error(`bilinmeyen alan: ${domain}. Kullanılabilir: ${Object.keys(DOMAINS).join(', ')}`);
   const frame = msg.frame || msg.cerceve || E.frame || 'notr';
   if (!FRAMES[frame]) throw new Error(`bilinmeyen çerçeve: ${frame}. Kullanılabilir: ${Object.keys(FRAMES).join(', ')}`);
-  const inst = resolveInstitution(msg.institution ?? msg.kurum);
   let channels = msg.channels ?? msg.kanallar ?? msg.channel ?? msg.kanal ?? inst.kanallar ?? ['sosyal'];
   if (!Array.isArray(channels)) channels = String(channels).split(/[,\s]+/).filter(Boolean);
   for (const c of channels) if (!CHANNELS[c]) throw new Error(`bilinmeyen kanal: ${c}. Kullanılabilir: ${Object.keys(CHANNELS).join(', ')}`);

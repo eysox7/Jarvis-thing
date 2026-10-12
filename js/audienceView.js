@@ -6,6 +6,7 @@ import * as S from './store.js';
 import { predict, optimize, DOMAINS, CHANNELS, FRAMES } from './audience/engine.js';
 import { INSTITUTIONS } from './audience/institutions.js';
 import { DIMENSIONS } from './audience/personas.js';
+import { SCENARIOS } from './audience/scenarios.js';
 
 const selected = new Set();   // seçili kanallar (boş = kurumun kanalları)
 let lens = 'butunlesik';
@@ -19,6 +20,10 @@ export function initAudienceView() {
   domSel.value = '';
   frSel.append(opt('', '(metinden çıkar / nötr)'), ...Object.entries(FRAMES).map(([k, v]) => opt(k, v)));
   segSel.append(opt('', '(kırılım yok)'), ...Object.entries(DIMENSIONS).map(([k, v]) => opt(k, v.label, k === 'yas')));
+
+  const sc = $('#audScenario');
+  sc.append(opt('', '(boş — kendi mesajını gir)'), ...Object.entries(SCENARIOS).map(([k, v]) => opt(k, v.ad)));
+  sc.addEventListener('change', () => loadScenario(SCENARIOS[sc.value]));
 
   const chips = $('#audChannels');
   for (const [k, v] of Object.entries(CHANNELS)) {
@@ -37,6 +42,20 @@ export function initAudienceView() {
 
   $('#btnAudPredict').addEventListener('click', () => run('predict'));
   $('#btnAudOptimize').addEventListener('click', () => run('optimize'));
+}
+
+/** Hazır senaryoyu forma doldurur (alan/çerçeve metinden çıkarılsın diye boş bırakılır). */
+function loadScenario(s) {
+  if (!s) return;
+  renderAudience();
+  $('#audText').value = s.metin;
+  $('#audInst').value = s.kurum;
+  $('#audDomain').value = '';
+  $('#audFrame').value = '';
+  $('#audStance').value = '';
+  selected.clear();
+  for (const c of s.kanallar) selected.add(c);
+  document.querySelectorAll('#audChannels .chip').forEach((b) => b.classList.toggle('on', selected.has(b.dataset.ch)));
 }
 
 /** Kurum listesini (hazır türler + kayıtlı kurumlar) tazeler. */

@@ -23,6 +23,7 @@ export const DOMAINS = {
   cevre: { label: 'Çevre / iklim', interest: (f) => 0.3 + 0.25 * (1 - f.yas) + 0.2 * f.egitim + 0.1 * (f.ideoloji < 0 ? 1 : 0), frames: { kayip: 1.2, ahlaki: 1.15, umut: 1.15, korku: 1.05 }, controversy: 0.55, ideological: 0.6, expertise: 0.8 },
   finans: { label: 'Finans / ekonomi', interest: (f) => 0.35 + 0.3 * f.gelir + 0.2 * f.egitim, frames: { ekonomik: 1.3, kayip: 1.2, kazanc: 1.15 }, controversy: 0.4, ideological: 0.5, expertise: 0.8 },
   din: { label: 'Din / değerler', interest: (f) => 0.2 + 0.65 * f.dindarlik, frames: { ahlaki: 1.4, insan_hikayesi: 1.1, sorumluluk: 1.1 }, controversy: 0.6, ideological: 0.7, expertise: 0.5 },
+  genel: { label: 'Genel / diğer (alan bağımsız)', interest: (f) => 0.4 + 0.1 * f.egitim + 0.1 * f.nfc, frames: {}, controversy: 0.3, ideological: 0.3, expertise: 0.5 },
   kamu_hizmeti: { label: 'Kamu hizmeti / yerel yönetim', interest: (f) => 0.45 + 0.2 * f.yas + 0.15 * f.yerlesim, frames: { sorumluluk: 1.2, ekonomik: 1.15, insan_hikayesi: 1.1 }, controversy: 0.4, ideological: 0.55, expertise: 0.5 },
 };
 

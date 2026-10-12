@@ -21,6 +21,7 @@ const SHELL = [
   './js/audience/calibrate.js',
   './js/audience/extract.js',
   './js/audience/survey.js',
+  './js/audience/scenarios.js',
   './manifest.webmanifest',
   './icons/icon.svg',
 ];
