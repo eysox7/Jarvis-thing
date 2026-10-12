@@ -119,6 +119,48 @@
     </div>
   </section>
 
+  <!-- ================= DECISION ================= -->
+  <section class="view" id="view-decision">
+    <div class="pad">
+      <p class="muted small">
+        Karar tahmini: insanların oy, satın alma ve gündelik kararlarını rastgele fayda modeliyle
+        (çok terimli logit) persona nüfusunda tahmin eder. Veri yüklersen model kurumun verisinden
+        öğrenir ve görülmemiş verideki isabetini ölçer.
+      </p>
+      <div class="row gap">
+        <label class="grow">Senaryo <select id="decScenario"></select></label>
+        <button class="btn" id="btnDecSave" title="Senaryoyu kaydet">💾</button>
+      </div>
+      <label>Senaryo kimliği <input id="decId" placeholder="secim26"></label>
+      <label>Alan
+        <select id="decDomain">
+          <option value="siyaset">Siyaset (oy)</option>
+          <option value="ticaret">Ticaret (satın alma)</option>
+          <option value="gundelik">Gündelik karar</option>
+        </select>
+      </label>
+      <label>Seçenekler (JSON) <textarea id="decAlts" rows="7" spellcheck="false"></textarea></label>
+      <label>Bağlam (JSON) <textarea id="decCtx" rows="2" spellcheck="false"></textarea></label>
+      <details class="small"><summary>Seçenek özellikleri</summary><pre id="decAttrDoc"></pre></details>
+      <div class="row gap">
+        <label class="grow">Kırılım <select id="decSegment"></select></label>
+        <button class="btn primary grow" id="btnDecPredict">Tahmin et</button>
+      </div>
+      <details id="decDataBox">
+        <summary>Veri yükle ve öğren (CSV)</summary>
+        <p class="muted small">Sütunlar: yas, cinsiyet, egitim, gelir, ideoloji… + <code>secim</code>. Opsiyonel: <code>agirlik</code>, <code>fiyat_A</code> gibi satıra özgü özellikler, <code>var_A</code> bulunurluk.</p>
+        <textarea id="decCsv" rows="5" spellcheck="false" placeholder="yas;cinsiyet;gelir;secim&#10;34;kadın;orta;B"></textarea>
+        <button class="btn wide" id="btnDecLearn">Yükle, öğren ve doğrula</button>
+      </details>
+      <details>
+        <summary>Ne olur? (senaryo değişikliği)</summary>
+        <textarea id="decWhatIf" rows="3" spellcheck="false" placeholder='{"secenekler": {"B": {"lider": 0.8}}, "baglam": {"ekonomi_algisi": 0.3}}'></textarea>
+        <button class="btn wide" id="btnDecWhatIf">Karşılaştır</button>
+      </details>
+      <div id="decResult"></div>
+    </div>
+  </section>
+
   <!-- ================= CONNECTIONS ================= -->
   <section class="view" id="view-conn">
     <div class="pad">
@@ -205,6 +247,7 @@
   <button data-view="tasks"><span>✔</span>Görevler</button>
   <button data-view="notes"><span>📝</span>Notlar</button>
   <button data-view="audience"><span>📊</span>Kitle</button>
+  <button data-view="decision"><span>⚖️</span>Karar</button>
   <button data-view="conn"><span>🔌</span>API</button>
   <button data-view="settings"><span>⚙</span>Ayarlar</button>
 </nav>

@@ -7,6 +7,7 @@ import { PRESETS, listModels, testProfile, kindOf } from './providers.js';
 import { runAgent } from './agent.js';
 import { Voice } from './voice.js';
 import { initAudienceView, renderAudience } from './audienceView.js';
+import { initDecisionView, renderDecision } from './decisionView.js';
 
 const VERSION = '1.0.0';
 let busy = false;
@@ -19,6 +20,7 @@ function showView(name) {
   if (name === 'tasks') renderTasks();
   if (name === 'notes') renderNotes();
   if (name === 'audience') renderAudience();
+  if (name === 'decision') renderDecision();
   if (name === 'conn') renderConnections();
   if (name === 'settings') renderSettings();
 }
@@ -653,6 +655,7 @@ $('#btnWipe').addEventListener('click', async () => {
 function boot() {
   restoreChat();
   initAudienceView();
+  initDecisionView();
   refreshHeader();
   renderSettings();
   scheduleReminders();
