@@ -121,7 +121,9 @@ export function anes(year, full) {
   const raw = load('ANES' + year);
   const inc = (v) => (!Number.isFinite(v) ? undefined : v <= 1 / 3 ? 'dusuk' : v <= 2 / 3 ? 'orta' : 'yuksek');
   const D = year === 2016, R = !D;
-  const spec = { alan: 'siyaset', baglam: { ekonomi_algisi: D ? -0.1 : -0.3, iktidar_suresi_yil: D ? 8 : 4, medya_yanliligi: { sag_medya: { rep: 1, dem: -1 }, sol_medya: { dem: 1, rep: -1 } } }, secenekler: [
+  // Topluluk bağlamı: eyaletin gerçek 2016 sonucu (kamuya açık; yalnız 2016 kamu dosyasında eyalet var)
+  const bolge = D && existsSync(new URL('eyalet_2016.csv', DIR)) ? Object.fromEntries(load('eyalet_2016').map((r) => [r.eyalet, { dem: num(r.dem), rep: num(r.rep), ucuncu: num(r.ucuncu) }])) : null;
+  const spec = { alan: 'siyaset', baglam: { ...(bolge && process.env.TOPLULUK !== '0' ? { bolge_paylari: bolge } : {}), ekonomi_algisi: D ? -0.1 : -0.3, iktidar_suresi_yil: D ? 8 : 4, medya_yanliligi: { sag_medya: { rep: 1, dem: -1 }, sol_medya: { dem: 1, rep: -1 } } }, secenekler: [
     { id: 'dem', ad: D ? 'Clinton (D)' : 'Biden (D)', iktidar: D, ekonomi: -0.4, kultur: -0.45, kimlik: 'sol' },
     { id: 'rep', ad: 'Trump (R)', iktidar: R, ekonomi: 0.35, kultur: 0.8, kimlik: 'sag', guclu_lider: 0.8, duzen_karsiti: D },
     { id: 'ucuncu', ad: 'Üçüncü aday', ekonomi: 0.2, kultur: -0.3, kimlik: 'merkez' },
@@ -137,6 +139,7 @@ export function anes(year, full) {
       otoriterlik: Number.isFinite(au) ? Math.round(au * 8) / 8 : undefined,
       // Siyasete dikkat → bilişsel ihtiyaç (ELM merkezî yol; Habermas'ın akılcı-eleştirel kamusu)
       bilissel_ihtiyac: num(r.ilgi5) >= 1 && num(r.ilgi5) <= 2 ? 'yuksek' : num(r.ilgi5) >= 3 ? 'dusuk' : undefined,
+      bolge: r.eyalet || undefined,
     };
     // Herman & Chomsky: kişinin izlediği partizan medya (yanlılık bağlamda tanımlı)
     const ms = num(r.medya_sag), ml = num(r.medya_sol);
@@ -163,6 +166,7 @@ function plainDomain(base, attrs, rows) {
 
 const COMM = ILETISIM_TERIMLERI.map((t) => t.id);
 const ELESTIREL = ['kimlik_siyaseti', 'otoriter_dinamik', 'muzakere', 'medya_yanliligi', 'arac', 'cinsiyet_acigi', 'kultur_endustrisi', 'arama_maliyeti', 'kulturel_sermaye', 'gosteris', 'reklam_teshir', 'risk_toplumu', 'otoriteye_uyum', 'bakim_yuku'];
+const SOSYAL = ['aile', 'ag', 'topluluk'];
 const args = process.argv.slice(2);
 const LIB = args[0] === '--yukle';   // başka betikten içe aktarım: ana akışı çalıştırma
 const cleanRows = (rows) => rows.filter((r) => r.secim && Object.values(r.ozel || {}).every((o) => Object.values(o).every((v) => typeof v !== 'number' || Number.isFinite(v))));
@@ -177,9 +181,9 @@ if (args[0] === '--egri') {
     const serbest = Object.fromEntries(attrs.map((k) => [k, DECISION_DOMAINS.__ham.terimler.find((t) => t.id === 'lin_' + k).sd]));
     const ids = resolveChoice(spec).alts.map((a) => a.id);
     console.log(`\n${name} (n=${clean.length}) — test isabeti %, 3 tekrar ortalaması`);
-    console.log('eğitim n | çoğunluk | standart | bütünleşik | eleştirelsiz');
+    console.log('eğitim n | çoğunluk | standart | bütünleşik | eleştirelsiz | sosyalsiz');
     for (const n of sizes) {
-      const acc = { c: [], s: [], b: [], e: [] };
+      const acc = { c: [], s: [], b: [], e: [], so: [] };
       for (let rep = 0; rep < 3; rep++) {
         const r = rng(100 + rep * 7 + n), idx = clean.map((_, i) => i);
         for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
@@ -194,9 +198,10 @@ if (args[0] === '--egri') {
         const bs = { ...spec, serbest };
         acc.b.push(score(bs, fit(bs, {})));
         acc.e.push(score(bs, fit(bs, { haric: ELESTIREL })));
+        acc.so.push(score(bs, fit(bs, { haric: SOSYAL })));
       }
       const m = (a) => (a.every(Number.isNaN) ? '  —  ' : (a.reduce((x, y) => x + y, 0) / a.length).toFixed(1).padStart(5));
-      console.log(`${String(n).padStart(8)} | ${m(acc.c)}    | ${m(acc.s)}    | ${m(acc.b)}      | ${m(acc.e)}`);
+      console.log(`${String(n).padStart(8)} | ${m(acc.c)}    | ${m(acc.s)}    | ${m(acc.b)}      | ${m(acc.e)}        | ${m(acc.so)}`);
     }
     delete DECISION_DOMAINS.__ham;
   }
@@ -278,10 +283,11 @@ for (const [name, mk] of Object.entries(DATASETS)) {
   const base = DECISION_DOMAINS[spec.alan];
   DECISION_DOMAINS.__ham = plainDomain(base, attrs, clean);
   const cvO = { k: 5, seed: 3, demoSigma: 'oto' };
+  const HARIC = process.env.HARIC ? process.env.HARIC.split(',') : [];
   const std = crossValidate({ ...spec, alan: '__ham' }, clean, { ...cvO, haric: [...COMM, 'gecmis'], kuramGuveni: 3 });
   // Hibrit: kuramın kapsamadığı ölçülmüş özellikler serbest terim olarak da girer (ölçek = std. sapma)
   const serbest = Object.fromEntries(attrs.map((k) => [k, DECISION_DOMAINS.__ham.terimler.find((t) => t.id === 'lin_' + k).sd]));
-  const but = crossValidate(process.env.SERBEST === '0' ? spec : { ...spec, serbest }, clean, { ...cvO, kuramGuveni: Number(process.env.KG || 1), siniflar: Number(process.env.SINIF || 1), etkilesim: process.env.ETK === '1' });
+  const but = crossValidate(process.env.SERBEST === '0' ? spec : { ...spec, serbest }, clean, { ...cvO, haric: HARIC, kuramGuveni: Number(process.env.KG || 1), siniflar: Number(process.env.SINIF || 1), etkilesim: process.env.ETK === '1' });
   delete DECISION_DOMAINS.__ham;
   const res = { veri: name, alan: spec.alan, n: clean.length,
     cogunluk: std.cogunluk_isabet_yuzde, standart: std.isabet_yuzde, butunlesik: but.isabet_yuzde,

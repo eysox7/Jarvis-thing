@@ -81,6 +81,7 @@ for y, v in V.items():
         out['medya_sol'] = m('V201630d')
     else:
         out['medya_sag'] = ''; out['medya_sol'] = ''
+    out['eyalet'] = d['V161010e'] if y == 2016 else ''   # 2020 kamu dosyasında eyalet gizli
     out = out[out['secim'] != '']
     out.to_csv(os.path.join(CACHE, f'ANES{y}.csv'), index=False)
     print(f'ANES{y}.csv', out.shape, out['secim'].value_counts().to_dict())

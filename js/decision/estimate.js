@@ -21,7 +21,7 @@ function precompute(resolved, rows) {
   return rows.map((r, i) => {
     const f = features(r.p);
     const { r: rr, mask } = rowResolved(resolved, r);
-    return { p: r.p, y: altIndex[r.secim], w: r.w ?? 1, mask, zs: zMatrix(rr, f, r.p, i), keys: Object.entries(r.p).map(([k, v]) => k + '=' + v) };
+    return { p: r.p, y: altIndex[r.secim], w: r.w ?? 1, mask, zs: zMatrix(rr, f, r.p, i), keys: Object.entries(r.p).filter(([, v]) => v === null || typeof v !== 'object').map(([k, v]) => k + '=' + v) };
   }).filter((x) => x.y !== undefined && (!x.mask || x.mask[x.y]));
 }
 

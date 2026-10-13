@@ -7,7 +7,7 @@
 
 import { samplePopulation, features, DIMENSIONS } from '../audience/personas.js';
 import { predict as audiencePredict } from '../audience/engine.js';
-import { DECISION_DOMAINS, ILETISIM, GECMIS, ILETISIM_TERIMLERI, isAbstain , SILIKON } from './domains.js';
+import { DECISION_DOMAINS, ILETISIM, GECMIS, ILETISIM_TERIMLERI, isAbstain, SILIKON, SOSYAL_TERIMLERI } from './domains.js';
 import { ensureComm } from './communication.js';
 import { rng } from '../audience/personas.js';
 
@@ -27,7 +27,7 @@ export function resolveChoice(spec = {}) {
   // doğrusal katsayı (öncül 0, gevşek). spec.serbest = {özellik: ölçek} — bütünleşik model kuramsız modeli kapsar.
   const free = Object.entries(spec.serbest || {}).map(([k, sc]) => ({ id: 'serbest_' + k, ad: k + ' (serbest)', kuram: 'veriden öğrenilen doğrusal etki', onsel: 0, sigma: 2,
     z: (f, p, a) => (a[k] === undefined || a[k] === null ? 0 : (Number(a[k]) || 0) / (Number(sc) || 1)) }));
-  const terms = [...domain.terimler, ...free, ...ILETISIM_TERIMLERI, ILETISIM, GECMIS, SILIKON];
+  const terms = [...domain.terimler, ...free, ...ILETISIM_TERIMLERI, ...SOSYAL_TERIMLERI, ILETISIM, GECMIS, SILIKON];
   return { domain, alts, ctx, terms };
 }
 
@@ -54,7 +54,7 @@ export function coefficients(resolved, model = {}, overrides = {}) {
 export function thetaFor(coef, termId, p) {
   let t = coef.theta[termId] || 0;
   const e = coef.etk && coef.etk[termId];
-  if (e) for (const k in p) { const c = e[k + '=' + p[k]]; if (c) t += c; }
+  if (e) for (const k in p) { if (p[k] !== null && typeof p[k] === 'object') continue; const c = e[k + '=' + p[k]]; if (c) t += c; }
   return t;
 }
 
@@ -100,7 +100,7 @@ export function demoUtility(demo, altId, p) {
   const d = demo && demo[altId];
   if (!d) return 0;
   let v = 0;
-  for (const k in p) { const c = d[k + '=' + p[k]]; if (c) v += c; }
+  for (const k in p) { if (p[k] !== null && typeof p[k] === 'object') continue; const c = d[k + '=' + p[k]]; if (c) v += c; }
   return v;
 }
 

@@ -53,7 +53,7 @@ export const SIYASET = {
     guclu_lider: '0..1 "güçlü lider / düzen" vaadi', duzen_karsiti: 'boolean — düzen karşıtı / popülist parti',
     tur: '"cekimser" → oy kullanmama seçeneği',
   },
-  baglam: { ekonomi_algisi: '-1 (kötü) .. 1 (iyi) genel ekonomik algı (varsayılan -0.2)', konu_onemi: '{ekonomi: ağırlık, kultur: ağırlık} hangi eksen daha belirleyici (ör. kriz: {ekonomi: 2, kultur: 0.6})', iktidar_suresi_yil: 'görevdeki partinin iktidar süresi (yorgunluk etkisi)', onceki_paylar: '{seçenek_id|etiket: yüzde} önceki seçim sonucu — personalara geçmiş oy atanır', tehdit: '0..2 normatif/güvenlik tehdidi algısı (terör, göç, kriz)', medya_yanliligi: '{medya türü veya kişinin medya_kaynagi etiketi: {seçenek_id: -1..1}} medya sahipliği/yanlılığı' },
+  baglam: { bolge_paylari: '{bölge: {seçenek_id: %}} bölge/il/ilçe sonuçları — kişinin p.bolge alanıyla topluluk bağlamı', ekonomi_algisi: '-1 (kötü) .. 1 (iyi) genel ekonomik algı (varsayılan -0.2)', konu_onemi: '{ekonomi: ağırlık, kultur: ağırlık} hangi eksen daha belirleyici (ör. kriz: {ekonomi: 2, kultur: 0.6})', iktidar_suresi_yil: 'görevdeki partinin iktidar süresi (yorgunluk etkisi)', onceki_paylar: '{seçenek_id|etiket: yüzde} önceki seçim sonucu — personalara geçmiş oy atanır', tehdit: '0..2 normatif/güvenlik tehdidi algısı (terör, göç, kriz)', medya_yanliligi: '{medya türü veya kişinin medya_kaynagi etiketi: {seçenek_id: -1..1}} medya sahipliği/yanlılığı' },
   terimler: [
     { id: 'yakinlik', ad: 'Mekânsal yakınlık', kuram: 'Downs (1957) — mekânsal oy modeli', onsel: 1.6,
       z: (f, p, a, ctx) => { if (isAbstain(a)) return 0; const v = politicalPosition(f, p), q = partyPos(a), w = issueWeights(ctx); return -(w.ekonomi * (v.ekonomi - q.ekonomi) ** 2 + w.kultur * (v.kultur - q.kultur) ** 2); } },
@@ -223,6 +223,32 @@ export const ILETISIM_TERIMLERI = [
     z: (f, p, a) => comm(p, a, 't') },
   { id: 'hall_okuma', ad: 'Mesajın okunma konumu', kuram: 'Kodlama/kodaçımlama (Stuart Hall); kültürel hegemonya (Gramsci)', onsel: 0.9,
     z: (f, p, a) => comm(p, a, 'o') },
+];
+
+/**
+ * SOSYAL BAĞLAM — karar bireyin kafasında değil, ilişkileri içinde verilir.
+ * Columbia okulu (Lazarsfeld, Berelson & Gaudet 1944; Berelson vd. 1954): "Bir kişi siyasi olarak
+ * nasıl düşünüyorsa sosyal olarak da öyledir"; Huckfeldt & Sprague (1995): bağlam ve tartışma ağları;
+ * Zuckerman (2005) "Sosyal mantık": hane içi uyum; Jennings & Niemi (1968): aileden aktarım;
+ * Chicago okulu (Park; Cooley/Mead): mahalle ekolojisi ve referans grupları. Üç düzey:
+ *   aile      p.aile_tercihi = eşin / ebeveynin / hanenin tercihi (seçenek kimliği)
+ *   ağ        p.ag_paylari = {seçenek: pay} — kişinin konuştuğu çevrede her seçeneğin payı (0..1 ya da %)
+ *   topluluk  p.cevre_paylari = {seçenek: %} ya da p.bolge + baglam.bolge_paylari = {bölge: {seçenek: %}}
+ * Topluluk etkisi topluluğa gömülülükle güçlenir (kırsal, yaşlı, dindar — cemaat; Harteveld & van der Brug).
+ */
+const share01 = (v) => { const x = num(v, NaN); return Number.isFinite(x) ? (x > 1 ? x / 100 : x) : null; };
+const embedded = (f) => 0.4 * (1 - f.yerlesim) + 0.3 * f.yas + 0.3 * f.dindarlik;
+export const SOSYAL_TERIMLERI = [
+  { id: 'aile', ad: 'Aile / hane etkisi', kuram: 'Zuckerman (2005) sosyal mantık; Jennings & Niemi (1968) aileden aktarım', onsel: 1.5,
+    z: (f, p, a) => (p?.aile_tercihi !== undefined && p.aile_tercihi !== null && String(p.aile_tercihi) === a.id ? 1 : 0) },
+  { id: 'ag', ad: 'Tartışma ağı', kuram: 'Huckfeldt & Sprague (1995); Lazarsfeld vd. (1944) Columbia okulu; Katz iki aşamalı akış', onsel: 1.5,
+    z: (f, p, a) => { const v = share01(p?.ag_paylari?.[a.id]); return v === null ? 0 : v; } },
+  { id: 'topluluk', ad: 'Topluluk / mahalle bağlamı', kuram: 'Park — insan ekolojisi (Chicago); Berelson vd. (1954); Huckfeldt (1986) bağlam etkisi', onsel: 0.7,
+    z: (f, p, a, ctx) => {
+      const src = p?.cevre_paylari || (p?.bolge !== undefined ? ctx?.bolge_paylari?.[p.bolge] : null);
+      const v = src ? share01(src[a.id]) : null;
+      return v === null ? 0 : Math.log(v + 0.02) * (0.6 + 0.8 * embedded(f));
+    } },
 ];
 
 /**

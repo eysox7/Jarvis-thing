@@ -283,6 +283,20 @@ console.log('\n[22] Eleştirel okullar ve kuram girdileri');
   ok(describePersona({ yas: '35-44', otoriterlik: 0.9 }).includes('otoriter'), 'silikon betimi gerçek veri alanlarını içerir');
 }
 
+console.log('\n[23] Sosyal bağlam: aile, ağ, topluluk');
+{
+  const sp = { alan: 'siyaset', baglam: { bolge_paylari: { Konya: { L: 25, R: 75 }, Izmir: { L: 70, R: 30 } } }, secenekler: [{ id: 'L', ekonomi: -0.5, kultur: -0.5, kimlik: 'sol' }, { id: 'R', ekonomi: 0.5, kultur: 0.6, kimlik: 'sag' }] };
+  const base = { yas: '45-54', ideoloji: 'merkez' };
+  const pr = (p) => predictPerson(sp, p).olasiliklar.L;
+  ok(pr({ ...base, aile_tercihi: 'L' }) > pr({ ...base, aile_tercihi: 'R' }), 'aile: hanenin tercihi kişinin olasılığını kendi yönüne çeker');
+  ok(pr({ ...base, ag_paylari: { L: 0.8, R: 0.2 } }) > pr({ ...base, ag_paylari: { L: 0.2, R: 0.8 } }), 'tartışma ağı: çevredeki çoğunluk yönünde etki');
+  ok(pr({ ...base, bolge: 'Izmir' }) > pr({ ...base, bolge: 'Konya' }), 'topluluk: bölgenin sonucu bağlam etkisi yapar');
+  const rural = pr({ ...base, yerlesim: 'kirsal', dindarlik: 'yuksek', bolge: 'Konya' }), urban = pr({ ...base, yerlesim: 'metropol', dindarlik: 'dusuk', bolge: 'Konya' });
+  ok(rural < urban, 'topluluğa gömülü kişide (kırsal, dindar) bağlam etkisi daha güçlü');
+  const rows = prepareRows(parseCSV('es_oyu;ag_L;ag_R;il;secim\nL;0.7;0.3;Konya;L\n'), sp).rows;
+  ok(rows[0].p.aile_tercihi === 'L' && rows[0].p.ag_paylari.L === 0.7 && rows[0].p.bolge === 'Konya', 'CSV: aile, ağ ve bölge sütunları tanınır');
+}
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ karar testleri geçti');

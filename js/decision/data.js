@@ -107,6 +107,11 @@ export function prepareRows(raw, spec) {
   if (!choiceCol) throw new Error('seçim sütunu bulunamadı (secim / tercih / choice / oy / karar)');
   const wCol = cols.find((c) => ['agirlik', 'weight', 'w'].includes(fold(c)));
   const idCol = cols.find((c) => ['kisi', 'katilimci', 'respondent', 'musteri', 'musteri_id', 'kisi_id'].includes(fold(c)));
+  // Sosyal bağlam sütunları: aile (eş/ebeveyn/hane tercihi), ağ_<seçenek> (çevredeki pay), cevre_<seçenek> / bolge_<seçenek> (topluluk payı), bolge
+  const famCol = cols.find((c) => ['aile_tercihi', 'aile', 'es_oyu', 'es_tercihi', 'ebeveyn_oyu', 'ebeveyn_tercihi', 'hane_tercihi', 'spouse', 'parent_vote'].includes(fold(c)));
+  const regionCol = cols.find((c) => ['bolge', 'il', 'ilce', 'sehir', 'mahalle', 'region', 'state', 'eyalet'].includes(fold(c)));
+  const shareCols = [];
+  for (const c of cols) for (const a of alts) for (const [pre, k] of [['ag_', 'ag_paylari'], ['cevre_', 'cevre_paylari'], ['bolge_', 'cevre_paylari']]) if (fold(c) === pre + fold(a.id)) shareCols.push({ c, alt: a.id, k });
   const pastCol = cols.find((c) => ['onceki', 'onceki_secim', 'onceki_oy', 'gecmis_oy', 'gecmis', 'previous', 'past'].includes(fold(c)));
   // Satıra özgü seçenek özellikleri: "<özellik>_<seçenek>" (ör. fiyat_A) ve bulunurluk "var_<seçenek>"
   const attrKeys = Object.keys(resolveChoice(spec).domain.seceneOzellikleri || {});
@@ -131,6 +136,9 @@ export function prepareRows(raw, spec) {
     }
     for (const [c, { k, fn }] of Object.entries(numOf)) { const v = fn(r[c]); if (v !== undefined) p[k] = v; }
     for (const [c, k] of Object.entries(catOf)) if (r[c] !== '' && r[c] !== undefined) p[k] = fold(r[c]);
+    if (famCol && r[famCol] !== '' && r[famCol] !== undefined) p.aile_tercihi = altIds.get(fold(r[famCol])) || fold(r[famCol]);
+    if (regionCol && r[regionCol] !== '' && r[regionCol] !== undefined) p.bolge = String(r[regionCol]).trim();
+    for (const { c, alt, k } of shareCols) { const v = Number(String(r[c] ?? '').replace(',', '.')); if (r[c] !== '' && Number.isFinite(v)) (p[k] ||= {})[alt] = v; }
     if (pastCol && r[pastCol] !== '' && r[pastCol] !== undefined) p.onceki = altIds.get(fold(r[pastCol])) || fold(r[pastCol]);
     const w = wCol ? Number(r[wCol]) : 1;
     const row = { p, secim: id, w: Number.isFinite(w) && w > 0 ? w : 1 };
@@ -149,6 +157,7 @@ export function prepareRows(raw, spec) {
   if (!Object.keys(dimOf).length) warn.push('hiç persona sütunu tanınmadı — yalnızca seçenek sabitleri öğrenilebilir');
   if (Object.keys(numOf).length) warn.push(`kuram girdisi sütunları bulundu: ${[...new Set(Object.values(numOf).map((x) => x.k))].join(', ')} (otomatik ölçeklendi)`);
   if (Object.keys(catOf).length) warn.push('medya kaynağı sütunu bulundu — baglam.medya_yanliligi ile kanal yanlılığını tanımlayın');
+  if (famCol || shareCols.length || regionCol) warn.push(`sosyal bağlam sütunları bulundu: ${[famCol && 'aile', shareCols.some((x) => x.k === 'ag_paylari') && 'tartışma ağı', shareCols.some((x) => x.k === 'cevre_paylari') && 'topluluk payı', regionCol && 'bölge (baglam.bolge_paylari ile)'].filter(Boolean).join(', ')}`);
   if (pastCol) warn.push('geçmiş davranış sütunu bulundu (önceki seçim → sadakat ve geçiş matrisi öğrenilecek)');
   if (altCols.length) warn.push(`${altCols.length} satıra özgü seçenek sütunu bulundu (conjoint/satış verisi)`);
   return { rows, uyarilar: warn, eslesen_boyutlar: [...new Set([...Object.values(dimOf), ...Object.values(numOf).map((x) => x.k), ...Object.values(catOf)])] };
