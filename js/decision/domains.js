@@ -60,7 +60,13 @@ export const SIYASET = {
     { id: 'yon', ad: 'Yönsel oy', kuram: 'Rabinowitz & Macdonald (1989)', onsel: 0.7,
       z: (f, p, a, ctx) => { if (isAbstain(a)) return 0; const v = politicalPosition(f, p), q = partyPos(a), w = issueWeights(ctx); return w.ekonomi * v.ekonomi * q.ekonomi + w.kultur * v.kultur * q.kultur; } },
     { id: 'parti_kimligi', ad: 'Parti kimliği', kuram: 'Campbell vd. (1960) — Michigan modeli', onsel: 1.3,
-      z: (f, p, a) => (!isAbstain(a) && a.kimlik && a.kimlik === p.ideoloji ? 0.5 + f.yas : 0) },
+      // Ölçülmüş parti kimliği varsa (p.parti_kimligi: -1 güçlü sol/demokrat .. 1 güçlü sağ/cumhuriyetçi) o kullanılır
+      z: (f, p, a) => {
+        if (isAbstain(a) || !a.kimlik) return 0;
+        const pk = perceived(p, 'parti_kimligi', null);
+        if (pk !== null) return a.kimlik === 'sag' ? pk : a.kimlik === 'sol' ? -pk : -Math.abs(pk) * 0.5;
+        return a.kimlik === p.ideoloji ? 0.5 + f.yas : 0;
+      } },
     { id: 'ekonomik_oy', ad: 'Geriye dönük ekonomik oy', kuram: 'Fiorina (1981); Lewis-Beck (1988)', onsel: 1.4,
       z: (f, p, a, ctx) => (a.iktidar ? perceived(p, 'ekonomi_algisi', num(ctx.ekonomi_algisi, -0.2)) + 0.5 * perceived(p, 'hane_algisi', f.gelir - 0.4) : 0) },
     { id: 'kurumsal_guven', ad: 'Sistem güveni', kuram: 'Easton (1965) — yaygın destek', onsel: 1.0,
