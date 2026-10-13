@@ -267,9 +267,9 @@ değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diye
 
 | Test | Çoğunluk | Standart | Bütünleşik | Eleştirel terimler çıkarılınca |
 |---|---|---|---|---|
-| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 59,5 | **69,4** | 68,3 |
-| Seçimler arası, yapısal: 2020 → 2016 | 35,7 | 55,7 | **61,7** | 59,9 |
-| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | 79,3 | 79,3 | 77,8 |
+| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 58,7 | **70,3** | 70,1 |
+| Seçimler arası, yapısal: 2020 → 2016 (2016'da eyalet bağlamı) | 35,7 | 57,3 | **62,5** | 60,6 |
+| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | **80,4** | 79,9 | 78,7 |
 | Gerçek iş akışı: 2016'da öğren + 2020'nin toplam paylarına (anket) kalibre et → 2020, yapısal | 47,1 | 61,6 | **70,9** | — |
 | Aynı iş akışı, tam model (parti kimliği + termometre) | 47,1 | **81,3** | 80,8 | — |
 | Aynı seçim, 5 katlı CV, yapısal 2020 | 47,1 | 73,7 | 73,5 | — |

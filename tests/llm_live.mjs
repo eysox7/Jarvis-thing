@@ -85,15 +85,17 @@ const betim3 = (p) => betim2(p) + (p.bolge && stateRes[p.bolge] ? `, lives in ${
 const opt = (year) => (SOS ? { sistem: SYS2, brief: brief2(year), betim: betim3 } : V2 ? { sistem: SYS2, brief: brief2(year), betim: betim2 } : {});
 const t0 = Date.now();
 console.log(`${process.env.LLM_SAHTE ? 'SAHTE MODEL (akış denetimi)' : 'Groq ' + MODEL} ile ${N} (${SOS ? 2016 : 2020}) + ${NCAL} (2016) seçmen canlandırılıyor…`);
+// Önbelleği her 12 kişide diske yaz (kota/kesinti ilerlemeyi silmesin)
+const attach = async (spec, rows, o) => { let n = 0; for (let i = 0; i < rows.length; i += 12) { n += await attachSilicon(spec, rows.slice(i, i + 12), chat, o); writeFileSync(CACHE_F, JSON.stringify(cache)); } return n; };
 // Kıyas: aynı panel, bağlamsız betim (v2) → topluluk bilgisi dil modelinin kendi isabetini artırıyor mu
 let PS0 = null;
 if (SOS) {
   const tag0 = tag.replace('v3s|', 'v2|');
-  await attachSilicon(A.spec, panel, chat, { batch: 6, cache, anahtar: (row) => tag0 + row.kisi, sistem: SYS2, brief: brief2(2016), betim: betim2 });
+  await attach(A.spec, panel, { batch: 6, cache, anahtar: (row) => tag0 + row.kisi, sistem: SYS2, brief: brief2(2016), betim: betim2 });
   PS0 = panel.map((x) => (x.p.__silikon ? ids.map((id) => x.p.__silikon[id]) : null));
 }
-const nP = await attachSilicon(TEST.spec, panel, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi, ...opt(SOS ? 2016 : 2020) });
-const nC = await attachSilicon(A.spec, calib, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi, ...opt(2016) });
+const nP = await attach(TEST.spec, panel, { batch: 6, cache, anahtar: (row) => tag + row.kisi, ...opt(SOS ? 2016 : 2020) });
+const nC = await attach(A.spec, calib, { batch: 6, cache, anahtar: (row) => tag + row.kisi, ...opt(2016) });
 writeFileSync(CACHE_F, JSON.stringify(cache));
 
 // 2020 toplam paylarına (anket yerine tüm 2020 örneklemi) sabit kalibrasyonu
