@@ -25,8 +25,19 @@ const LABEL = {
 };
 
 /** Persona → doğal dil betimi (MatrAIx persona kartı). */
+// Veri satırlarında bulunabilen ek alanlar (gerçek anket değişkenleri) — silikon örneklem bunları da görür
+const EXTRA = {
+  otoriterlik: (v) => `otoriter yatkınlığı ${v >= 0.7 ? 'yüksek (itaat, düzen, saygı önemli)' : v <= 0.3 ? 'düşük (bağımsızlık, merak önemli)' : 'orta'}`,
+  ekonomi_algisi: (v) => `ülke ekonomisinin ${v > 0.2 ? 'iyileştiğini' : v < -0.2 ? 'kötüleştiğini' : 'aynı kaldığını'} düşünüyor`,
+  parti_kimligi: (v) => (Math.abs(v) < 0.2 ? 'kendini bağımsız görüyor' : `kendini ${Math.abs(v) > 0.8 ? 'güçlü biçimde ' : ''}${v > 0 ? 'sağ/muhafazakâr partili' : 'sol/ilerici partili'} görüyor`),
+  medya_kaynagi: (v) => ({ sag_medya: 'sağ eğilimli medyayı izliyor', sol_medya: 'sol eğilimli medyayı izliyor' }[v] || ''),
+  onceki: (v) => `geçen sefer "${v}" seçmişti`,
+};
+
 export function describePersona(p) {
-  return Object.keys(DIMENSIONS).map((k) => (LABEL[k] ? LABEL[k](p[k]) : `${k}: ${p[k]}`)).filter(Boolean).join(', ');
+  const base = Object.keys(DIMENSIONS).filter((k) => p[k] !== undefined && p[k] !== null).map((k) => (LABEL[k] ? LABEL[k](p[k]) : `${k}: ${p[k]}`));
+  const extra = Object.keys(EXTRA).filter((k) => p[k] !== undefined && p[k] !== null && p[k] !== '').map((k) => EXTRA[k](p[k]));
+  return [...base, ...extra].filter(Boolean).join(', ');
 }
 
 /** Nüfustan tabakalı örnek: seçilen boyutta her değerden sırayla alarak çeşitliliği korur. */

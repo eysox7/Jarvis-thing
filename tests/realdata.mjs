@@ -164,6 +164,7 @@ function plainDomain(base, attrs, rows) {
 const COMM = ILETISIM_TERIMLERI.map((t) => t.id);
 const ELESTIREL = ['kimlik_siyaseti', 'otoriter_dinamik', 'muzakere', 'medya_yanliligi', 'arac', 'cinsiyet_acigi', 'kultur_endustrisi', 'arama_maliyeti', 'kulturel_sermaye', 'gosteris', 'reklam_teshir', 'risk_toplumu', 'otoriteye_uyum', 'bakim_yuku'];
 const args = process.argv.slice(2);
+const LIB = args[0] === '--yukle';   // başka betikten içe aktarım: ana akışı çalıştırma
 const cleanRows = (rows) => rows.filter((r) => r.secim && Object.values(r.ozel || {}).every((o) => Object.values(o).every((v) => typeof v !== 'number' || Number.isFinite(v))));
 
 // Öğrenme eğrisi: az veriyle (n kişi) eğit, kalanında sına. Kuram öncülünün değeri az veride ortaya çıkar.
@@ -265,6 +266,7 @@ if (args[0] === '--katsayi') {
   for (const [k, v] of Object.entries(th)) console.log(k.padEnd(22), v.toFixed(2), se[k] !== undefined ? '± ' + (1.96 * se[k]).toFixed(2) : '');
   process.exit(0);
 }
+if (LIB) { /* yalnızca dışa aktarım */ } else {
 const only = args;
 const out = [];
 const t0 = Date.now();
@@ -290,3 +292,4 @@ for (const [name, mk] of Object.entries(DATASETS)) {
 const avg = (k) => Math.round(out.reduce((s, r) => s + r[k], 0) / out.length * 10) / 10;
 if (out.length) console.log(`ORTALAMA isabet: çoğunluk ${avg('cogunluk')}% | standart ${avg('standart')}% | bütünleşik ${avg('butunlesik')}%   (${((Date.now() - t0) / 1000).toFixed(0)} sn)`);
 try { mkdirSync(new URL('../reports/', import.meta.url), { recursive: true }); writeFileSync(new URL('../reports/realdata.json', import.meta.url), JSON.stringify(out, null, 2)); } catch {}
+}
