@@ -261,7 +261,7 @@ for (const [name, mk] of Object.entries(DATASETS)) {
   const std = crossValidate({ ...spec, alan: '__ham' }, clean, { ...cvO, haric: [...COMM, 'gecmis'], kuramGuveni: 3 });
   // Hibrit: kuramın kapsamadığı ölçülmüş özellikler serbest terim olarak da girer (ölçek = std. sapma)
   const serbest = Object.fromEntries(attrs.map((k) => [k, DECISION_DOMAINS.__ham.terimler.find((t) => t.id === 'lin_' + k).sd]));
-  const but = crossValidate(process.env.SERBEST === '0' ? spec : { ...spec, serbest }, clean, { ...cvO, kuramGuveni: Number(process.env.KG || 1) });
+  const but = crossValidate(process.env.SERBEST === '0' ? spec : { ...spec, serbest }, clean, { ...cvO, kuramGuveni: Number(process.env.KG || 1), siniflar: Number(process.env.SINIF || 1), etkilesim: process.env.ETK === '1' });
   delete DECISION_DOMAINS.__ham;
   const res = { veri: name, alan: spec.alan, n: clean.length,
     cogunluk: std.cogunluk_isabet_yuzde, standart: std.isabet_yuzde, butunlesik: but.isabet_yuzde,

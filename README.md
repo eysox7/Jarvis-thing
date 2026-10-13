@@ -212,6 +212,59 @@ verilmezse seçenek özelliklerinden türetilir.
 9. **Topluluk.** `decision_ensemble` kuram, öğrenilmiş model ve dil modeline personaları canlandırtan
    silikon örneklemi doğrulama satırlarında karşılaştırıp log-kaybı en aza indiren ağırlıkları öğrenir.
 
+### Eleştirel okullar modelin içinde
+
+Ana akım kuramların yanında eleştirel okullar da faydaya terim olarak girer (ayrıntı ve kanıtlar:
+[docs/elestirel_okullar.md](docs/elestirel_okullar.md)):
+
+- **Frankfurt Okulu** — otoriter dinamik (Adorno; Fromm; Stenner: yatkınlık × tehdit), kültür
+  endüstrisi ve reklam/teşhir maruziyeti (Horkheimer & Adorno; Marcuse), otoriteye uyum
+- **Habermas** — müzakereci akıl; **Herman & Chomsky / Smythe** — medya sahipliği ve yanlılığı;
+  **Hall / Gramsci** — egemen kod = iktidar bloğu; **McLuhan / Innis** — araç mesajdır
+- **Chicago okulu** — Thomas teoremi (kişinin beyan ettiği konum ve algı demografik tahminin yerine
+  geçer), Becker (zamanın fırsat maliyeti, işletme maliyeti, akılcı bağımlılık), Stigler (arama
+  maliyeti), Thaler (varsayılan), Mead/Blumer (sembolik etkileşim — kitle motorunda)
+- **Bourdieu / Veblen / Baudrillard** — kültürel sermaye, gösterişçi tüketim; **Beck** — risk
+  toplumu; **feminist** — kuşaksal cinsiyet açığı, bakım yükü
+- Bilinçli olarak eklenmeyen: "yoksul statükoyu destekler" (sistemi meşrulaştırma) — büyük
+  örneklem testlerinde tutmadı (Brandt 2013).
+
+Kuramın kapsamadığı ölçülmüş özellikler `spec.serbest = {özellik: ölçek}` ile serbest doğrusal terim
+olarak eklenir; bütünleşik model böylece kuramsız standart modeli kapsar.
+
+### Gerçek veride ölçülen başarım (`node tests/realdata.mjs`)
+
+Gerçek insanların gerçek kararları, görülmemiş veride. Kıyas: **standart** = kuramsız koşullu logit
+(özellikler doğrusal + tüm kişi değişkenleri seçeneğe özgü), **bütünleşik** = kuram terimleri + aynı
+kişi değişkenleri. ANES için önce `python3 tests/data/fetch_anes.py` (ham veri repoya konmaz).
+
+**Siyaset — ANES 2016/2020** (ABD; Demokrat / Cumhuriyetçi / üçüncü aday / oy kullanmama; 3.610 ve
+6.943 seçmen). "Yapısal" model parti kimliği ve aday termometresi kullanmaz; yalnızca toplumsal yapı,
+değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diyeti:
+
+| Test | Çoğunluk | Standart | Bütünleşik | Eleştirel terimler çıkarılınca |
+|---|---|---|---|---|
+| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 59,5 | **68,2** | 67,7 |
+| Seçimler arası, yapısal: 2020 → 2016 | 35,7 | 55,7 | **60,4** | 58,2 |
+| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | 79,3 | 79,0 | 77,6 |
+| Aynı seçim, 5 katlı CV, yapısal 2020 | 47,1 | 73,7 | 73,5 | — |
+| Az veri: 2016'dan 100 kişiyle öğren (`--egri`) | 33,7 | 56,7 | **60,2** | 58,0 |
+| Az veri: 50 kişi | 33,5 | 33,1 | **57,0** | 56,1 |
+| Hiç bireysel veri yok — yalnız kuram + seçimin toplam sonucu, 2020 yapısal (`--sifir`) | 47,1 | — | **68,3** | — |
+
+- Otoriter dinamik terimi (Frankfurt Okulu) iki seçimde de anlamlı: katsayı 0,34 ± 0,14 (2016),
+  0,30 ± 0,10 (2020).
+- Kuramın değeri **az veride**, **yeni bir seçime/bağlama taşımada** ve **veri yokken** ortaya çıkar
+  (iktidar değişince kuram ekonomik oyu ve iktidar yorgunluğunu doğru tarafa taşır; kuramsız model
+  çöker). Bol veriyle aynı seçimin içinde ise esnek kuramsız model ile başa baş gider.
+- Diğer siyasi veriler (5 katlı CV): Şili 1988 plebisiti 32,9 / 65,2 / **67,0**; İngiltere BEPS
+  47,2 / **67,6** / 66,7 (log-kayıpta bütünleşik daha iyi).
+
+**Ticaret:** otomobil tercihi (4.654 kişi, 6 seçenek) çoğunluk 32,2 / standart 40,2 / bütünleşik 40,1;
+ısıtma sistemi (900 hane) her model çoğunlukta 63,7 — veride kişi bilgisi çok az, kuram ek katkı vermiyor.
+**Gündelik:** şehirlerarası ulaşım (210 kişi) 26,2 / 43,8 / **54,8** (Becker'in zaman maliyeti);
+işe gidiş türü (453 kişi) 48,1 / 67,1 / **67,5**.
+
 ### CSV biçimi
 
 ```
@@ -222,7 +275,7 @@ yas;cinsiyet;egitim;gelir;ideoloji;onceki_oy;kisi;fiyat_A;var_C;secim
 Persona sütunlarının hepsi isteğe bağlı; Türkçe karakter, büyük/küçük harf ve sayısal yaş
 otomatik eşlenir. Seçim, seçenek kimliği ya da adıyla eşleşebilir.
 
-### Ölçülen başarım (sentetik "gerçek" modellerle — `npm run validate`)
+### Sentetik doğrulama (bilinen "gerçek" modellerle — `npm run validate`)
 
 Gerçek kampanya verisi olmadan dürüst ölçüm, bilinen bir gerçek modelden veri üretip görülmemiş
 veride teorik tavanla kıyaslamaktır:
