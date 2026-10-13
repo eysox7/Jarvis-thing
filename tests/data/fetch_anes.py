@@ -8,7 +8,7 @@ Ortak sütunlar (iki yılda aynı anlam):
   otoriterlik  0..1 — çocuk yetiştirme bataryası (Feldman & Stenner 1997; Adorno'nun F-ölçeğinin halefi)
   ideoloji7, parti7 (1 güçlü Demokrat .. 7 güçlü Cumhuriyetçi), dindarlik, egitim, gelir_yuzdelik,
   yas, cinsiyet, beyaz, guven5 (1 hükümete hep güvenir .. 5 hiç), ekonomi5 (1 çok iyileşti .. 5 çok kötüleşti),
-  ilgi5 (siyasete dikkat: 1 her zaman .. 5 hiç), term_dem, term_rep (aday termometreleri 0..100)
+  medya_sag, medya_sol (2020: partizan medya programı/site sayısı), ilgi5 (siyasete dikkat: 1 her zaman .. 5 hiç), term_dem, term_rep (aday termometreleri 0..100)
 """
 import os, urllib.request
 import pandas as pd
@@ -74,6 +74,13 @@ for y, v in V.items():
         'guven5': d[v['trust']].where(d[v['trust']] > 0), 'ekonomi5': d[v['econ']].where(d[v['econ']] > 0),
         'term_dem': d[v['tdem']].where(d[v['tdem']].between(0, 100)), 'term_rep': d[v['trep']].where(d[v['trep']].between(0, 100)),
     })
+    # Medya diyeti (yalnız 2020): sağ = Hannity, Tucker Carlson, Fox & Friends, foxnews.com; sol = Rachel Maddow (MSNBC)
+    if y == 2020:
+        m = lambda c: (d[c] == 1).astype(int)
+        out['medya_sag'] = m('V201630b') + m('V201630c') + m('V201631k') + m('V201634f')
+        out['medya_sol'] = m('V201630d')
+    else:
+        out['medya_sag'] = ''; out['medya_sol'] = ''
     out = out[out['secim'] != '']
     out.to_csv(os.path.join(CACHE, f'ANES{y}.csv'), index=False)
     print(f'ANES{y}.csv', out.shape, out['secim'].value_counts().to_dict())

@@ -121,7 +121,7 @@ export function anes(year, full) {
   const raw = load('ANES' + year);
   const inc = (v) => (!Number.isFinite(v) ? undefined : v <= 1 / 3 ? 'dusuk' : v <= 2 / 3 ? 'orta' : 'yuksek');
   const D = year === 2016, R = !D;
-  const spec = { alan: 'siyaset', baglam: { ekonomi_algisi: D ? -0.1 : -0.3, iktidar_suresi_yil: D ? 8 : 4 }, secenekler: [
+  const spec = { alan: 'siyaset', baglam: { ekonomi_algisi: D ? -0.1 : -0.3, iktidar_suresi_yil: D ? 8 : 4, medya_yanliligi: { sag_medya: { rep: 1, dem: -1 }, sol_medya: { dem: 1, rep: -1 } } }, secenekler: [
     { id: 'dem', ad: D ? 'Clinton (D)' : 'Biden (D)', iktidar: D, ekonomi: -0.4, kultur: -0.45, kimlik: 'sol' },
     { id: 'rep', ad: 'Trump (R)', iktidar: R, ekonomi: 0.35, kultur: 0.8, kimlik: 'sag', guclu_lider: 0.8, duzen_karsiti: D },
     { id: 'ucuncu', ad: 'Üçüncü aday', ekonomi: 0.2, kultur: -0.3, kimlik: 'merkez' },
@@ -138,6 +138,9 @@ export function anes(year, full) {
       // Siyasete dikkat → bilişsel ihtiyaç (ELM merkezî yol; Habermas'ın akılcı-eleştirel kamusu)
       bilissel_ihtiyac: num(r.ilgi5) >= 1 && num(r.ilgi5) <= 2 ? 'yuksek' : num(r.ilgi5) >= 3 ? 'dusuk' : undefined,
     };
+    // Herman & Chomsky: kişinin izlediği partizan medya (yanlılık bağlamda tanımlı)
+    const ms = num(r.medya_sag), ml = num(r.medya_sol);
+    if (Number.isFinite(ms) && Number.isFinite(ml)) p.medya_kaynagi = ms > ml ? 'sag_medya' : ml > ms ? 'sol_medya' : 'notr_medya';
     if (full && pid >= 1 && pid <= 7) p.parti_kimligi = (pid - 4) / 3;
     for (const k of Object.keys(p)) if (p[k] === undefined) delete p[k];
     const row = { kisi: year + '-' + i, w: 1, secim: r.secim, p };
@@ -215,6 +218,23 @@ if (args[0] === '--secimler') {
     const cnt = {}; for (const t of tr) cnt[t.secim] = (cnt[t.secim] || 0) + 1; const maj = ids.reduce((a, b) => ((cnt[a] || 0) >= (cnt[b] || 0) ? a : b));
     console.log(`${full ? 'tam    ' : 'yapısal'} ${ya}→${yb}: çoğunluk ${(te.filter((t) => t.secim === maj).length / te.length * 100).toFixed(1)}% | standart ${std.isabet_yuzde}% (ll ${std.log_kayip}) | bütünleşik ${but.isabet_yuzde}% (ll ${but.log_kayip}) | eleştirelsiz ${ele.isabet_yuzde}% (ll ${ele.log_kayip})`);
     delete DECISION_DOMAINS.__ham;
+  }
+  process.exit(0);
+}
+// Sıfır bireysel veri: yalnızca kuram öncülleri + seçimin TOPLAM sonucu (sabitler toplam paylara
+// oturtulur). Kurumun elinde anket yokken, kamuya açık sonuçla kişi düzeyinde ne kadar isabet edilir?
+if (args[0] === '--sifir') {
+  for (const y of [2016, 2020]) for (const full of [false, true]) {
+    const { spec, rows } = anes(y, full); const te = cleanRows(rows);
+    const ids = ['dem', 'rep', 'ucuncu', 'oy_yok'];
+    const target = ids.map((id) => te.filter((t) => t.secim === id).length / te.length);
+    const model = { asc: {} };
+    for (let it = 0; it < 40; it++) {
+      const P = rowProbabilities(spec, model, te), mean = ids.map((_, j) => P.reduce((a, x) => a + x.P[j], 0) / P.length);
+      ids.forEach((id, j) => { model.asc[id] = (model.asc[id] || 0) + Math.log(target[j] / mean[j]); });
+    }
+    const r = scoreProbs(rowProbabilities(spec, model, te).map((x, i) => ({ P: x.P, y: ids.indexOf(te[i].secim), w: 1 })));
+    console.log(`${y} ${full ? 'tam    ' : 'yapısal'}: çoğunluk ${(Math.max(...target) * 100).toFixed(1)}% | yalnız kuram + toplam sonuç ${r.isabet_yuzde}% (ll ${r.log_kayip})`);
   }
   process.exit(0);
 }
