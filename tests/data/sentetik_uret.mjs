@@ -129,20 +129,22 @@ function person(i) {
   const fam = (k) => (babaParti === k ? 1 : 0);
   const ekonomiZarar = clamp(0.35 * (isKaybi ? 1 : 0) + 0.35 * borc + (gelir === 'dusuk' ? 0.15 : 0) + 0.1 * norm());
   const sadakat = babaParti === 'iktidar' ? 0.6 : 0;   // partizan güdümlü akıl yürütme: zarar iktidarı daha az cezalandırır
-  const Ubase = (o = {}) => ({
-    iktidar: 1.9 * din + 1.1 * otoriterGizli * (1 + tehditGizli) + 1.3 * fam('iktidar') + 0.9 * (medyaKaynagi.startsWith('hukumete') ? 1 : 0)
-      - 1.5 * ekonomiZarar * (1 - sadakat) - 1.6 * (alevi ? 1 : 0) - 1.4 * (kurt ? 1 : 0) * (1 - 0.6 * din) + 0.5 * (kirsal ? 1 : 0)
-      + 0.012 * (yas - 40) - 0.4 * egit01 + (depremKayip ? -0.5 : 0) + (o.iktidar || 0),
-    ana_muhalefet: 1.8 * (alevi ? 1 : 0) + 1.4 * (1 - din) + 0.6 * egit01 + 1.2 * fam('ana_muhalefet') + 0.9 * ekonomiZarar
+  // o: seçim dönemine göre koşullar (ez: ekonomik zarar, dk: deprem kaybı, tg: tehdit, mu: sığınmacı gündemi, guv: güvenlik gündemi)
+  const Ubase = (o = {}) => { const ez = o.ez ?? ekonomiZarar, dk = o.dk ?? depremKayip, tg = o.tg ?? tehditGizli, mu = o.mu ?? 1, guv = o.guv ?? 0; return {
+    iktidar: 1.9 * din + 1.1 * otoriterGizli * (1 + tg) + 1.3 * fam('iktidar') + 0.9 * (medyaKaynagi.startsWith('hukumete') ? 1 : 0) + guv * otoriterGizli
+      - 1.5 * ez * (1 - sadakat) - 1.6 * (alevi ? 1 : 0) - 1.4 * (kurt ? 1 : 0) * (1 - 0.6 * din) + 0.5 * (kirsal ? 1 : 0)
+      + 0.012 * (yas - 40) - 0.4 * egit01 + (dk ? -0.5 : 0) + (o.iktidar || 0),
+    ana_muhalefet: 1.8 * (alevi ? 1 : 0) + 1.4 * (1 - din) + 0.6 * egit01 + 1.2 * fam('ana_muhalefet') + 0.9 * ez
       + 0.6 * (medyaKaynagi.startsWith('muhalif') ? 1 : 0) + (bolge === 'ege' ? 0.6 : bolge === 'istanbul' ? 0.25 : 0) - 0.9 * (kurt ? 1 : 0) + (o.ana_muhalefet || 0),
-    milliyetci: 0.9 * otoriterGizli * tehditGizli * 2 + 1.1 * fam('milliyetci') + 0.7 * B.multeci * tehditGizli + (kadin ? -0.3 : 0.25) + (yas < 35 ? 0.35 : 0)
-      + (sehitYakini ? 0.8 : 0) - 2.5 * (kurt ? 1 : 0) - 1.2 * (alevi ? 1 : 0) * 0.5 + (o.milliyetci || 0),
+    milliyetci: 0.9 * otoriterGizli * tg * 2 + 1.1 * fam('milliyetci') + 0.7 * mu * B.multeci * tg + (kadin ? -0.3 : 0.25) + (yas < 35 ? 0.35 : 0)
+      + (sehitYakini ? 0.8 + guv : 0) - 2.5 * (kurt ? 1 : 0) - 1.2 * (alevi ? 1 : 0) * 0.5 + (o.milliyetci || 0),
     kurt_sol: (kurt ? 3.2 - 1.6 * din : -3) + 1.3 * (ace.zorunlu_goc ? 1 : 0) + 0.8 * (teror && kurt ? 1 : 0) + 1.0 * fam('kurt_sol') + (yas < 35 ? 0.4 : 0)
       + (alevi && !kurt ? 0.2 : 0) + (o.kurt_sol || 0),
-    oy_yok: 1.6 * (1 - ilgi) + (yas < 25 ? 0.6 : 0) + 0.12 * travma + 0.5 * (ekonomiZarar > 0.6 ? 1 : 0) + (goc && bern(0.3) ? 0.5 : 0) - 0.6 * egit01 + (o.oy_yok || 0),
-  });
+    oy_yok: 1.6 * (1 - ilgi) + (yas < 25 ? 0.6 : 0) + 0.12 * travma + 0.5 * (ez > 0.6 ? 1 : 0) + (gocOy ? 0.5 : 0) - 0.6 * egit01 + (o.oy_yok || 0),
+  }; };
+  const gocOy = goc && bern(0.3);   // göç sonrası seçmen kaydı sorunu (adres değişikliği)
   const ub = Ubase();
-  return { p, ub, kisiselTat, ctx: { yas, dogum, kadin, dogumBolge, kurt, alevi, arap, dogumKirsal, aileSES, aileDin, kardes, babaParti, ace, sertCeza, teror, sehitYakini, travma, goc, bolge, il, kirsal, yerlesim, egitim, egit01, meslek, gelir, isKaybi, borc, deprem99, deprem23, depremKayip, otoriterGizli, din, dindarlik, tehditGizli, ilgi, evli, cocuk, dijitalSkor, medya, medyaKaynagi, medyaHukumete, ekonomiZarar } };
+  return { p, ub, Ubase, kisiselTat, ctx: { yas, dogum, kadin, dogumBolge, kurt, alevi, arap, dogumKirsal, aileSES, aileDin, kardes, babaParti, ace, sertCeza, teror, sehitYakini, travma, goc, bolge, il, kirsal, yerlesim, egitim, egit01, meslek, gelir, isKaybi, borc, deprem99, deprem23, depremKayip, otoriterGizli, din, dindarlik, tehditGizli, ilgi, evli, cocuk, dijitalSkor, medya, medyaKaynagi, medyaHukumete, ekonomiZarar } };
 }
 
 // 1) Kişileri üret
@@ -193,8 +195,30 @@ for (const x of people) {
   x.ctx.secim = ALTS[choose(V)];
   // Önceki seçim (5 yıl önce): kalıcı eğilim + o günkü koşullar (ekonomik zarar henüz yoktu)
   const Vp = ALTS.map((a, j) => V[j] + (a === 'iktidar' ? 1.2 * x.ctx.ekonomiZarar * 0.8 : 0) + 0.9 * norm());
-  x.ctx.onceki = ALTS[choose(Vp)];
+  x.ctx.onceki = ALTS[choose(Vp)];   // (eski tanım; çekiliş akışı korunsun diye kalır, aşağıda 2018 dalgasıyla değiştirilir)
 }
+// 4b) 2018 seçimi — panelin ilk dalgası: aynı kişiler, farklı dönem koşulları. Ayrı rastgele akış
+// kullanılır; 2023 sütunları değişmez. 2018'de: ekonomik zarar daha azdı (döviz krizi seçimden
+// sonra, Ağustos 2018), 2023 depremi yoktu, 2015–17 terör dalgası ve darbe girişimi sonrası güvenlik
+// gündemi ağırdı, sığınmacı gündemi daha zayıftı. Kalıcı parti bağlılığı iki dalgayı birbirine bağlar.
+const r18 = rng(SEED * 31 + 7), U2 = () => r18(), n2 = () => Math.sqrt(-2 * Math.log(U2() || 1e-12)) * Math.cos(2 * Math.PI * U2());
+const choose2 = (V) => { const W = V.map((v) => v - Math.log(-Math.log(U2() || 1e-12))); return W.indexOf(Math.max(...W)); };
+const HEDEF18 = { iktidar: 0.46, ana_muhalefet: 0.2, milliyetci: 0.085, kurt_sol: 0.1, oy_yok: 0.155 };
+const BAGLILIK = 1.3;   // iki seçim arasında aynı partiye oy verme eğilimi (parti kimliği, alışkanlık)
+for (const x of people) {
+  const c = x.ctx;
+  c.isKaybi18 = c.isKaybi && U2() < 0.35; c.borc18 = c.borc * 0.6;
+  c.ez18 = clamp(0.35 * (c.isKaybi18 ? 1 : 0) + 0.35 * c.borc18 + (c.gelir === 'dusuk' ? 0.15 : 0) + 0.1 * n2());
+  c.tehdit18 = clamp(c.tehditGizli + 0.12 + 0.08 * n2());
+  x.ub18 = x.Ubase({ ez: c.ez18, dk: false, tg: c.tehdit18, mu: 0.6, guv: 0.5 });
+}
+const asc18 = Object.fromEntries(ALTS.map((a) => [a, asc[a]]));
+const V18 = (x) => ALTS.map((a, j) => x.ub18[a] + asc18[a] + x.kisiselTat[j] + SOS.ag * (x.ctx.ag[j] - 0.2) + SOS.mahalle * Math.log(x.ctx.mahalle[j] + 0.03) + (x.ctx.secim === a ? BAGLILIK : 0));
+for (let it = 0; it < 40; it++) {
+  const P = people.map((x) => softmax(V18(x)));
+  ALTS.forEach((a, j) => { const m = P.reduce((s, q) => s + q[j], 0) / N; asc18[a] += 0.8 * Math.log(HEDEF18[a] / m); });
+}
+for (const x of people) x.ctx.onceki = ALTS[choose2(V18(x))];
 
 // 5) Ölçülen (ankette sorulabilir) sütunlar — ölçüm hatası ile
 const tri = (v, a, b) => (v < a ? 'dusuk' : v < b ? 'orta' : 'yuksek');
@@ -217,6 +241,10 @@ const rows = people.map(({ p, ctx: c }) => {
     deprem_maruziyeti: c.deprem23 ? (c.depremKayip ? 2 : 1) : c.deprem99 ? 1 : 0, is_kaybi: c.isKaybi ? 1 : 0, borc_yuku: r2(c.borc),
     ic_goc: c.goc ? 1 : 0, meslek: c.meslek, medeni_durum: c.evli ? 'evli' : 'bekar', cocuk_sayisi: c.cocuk,
     es_oyu: c.esOyu || '', ebeveyn_oyu: c.babaParti, onceki: c.onceki,
+    // 2018 dalgası ölçümleri (o dönemde sorulmuş gibi): ekonomi/hane algısı, tehdit, iş kaybı, borç, deprem
+    ekonomi_algisi_2018: r2(clamp(-0.05 - 0.9 * c.ez18 + (c.babaParti === 'iktidar' ? 0.55 : 0) + (c.medyaKaynagi.startsWith('hukumete') ? 0.3 : 0) + 0.25 * n2(), -1, 1)),
+    hane_algisi_2018: r2(clamp(-0.1 - 1.1 * c.ez18 + 0.2 * n2(), -1, 1)), tehdit_algisi_2018: r2(clamp(c.tehdit18 + 0.1 * n2())),
+    is_kaybi_2018: c.isKaybi18 ? 1 : 0, borc_yuku_2018: r2(c.borc18), deprem_maruziyeti_2018: c.deprem99 ? 1 : 0,
     ...Object.fromEntries(ALTS.map((a, j) => ['ag_' + a, r2(c.ag[j])])),
     ...Object.fromEntries(ALTS.map((a, j) => ['cevre_' + a, r2(c.mahalle[j])])),
     il: c.il, bolge_adi: c.bolge, secim: c.secim,

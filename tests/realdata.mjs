@@ -143,7 +143,17 @@ export function sentetikTR(surum = 'tam') {
     { id: 'kurt_sol', ekonomi: -0.6, kultur: -0.6, kimlik: 'sol', azinlik_temsili: true, duzen_karsiti: true },
     { id: 'oy_yok', tur: 'cekimser' }] };
   let raw = parseCSV(readFileSync(new URL('TR_secmen.csv', S), 'utf8'));
-  const drop = surum === 'tam' ? [] : surum === 'onceki_yok' ? ['onceki'] : ['onceki', 'es_oyu', 'ebeveyn_oyu', 'il', ...OYKU_SUTUN, ...ALT.flatMap((a) => ['ag_' + a, 'cevre_' + a])];
+  // Panel dalgaları (seçimler arası aktarım testi): d2018 = 2018 oyu (onceki sütunu) ve 2018 ölçümleri,
+  // d2023 = 2023. İkisinde de önceki oy ve 2023'te ölçülen eş/ağ/mahalle sütunları yok; il sonucu bağlamı yok.
+  const DONEM = ['ekonomi_algisi', 'hane_algisi', 'tehdit_algisi', 'is_kaybi', 'borc_yuku', 'deprem_maruziyeti'];
+  if (surum === 'd2018' || surum === 'd2023') {
+    raw = raw.map((r) => { const o = { ...r }; if (surum === 'd2018') { for (const k of DONEM) o[k] = r[k + '_2018']; o.secim = r.onceki; }
+      for (const k of [...DONEM.map((d) => d + '_2018'), 'onceki', 'es_oyu', ...ALT.flatMap((a) => ['ag_' + a, 'cevre_' + a])]) delete o[k]; return o; });
+    const { bolge_paylari, ...b } = spec.baglam;
+    const sp = { ...spec, baglam: surum === 'd2018' ? { ...b, iktidar_suresi_yil: 16, ekonomi_algisi: -0.1, tehdit: 0.6 } : b };
+    return { spec: sp, rows: prepareRows(raw, sp).rows, attrs: [] };
+  }
+  const drop = [...DONEM.map((d) => d + '_2018'), ...(surum === 'tam' ? [] : surum === 'onceki_yok' ? ['onceki'] : ['onceki', 'es_oyu', 'ebeveyn_oyu', 'il', ...OYKU_SUTUN, ...ALT.flatMap((a) => ['ag_' + a, 'cevre_' + a])])];
   raw = raw.map((r) => { const o = { ...r }; for (const k of drop) delete o[k]; return o; });
   return { spec, rows: prepareRows(raw, spec).rows, attrs: [] };
 }
@@ -272,6 +282,26 @@ if (args[0] === '--secimler') {
     console.log(`        + toplam paya kalibre: standart ${stdC.isabet_yuzde}% (ll ${stdC.log_kayip}) | bütünleşik ${butC.isabet_yuzde}% (ll ${butC.log_kayip})`);
     const cnt = {}; for (const t of tr) cnt[t.secim] = (cnt[t.secim] || 0) + 1; const maj = ids.reduce((a, b) => ((cnt[a] || 0) >= (cnt[b] || 0) ? a : b));
     console.log(`${full ? 'tam    ' : 'yapısal'} ${ya}→${yb}: çoğunluk ${(te.filter((t) => t.secim === maj).length / te.length * 100).toFixed(1)}% | standart ${std.isabet_yuzde}% (ll ${std.log_kayip}) | bütünleşik ${but.isabet_yuzde}% (ll ${but.log_kayip}) | eleştirelsiz ${ele.isabet_yuzde}% (ll ${ele.log_kayip})`);
+    delete DECISION_DOMAINS.__ham;
+  }
+  process.exit(0);
+}
+// Sentetik Türkiye paneli: 2018'de öğren → 2023'ü tahmin et (ve tersi). Koşullar değişir (ekonomik
+// zarar, deprem, güvenlik gündemi); yapıyı kuramla taşıyan model aktarımda daha az bozulmalı mı?
+if (args[0] === '--secimler-tr') {
+  const ids = ['iktidar', 'ana_muhalefet', 'milliyetci', 'kurt_sol', 'oy_yok'];
+  for (const [ya, yb] of [['d2018', 'd2023'], ['d2023', 'd2018']]) {
+    const A = sentetikTR(ya), B = sentetikTR(yb), tr = cleanRows(A.rows), te = cleanRows(B.rows);
+    DECISION_DOMAINS.__ham = plainDomain(DECISION_DOMAINS.siyaset, [], tr);
+    const sc = (sp, m) => scoreProbs(rowProbabilities(sp, m, te).map((x, i) => ({ P: x.P, y: ids.indexOf(te[i].secim), w: 1 })));
+    const fit = (sp, o) => fitChoiceModel(sp, tr, { ...o, demoSigma: tuneDemoSigma(sp, tr, o), iters: 300 });
+    const target = ids.map((id) => te.filter((t) => t.secim === id).length / te.length);
+    const calib = (sp, model) => { const mm = { ...model, asc: { ...model.asc } }; for (let it = 0; it < 30; it++) { const PP = rowProbabilities(sp, mm, te); ids.forEach((id, j) => { const mean = PP.reduce((a, x) => a + x.P[j], 0) / PP.length; mm.asc[id] = (mm.asc[id] || 0) + Math.log(target[j] / mean); }); } return mm; };
+    const hsA = { ...A.spec, alan: '__ham' }, hsB = { ...B.spec, alan: '__ham' };
+    const mStd = fit(hsA, { haric: STD_HARIC, kuramGuveni: 3 }), mBut = fit(A.spec, {}), mEle = fit(A.spec, { haric: ELESTIREL });
+    const std = sc(hsB, mStd), but = sc(B.spec, mBut), ele = sc(B.spec, mEle), stdC = sc(hsB, calib(hsB, mStd)), butC = sc(B.spec, calib(B.spec, mBut));
+    const ayni = sc(B.spec, fit(B.spec, {}));   // kıyas: hedef seçimin kendi verisiyle eğitilmiş (örneklem içi)
+    console.log(`${ya.slice(1)}→${yb.slice(1)}: standart ${std.isabet_yuzde}% (ll ${std.log_kayip}) | bütünleşik ${but.isabet_yuzde}% (ll ${but.log_kayip}) | eleştirelsiz ${ele.isabet_yuzde}% | toplam paya kalibre: standart ${stdC.isabet_yuzde}% / bütünleşik ${butC.isabet_yuzde}% | hedefte eğitilmiş (örneklem içi) ${ayni.isabet_yuzde}%`);
     delete DECISION_DOMAINS.__ham;
   }
   process.exit(0);

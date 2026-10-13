@@ -360,6 +360,10 @@ console.log('\n[26] Zengin sentetik Türkiye verisi (tests/data/sentetik)');
     ok(story.length === raw.length && story.every((x) => x.oyku.length > 150 && !/oy verdi\.$/.test(x.oyku)), 'her kişinin hayat öyküsü var');
     const alevi = raw.filter((r) => r.inanc === 'alevi');
     ok(alevi.filter((r) => r.secim === 'ana_muhalefet').length / alevi.length > 0.6, 'bilinen ayrışmalar korunur (Alevi seçmen ana muhalefete)');
+    // 2018 dalgası (panel): onceki = 2018 oyu; dağılım 2018 düzeyinde, iki seçim arası istikrar gerçekçi (%70–88)
+    const s18 = (id) => raw.filter((r) => r.onceki === id).length / raw.length, ayni = raw.filter((r) => r.onceki === r.secim).length / raw.length;
+    ok(Math.abs(s18('iktidar') - 0.46) < 0.04 && Math.abs(s18('kurt_sol') - 0.1) < 0.03 && ayni > 0.7 && ayni < 0.88, `2018 dalgası: iktidar %${(s18('iktidar') * 100).toFixed(1)}, iki seçimde aynı oy %${(ayni * 100).toFixed(0)}`);
+    ok(raw.every((r) => r.ekonomi_algisi_2018 !== '' && r.deprem_maruziyeti_2018 !== undefined) && raw.every((r) => !(Number(r.deprem_maruziyeti_2018) > 1)), '2018 ölçümleri var; 2023 deprem kaybı 2018 sütununda yok');
   }
 }
 

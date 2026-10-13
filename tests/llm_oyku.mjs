@@ -38,8 +38,14 @@ const cache = existsSync(CACHE_F) ? JSON.parse(readFileSync(CACHE_F, 'utf8')) : 
 const SYS = `Türkiye'deki seçmenleri canlandırıyorsun. Her kişi için son genel seçimde ne yaptığını olasılık olarak tahmin et. Seçenekler: iktidar (sağ-muhafazakâr iktidar ittifakı), ana_muhalefet (merkez sol), milliyetci (milliyetçi muhalefet), kurt_sol (Kürt siyasi hareketi), oy_yok (oy kullanmadı). Yalnız JSON: {"yanitlar":[{"no":1,"olasiliklar":{"iktidar":0,"ana_muhalefet":0,"milliyetci":0,"kurt_sol":0,"oy_yok":0}}]}`;
 const brief = () => 'Son genel seçim. Her personanın seçeneklere olasılık dağılımını ver.';
 const save = () => writeFileSync(CACHE_F, JSON.stringify(cache));
+let kota = false;   // günlük kota dolarsa: önbellekteki yanıtlarla (iki koşulda da yanıtı olan kişiler) değerlendir
 const run = async (tag, betim) => {
-  for (let i = 0; i < panel.length; i += 12) { await attachSilicon(spec, panel.slice(i, i + 12), chat, { batch: 6, cache, anahtar: (x) => `${MODEL}|tr_${tag}|${x.kisi}`, sistem: SYS, brief, betim }); save(); }
+  for (let i = 0; i < panel.length; i += 12) {
+    const part = panel.slice(i, i + 12), key = (x) => `${MODEL}|tr_${tag}|${x.kisi}`;
+    if (kota) { for (const x of part) if (cache[key(x)]) await attachSilicon(spec, [x], chat, { batch: 6, cache, anahtar: key, sistem: SYS, brief, betim }); continue; }
+    try { await attachSilicon(spec, part, chat, { batch: 6, cache, anahtar: key, sistem: SYS, brief, betim }); save(); }
+    catch (e) { if (!/kota/.test(e.message)) throw e; kota = true; console.error(e.message, '— önbellekle devam'); i -= 12; }
+  }
   return panel.map((x) => (x.p.__silikon ? ids.map((id) => x.p.__silikon[id]) : null));
 };
 const t0 = Date.now();
@@ -50,6 +56,6 @@ const sc = (Ps) => scoreProbs(ok.map((i) => ({ P: Ps[i], y: ys[i], w: 1 })));
 const sg = tuneDemoSigma(spec, train, { haric: ['silikon'] });
 const m = fitChoiceModel(spec, train, { demoSigma: sg, iters: 300, haric: ['silikon'] });
 const PM = rowProbabilities(spec, m, panel).map((x) => x.P);
-const res = { model: MODEL, panel: N, yanit: ok.length, sure_sn: Math.round((Date.now() - t0) / 1000),
+const res = { model: MODEL, panel: N, yanit: ok.length, kota_doldu: kota, sure_sn: Math.round((Date.now() - t0) / 1000),
   dil_modeli_yalniz_anket: sc(P0), dil_modeli_anket_arti_oyku: sc(P1), butunlesik_model: sc(PM) };
 console.log(JSON.stringify(res, null, 2));
