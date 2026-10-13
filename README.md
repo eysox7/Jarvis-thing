@@ -301,8 +301,8 @@ değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diye
 | Gerçek iş akışı: 2016'da öğren + 2020'nin toplam paylarına (anket) kalibre et → 2020, yapısal | 47,1 | 61,8 | **70,9** | — |
 | Aynı iş akışı, tam model (parti kimliği + termometre) | 47,1 | **81,2** | 80,8 | — |
 | Aynı seçim, 5 katlı CV, yapısal 2020 | 47,1 | 73,6 | 73,4 | — |
-| Az veri: 2016'dan 100 kişiyle öğren (`--egri`) | 33,7 | 58,7 | **62,0** | 59,4 |
-| Az veri: 50 kişi | 33,5 | 33,1 | **58,1** | 57,3 |
+| Az veri: 2016'dan 100 kişiyle öğren (`--egri`) | 33,7 | 56,5 | **62,0** | 60,1 |
+| Az veri: 50 kişi | 33,5 | 31,5 | **57,5** | 57,3 |
 | Hiç bireysel veri yok — yalnız kuram + seçimin toplam sonucu, 2020 yapısal (`--sifir`) | 47,1 | — | **68,8** | — |
 
 - Otoriter dinamik terimi (Frankfurt Okulu) iki seçimde de anlamlı: katsayı 0,34 ± 0,14 (2016),
