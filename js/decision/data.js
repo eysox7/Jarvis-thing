@@ -32,11 +32,11 @@ const NUMERIC = {
 const CAT_EXTRA = { medya_kaynagi: ['medya_kaynagi', 'medya_kanali', 'izlenen_kanal', 'kanal'] };
 const SCALES = [[0, 1], [-1, 1], [1, 5], [1, 7], [0, 10], [1, 10], [0, 100], [-3, 3], [-5, 5]];
 function numericColumn(raw, col, to) {
-  const vals = raw.map((r) => Number(String(r[col] ?? '').replace(',', '.'))).filter((v) => Number.isFinite(v) && String(v) !== '');
+  const vals = raw.map((r) => String(r[col] ?? '').trim()).filter((v) => v !== '').map((v) => Number(v.replace(',', '.'))).filter(Number.isFinite);
   if (!vals.length) return null;
   const lo = Math.min(...vals), hi = Math.max(...vals);
   const [a, b] = SCALES.find(([x, y]) => lo >= x && hi <= y) || [lo, hi];
-  return (v) => { const n = Number(String(v ?? '').replace(',', '.')); if (v === '' || v === undefined || !Number.isFinite(n) || b === a) return undefined; return Math.round((to[0] + (n - a) / (b - a) * (to[1] - to[0])) * 1000) / 1000; };
+  return (v) => { const t = String(v ?? '').trim(), n = Number(t.replace(',', '.')); if (t === '' || !Number.isFinite(n) || b === a) return undefined; return Math.round((to[0] + (n - a) / (b - a) * (to[1] - to[0])) * 1000) / 1000; };
 }
 const VALUE_ALIASES = {
   cinsiyet: { k: 'kadin', e: 'erkek', kadin: 'kadin', erkek: 'erkek', female: 'kadin', male: 'erkek', f: 'kadin', m: 'erkek' },

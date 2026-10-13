@@ -26,7 +26,7 @@ export function politicalPosition(f, p) {
     kultur: sv('konum_kultur') ?? clamp(0.55 * (f.dindarlik * 2 - 1) + 0.35 * f.ideoloji + 0.15 * (f.yas - 0.5) - 0.15 * (f.yerlesim - 0.5), -1, 1),
   };
 }
-const perceived = (p, k, d) => (p && p[k] !== undefined && p[k] !== null && Number.isFinite(+p[k]) ? +p[k] : d);
+const perceived = (p, k, d) => (p && p[k] !== undefined && p[k] !== null && p[k] !== '' && Number.isFinite(+p[k]) ? +p[k] : d);
 // Otoriter yatkınlık (Adorno vd. 1950 → Stenner 2005): doğrudan ölçek yoksa vekil — dindarlık,
 // düşük eğitim, düşük bilişsel ihtiyaç, yaş, kırsallık. Kişi verisinde 'otoriterlik' (0..1) varsa o kullanılır.
 export const authoritarian = (f, p) => clamp(perceived(p, 'otoriterlik', 0.35 * f.dindarlik + 0.25 * (1 - f.egitim) + 0.15 * (1 - f.nfc) + 0.15 * f.yas + 0.1 * (1 - f.yerlesim)), 0, 1) - 0.5;
