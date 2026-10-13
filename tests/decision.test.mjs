@@ -269,6 +269,20 @@ ok(er.A > 0 && er.B > 0 && er.X === null, 'seçeneklerin ifade eğilimi kitle mo
 const sus = aggregatePolls(polls, { bugun: '2026-10-06', ifadeOrani: { A: 0.1, B: 0.3, C: 0.2, X: 0.2 } });
 ok(sus.suskunluk_duzeltmesi.A > 0 && sus.suskunluk_duzeltmesi.B < 0, `suskunluk sarmalı: az ifade edilen seçenek yukarı düzeltilir (A +${sus.suskunluk_duzeltmesi.A})`);
 
+console.log('\n[22] Eleştirel okullar ve kuram girdileri');
+{
+  const sp = { alan: 'siyaset', secenekler: [{ id: 'L', ekonomi: -0.5, kultur: -0.5, kimlik: 'sol' }, { id: 'R', ekonomi: 0.5, kultur: 0.8, kimlik: 'sag', guclu_lider: 0.8 }] };
+  const pr = prepareRows(parseCSV('otoriterlik;sol_sag;kanal;secim\n5;9;fox;R\n1;2;msnbc;L\n'), sp);
+  ok(pr.rows[0].p.otoriterlik === 1 && pr.rows[1].p.konum_ekonomi < 0 && pr.rows[0].p.medya_kaynagi === 'fox', 'CSV: otoriterlik/konum/medya sütunları otomatik ölçeklenir');
+  const hi = predictPerson(sp, { otoriterlik: 1, dindarlik: 'yuksek' }).olasiliklar?.R ?? predictPerson(sp, { otoriterlik: 1 }).paylar?.R;
+  const lo = predictPerson(sp, { otoriterlik: 0, dindarlik: 'yuksek' }).olasiliklar?.R ?? predictPerson(sp, { otoriterlik: 0 }).paylar?.R;
+  ok(hi > lo, `otoriter dinamik: otoriter yatkınlık güçlü lider/kültürel sağ olasılığını artırır (${lo} → ${hi})`);
+  const self = predictPerson(sp, { ideoloji: 'sag', konum_ekonomi: -1, konum_kultur: -1 });
+  const dem = predictPerson(sp, { ideoloji: 'sag' });
+  ok(JSON.stringify(self) !== JSON.stringify(dem), 'Thomas teoremi: beyan edilen konum demografik tahminin yerine geçer');
+  ok(describePersona({ yas: '35-44', otoriterlik: 0.9 }).includes('otoriter'), 'silikon betimi gerçek veri alanlarını içerir');
+}
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ karar testleri geçti');

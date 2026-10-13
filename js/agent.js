@@ -56,6 +56,7 @@ export function buildSystemPrompt() {
     `- Senaryoyu seçenek özellikleriyle kur (decision_catalog özellikleri listeler); bilmediğin özelliği uydurma, ask_user ile sor.`,
     `- Kullanıcının verisi varsa: decision_scenario_save → decision_data_import → decision_learn. Anketler varsa decision_polls. Önceki seçim/pazar payı biliniyorsa baglam.onceki_paylar.`,
     `- Sonucu verirken kaynağı söyle: "veriden öğrenilmiş, görülmemiş veride isabet %X" ya da "kuram öncülleri, kalibre değil — yön ve senaryo karşılaştırması için". Kesinlik uydurma.`,
+    `- Veride otoriterlik, kendi sol-sağ konumu, ekonomi algısı, medya kaynağı varsa yüklemesini öner: eleştirel kuram terimleri (otoriter dinamik, medya yanlılığı, Thomas teoremi) ancak bu girdilerle çalışır. Geçen seçimin verisi + bu seçimin anket toplamı en isabetli iş akışıdır (decision_learn → decision_calibrate_shares).`,
     `- Seçimde katılım ve geçerli oy paylarını ayrı ver. "Ne olur" sorularında decision_whatif kullan.`,
     ``,
     `ÇIKTI BİÇİMİ:`,

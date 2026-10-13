@@ -275,7 +275,9 @@ yas;cinsiyet;egitim;gelir;ideoloji;onceki_oy;kisi;fiyat_A;var_C;secim
 34;kadın;lisans;orta;sol;B;101;20000;1;B
 ```
 
-Persona sütunlarının hepsi isteğe bağlı; Türkçe karakter, büyük/küçük harf ve sayısal yaş
+Kuram girdisi sütunları da tanınır ve ölçekleri (0–1, 1–5, 1–7, 0–10, 0–100…) otomatik dönüştürülür:
+`otoriterlik`, `sol_sag` / `konum_ekonomi`, `konum_kultur`, `ekonomi_algisi`, `hane_algisi`, `parti_kimligi`,
+`medya_kaynagi` (kanal yanlılığı `baglam.medya_yanliligi` ile). Persona sütunlarının hepsi isteğe bağlı; Türkçe karakter, büyük/küçük harf ve sayısal yaş
 otomatik eşlenir. Seçim, seçenek kimliği ya da adıyla eşleşebilir.
 
 ### Sentetik doğrulama (bilinen "gerçek" modellerle — `npm run validate`)

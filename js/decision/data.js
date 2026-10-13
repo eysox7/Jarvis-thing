@@ -19,6 +19,25 @@ const ALIASES = {
   bilissel_ihtiyac: { bilissel_ihtiyac: 1 }, kanaat_onderi: { kanaat_onderi: 1 }, azinlik_kimlik: { azinlik_kimlik: 1, azinlik: 1 },
 };
 const CHOICE_COLS = { secim: 1, tercih: 1, choice: 1, oy: 1, karar: 1 };
+// Sayısal kişi alanları (eleştirel kuramların girdileri; Thomas teoremi: beyan edilen algı/konum).
+// Değer aralığı otomatik ölçeklenir: 0..1, -1..1, 1..5, 1..7, 1..10, 0..100 ölçekleri tanınır.
+const NUMERIC = {
+  otoriterlik: { al: ['otoriterlik', 'authoritarianism', 'otoriter'], to: [0, 1] },
+  ekonomi_algisi: { al: ['ekonomi_algisi', 'ekonomik_algi', 'economy', 'ekonomi'], to: [-1, 1] },
+  hane_algisi: { al: ['hane_algisi', 'hane_ekonomisi', 'household_economy'], to: [-1, 1] },
+  konum_ekonomi: { al: ['konum_ekonomi', 'ekonomik_konum', 'sol_sag', 'lr_self', 'left_right'], to: [-1, 1] },
+  konum_kultur: { al: ['konum_kultur', 'kulturel_konum', 'muhafazakarlik', 'liberal_muhafazakar'], to: [-1, 1] },
+  parti_kimligi: { al: ['parti_kimligi', 'party_id', 'partisanship'], to: [-1, 1] },
+};
+const CAT_EXTRA = { medya_kaynagi: ['medya_kaynagi', 'medya_kanali', 'izlenen_kanal', 'kanal'] };
+const SCALES = [[0, 1], [-1, 1], [1, 5], [1, 7], [0, 10], [1, 10], [0, 100], [-3, 3], [-5, 5]];
+function numericColumn(raw, col, to) {
+  const vals = raw.map((r) => Number(String(r[col] ?? '').replace(',', '.'))).filter((v) => Number.isFinite(v) && String(v) !== '');
+  if (!vals.length) return null;
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const [a, b] = SCALES.find(([x, y]) => lo >= x && hi <= y) || [lo, hi];
+  return (v) => { const n = Number(String(v ?? '').replace(',', '.')); if (v === '' || v === undefined || !Number.isFinite(n) || b === a) return undefined; return Math.round((to[0] + (n - a) / (b - a) * (to[1] - to[0])) * 1000) / 1000; };
+}
 const VALUE_ALIASES = {
   cinsiyet: { k: 'kadin', e: 'erkek', kadin: 'kadin', erkek: 'erkek', female: 'kadin', male: 'erkek', f: 'kadin', m: 'erkek' },
   _evet: { evet: 'evet', e: 'evet', '1': 'evet', true: 'evet', hayir: 'hayir', h: 'hayir', '0': 'hayir', false: 'hayir' },
@@ -80,6 +99,10 @@ export function prepareRows(raw, spec) {
     const fc = fold(c);
     for (const [dim, al] of Object.entries(ALIASES)) if (al[fc]) dimOf[c] = dim;
   }
+  const numOf = {};
+  for (const c of cols) for (const [k, d] of Object.entries(NUMERIC)) if (d.al.includes(fold(c))) { const fn = numericColumn(raw, c, d.to); if (fn) numOf[c] = { k, fn }; }
+  const catOf = {};
+  for (const c of cols) for (const [k, al] of Object.entries(CAT_EXTRA)) if (al.includes(fold(c))) catOf[c] = k;
   const choiceCol = cols.find((c) => CHOICE_COLS[fold(c)]);
   if (!choiceCol) throw new Error('seçim sütunu bulunamadı (secim / tercih / choice / oy / karar)');
   const wCol = cols.find((c) => ['agirlik', 'weight', 'w'].includes(fold(c)));
@@ -106,6 +129,8 @@ export function prepareRows(raw, spec) {
       const v = mapValue(dim, r[c]);
       if (v) p[dim] = v; else if (r[c] !== '' && r[c] !== undefined) unmapped++;
     }
+    for (const [c, { k, fn }] of Object.entries(numOf)) { const v = fn(r[c]); if (v !== undefined) p[k] = v; }
+    for (const [c, k] of Object.entries(catOf)) if (r[c] !== '' && r[c] !== undefined) p[k] = fold(r[c]);
     if (pastCol && r[pastCol] !== '' && r[pastCol] !== undefined) p.onceki = altIds.get(fold(r[pastCol])) || fold(r[pastCol]);
     const w = wCol ? Number(r[wCol]) : 1;
     const row = { p, secim: id, w: Number.isFinite(w) && w > 0 ? w : 1 };
@@ -122,9 +147,11 @@ export function prepareRows(raw, spec) {
   if (unknownChoice) warn.push(`${unknownChoice} satırda seçim, seçeneklerle eşleşmedi ve atlandı`);
   if (unmapped) warn.push(`${unmapped} hücre şemaya eşlenemedi ve boş sayıldı`);
   if (!Object.keys(dimOf).length) warn.push('hiç persona sütunu tanınmadı — yalnızca seçenek sabitleri öğrenilebilir');
+  if (Object.keys(numOf).length) warn.push(`kuram girdisi sütunları bulundu: ${[...new Set(Object.values(numOf).map((x) => x.k))].join(', ')} (otomatik ölçeklendi)`);
+  if (Object.keys(catOf).length) warn.push('medya kaynağı sütunu bulundu — baglam.medya_yanliligi ile kanal yanlılığını tanımlayın');
   if (pastCol) warn.push('geçmiş davranış sütunu bulundu (önceki seçim → sadakat ve geçiş matrisi öğrenilecek)');
   if (altCols.length) warn.push(`${altCols.length} satıra özgü seçenek sütunu bulundu (conjoint/satış verisi)`);
-  return { rows, uyarilar: warn, eslesen_boyutlar: [...new Set(Object.values(dimOf))] };
+  return { rows, uyarilar: warn, eslesen_boyutlar: [...new Set([...Object.values(dimOf), ...Object.values(numOf).map((x) => x.k), ...Object.values(catOf)])] };
 }
 
 /** Bilinen "gerçek" modelden sentetik bireysel veri üretir (doğrulama ve testler için). */
