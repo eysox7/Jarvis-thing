@@ -159,7 +159,7 @@ const ORD = {
 /** Persona'yı 0..1 (ideoloji -1..1) ölçekli özelliklere çevirir. */
 export function features(p) {
   const f = {};
-  for (const [k, m] of Object.entries(ORD)) f[k] = m[p[k]] ?? 0.5;
+  for (const [k, m] of Object.entries(ORD)) f[k] = m[p[k]] ?? (k === 'ideoloji' ? 0 : 0.5);
   f.nfc = p.bilissel_ihtiyac === 'yuksek' ? 1 : 0;
   f.leader = p.kanaat_onderi === 'evet' ? 1 : 0;
   f.marginal = p.azinlik_kimlik === 'evet' ? 1 : 0;
