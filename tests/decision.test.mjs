@@ -341,6 +341,28 @@ console.log('\n[25] Hayat öyküsü: travma, tehdit, deprem, ebeveyn ve öykü m
   ok(P({ ebeveyn_tercihi: 'K' }).K > P({}).K, 'ebeveynin tercihi aktarılır (Jennings & Niemi)');
 }
 
+console.log('\n[26] Zengin sentetik Türkiye verisi (tests/data/sentetik)');
+{
+  const { readFileSync, existsSync } = await import('node:fs');
+  const F = new URL('./data/sentetik/', import.meta.url);
+  if (!existsSync(new URL('TR_secmen.csv', F))) ok(false, 'sentetik veri dosyası yok (node tests/data/sentetik_uret.mjs)');
+  else {
+    const raw = parseCSV(readFileSync(new URL('TR_secmen.csv', F), 'utf8'));
+    const ids = ['iktidar', 'ana_muhalefet', 'milliyetci', 'kurt_sol', 'oy_yok'];
+    const sp = { alan: 'siyaset', secenekler: ids.map((id) => (id === 'oy_yok' ? { id, tur: 'cekimser' } : { id })) };
+    const pr = prepareRows(raw, sp);
+    ok(pr.rows.length === raw.length && raw.length >= 1000, `${raw.length} kişi yüklendi`);
+    const share = (id) => pr.rows.filter((r) => r.secim === id).length / pr.rows.length;
+    ok(Math.abs(share('iktidar') - 0.43) < 0.04 && Math.abs(share('oy_yok') - 0.12) < 0.03, 'oy dağılımı kalibrasyon hedeflerinde');
+    const p = pr.rows.map((r) => r.p);
+    ok(p.every((x) => x.travma_skoru !== undefined && x.tehdit_algisi !== undefined && x.ag_paylari), 'her kişinin travma, tehdit ve tartışma ağı bilgisi var');
+    const story = readFileSync(new URL('TR_secmen_oyku.jsonl', F), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    ok(story.length === raw.length && story.every((x) => x.oyku.length > 150 && !/oy verdi\.$/.test(x.oyku)), 'her kişinin hayat öyküsü var');
+    const alevi = raw.filter((r) => r.inanc === 'alevi');
+    ok(alevi.filter((r) => r.secim === 'ana_muhalefet').length / alevi.length > 0.6, 'bilinen ayrışmalar korunur (Alevi seçmen ana muhalefete)');
+  }
+}
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ karar testleri geçti');
