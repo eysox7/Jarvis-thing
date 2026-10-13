@@ -375,14 +375,14 @@ veriden öğrenilir. Groq gpt-oss modelleri ANES seçmenlerini betimlerinden can
 | Aynı, İngilizce ABD bağlamlı istem (120b) | 72,5 | 71,7 | 75,0 | −0,04 |
 | 2016 içi, 90 seçmen, betime eyalet sonucu eklendi (20b) | 50,0 (bağlamsız 55,6) | 63,3 | 67,8 | 0,03 |
 | Sentetik TR, 48 seçmen, betime hayat öyküsü eklendi (20b, `tests/llm_oyku.mjs`) | 56,3 (öyküsüz 37,5) | 72,9 | — | — |
-| Aynı, 96 seçmen (120b) | 57,3 (öyküsüz 37,5) | 76,0 | — | — |
+| Aynı, 84 seçmen (120b; kota dolunca iki yanıtı da olanlar) | 63,1 (öyküsüz 40,5) | 75,0 | — | — |
 
 Öğrenilen katsayı her koşuda sıfıra yakın: dil modeli, modelin zaten bildiği bireysel betimi okuyor ve
 bağımsız bilgi katmıyor. Topluluk bağlamını metin olarak vermek de dil modelinin isabetini artırmadı;
 aynı bilgi modele yapılandırılmış terim (`topluluk`) olarak girince kazanç ölçüldü (yukarıda). Örneklemler
 küçük (48–120), farklar bu nedenle temkinle okunmalı. Hayat öyküsü metni ise dil modelinin isabetini
-37,5'ten 56–57'ye çıkardı (20b ve 120b): dil modeli öyküden gerçek bilgi okuyor, ama aynı bilgiyi
-yapılandırılmış sütun olarak alan bütünleşik model yine önde (72,9–76,0). Ücretsiz Groq kotası günde 200 bin token.
+37,5–40,5'ten 56–63'e çıkardı (20b ve 120b): dil modeli öyküden gerçek bilgi okuyor, ama aynı bilgiyi
+yapılandırılmış sütun olarak alan bütünleşik model yine önde (72,9–75,0). Ücretsiz Groq kotası günde 200 bin token.
 
 ### CSV biçimi
 

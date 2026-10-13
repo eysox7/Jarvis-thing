@@ -40,6 +40,7 @@ const brief = () => 'Son genel seçim. Her personanın seçeneklere olasılık d
 const save = () => writeFileSync(CACHE_F, JSON.stringify(cache));
 let kota = false;   // günlük kota dolarsa: önbellekteki yanıtlarla (iki koşulda da yanıtı olan kişiler) değerlendir
 const run = async (tag, betim) => {
+  for (const x of panel) delete x.p.__silikon;   // önceki koşunun yanıtı yanıtsız kişide kalmasın
   for (let i = 0; i < panel.length; i += 12) {
     const part = panel.slice(i, i + 12), key = (x) => `${MODEL}|tr_${tag}|${x.kisi}`;
     if (kota) { for (const x of part) if (cache[key(x)]) await attachSilicon(spec, [x], chat, { batch: 6, cache, anahtar: key, sistem: SYS, brief, betim }); continue; }
