@@ -55,6 +55,28 @@ export async function siliconProbs(spec, people, chat, { batch = 6 } = {}) {
   return out;
 }
 
+/**
+ * Silikon olasılıklarını kişilere bağlar (görünmez p.__silikon) → 'silikon' fayda terimi kullanır.
+ * Önbellek (cache: {anahtar: P}) ve anahtar(row) verilirse aynı kişi için dil modeli yeniden çağrılmaz.
+ */
+export async function attachSilicon(spec, rows, chat, o = {}) {
+  const ids = resolveChoice(spec).alts.map((a) => a.id);
+  const key = o.anahtar || null, cache = o.cache || null;
+  const todo = rows.filter((r) => !(key && cache && cache[key(r)]));
+  if (todo.length) {
+    const P = await siliconProbs(spec, todo, chat, o);
+    todo.forEach((r, i) => { if (P[i] && key && cache) cache[key(r)] = P[i]; else if (P[i]) r.__P = P[i]; });
+  }
+  let n = 0;
+  for (const r of rows) {
+    const P = (key && cache && cache[key(r)]) || r.__P;
+    if (!P) continue;
+    Object.defineProperty(r.p, '__silikon', { value: Object.fromEntries(ids.map((id, j) => [id, P[j]])), enumerable: false, configurable: true, writable: true });
+    n++;
+  }
+  return n;
+}
+
 /** Doğrusal havuz ağırlıkları: simplex üzerinde ızgara araması ile en düşük log-kayıp. */
 export function stackWeights(components, ys, ws) {
   const M = components.length;

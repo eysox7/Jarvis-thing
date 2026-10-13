@@ -8,7 +8,7 @@
 // (NODE_USE_ENV_PROXY=1: Node'un fetch'i ortamdaki HTTPS_PROXY'yi kullansın.) LLM_SAHTE=1 → yalnızca akış denetimi, sonuç değildir.
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
-import { siliconProbs, stackWeights } from '../js/decision/ensemble.js';
+import { attachSilicon } from '../js/decision/ensemble.js';
 import { fitChoiceModel, tuneDemoSigma, scoreProbs } from '../js/decision/estimate.js';
 import { rowProbabilities } from '../js/decision/model.js';
 import { rng } from '../js/audience/personas.js';
@@ -49,31 +49,40 @@ const { anes } = await import('./realdata.mjs');
 const ids = ['dem', 'rep', 'ucuncu', 'oy_yok'];
 const A = anes(2016, false), B = anes(2020, false);
 const tr = A.rows, all = B.rows;
-const r = rng(2020), idx = all.map((_, i) => i);
-for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
-const panel = idx.slice(0, N).map((i) => all[i]);
+const shuffle = (arr, seed) => { const r = rng(seed), idx = arr.map((_, i) => i); for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; } return idx.map((i) => arr[i]); };
+const panel = shuffle(all, 2020).slice(0, N);
+const NCAL = Number(process.env.KALIBRASYON_N || 150);
+const calib = shuffle(tr, 2016).slice(0, NCAL);   // 2016'dan dil modeliyle de betimlenen eğitim alt kümesi
 
-// Bütünleşik: 2016'da öğren, 2020 toplam paylarına kalibre et (paylar tüm 2020 örnekleminden — anket yerine)
-const m = fitChoiceModel(A.spec, tr, { demoSigma: tuneDemoSigma(A.spec, tr, {}), iters: 300 });
-const target = ids.map((id) => all.filter((t) => t.secim === id).length / all.length);
-const mm = { ...m, asc: { ...m.asc } };
-for (let it = 0; it < 30; it++) { const PP = rowProbabilities(B.spec, mm, all); ids.forEach((id, j) => { mm.asc[id] += Math.log(target[j] / (PP.reduce((a, x) => a + x.P[j], 0) / PP.length)); }); }
-const modelP = rowProbabilities(B.spec, mm, panel).map((x) => x.P);
-
-console.log(`${process.env.LLM_SAHTE ? 'SAHTE MODEL (akış denetimi)' : 'Groq ' + MODEL} ile ${N} ANES 2020 seçmeni canlandırılıyor…`);
+// Dil modeli yanıt önbelleği (aynı kişi için yeniden çağırma yok; repoya girmez)
+const CACHE_F = new URL('./data/cache/llm_cache.json', import.meta.url);
+const cache = existsSync(CACHE_F) ? JSON.parse(readFileSync(CACHE_F, 'utf8')) : {};
+const tag = (process.env.LLM_SAHTE ? 'sahte|' : MODEL + '|') + (process.env.ISTEM || 'v1') + '|';
+const chat = process.env.LLM_SAHTE ? fakeChat : realChat;
 const t0 = Date.now();
-const silP = await siliconProbs(B.spec, panel, process.env.LLM_SAHTE ? fakeChat : realChat, { batch: 6 });
-const ok = panel.map((_, i) => i).filter((i) => silP[i]);
+console.log(`${process.env.LLM_SAHTE ? 'SAHTE MODEL (akış denetimi)' : 'Groq ' + MODEL} ile ${N} (2020) + ${NCAL} (2016) seçmen canlandırılıyor…`);
+const nP = await attachSilicon(B.spec, panel, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi });
+const nC = await attachSilicon(A.spec, calib, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi });
+writeFileSync(CACHE_F, JSON.stringify(cache));
+
+// 2020 toplam paylarına (anket yerine tüm 2020 örneklemi) sabit kalibrasyonu
+const target = ids.map((id) => all.filter((t) => t.secim === id).length / all.length);
+const calibrate = (model) => { const mm = { ...model, asc: { ...model.asc } }; for (let it = 0; it < 30; it++) { const PP = rowProbabilities(B.spec, mm, all); ids.forEach((id, j) => { mm.asc[id] += Math.log(target[j] / (PP.reduce((a, x) => a + x.P[j], 0) / PP.length)); }); } return mm; };
+const sg = tuneDemoSigma(A.spec, tr, { haric: ['silikon'] });
+// (a) bütünleşik, dil modelsiz   (b) HİBRİT: dil modeli fayda terimi, katsayısı 2016 alt kümesinden öğrenilir
+const mA = calibrate(fitChoiceModel(A.spec, tr, { demoSigma: sg, iters: 300, haric: ['silikon'] }));
+const mB = calibrate(fitChoiceModel(A.spec, tr, { demoSigma: sg, iters: 300 }));
+const okI = panel.map((_, i) => i).filter((i) => panel[i].p.__silikon);
 const ys = panel.map((x) => ids.indexOf(x.secim));
+const PA = rowProbabilities(B.spec, mA, panel).map((x) => x.P), PB = rowProbabilities(B.spec, mB, panel).map((x) => x.P);
+const PS = panel.map((x) => (x.p.__silikon ? ids.map((id) => x.p.__silikon[id]) : null));
 const score = (Ps, I) => scoreProbs(I.map((i) => ({ P: Ps[i], y: ys[i], w: 1 })));
-const half = Math.floor(ok.length / 2), fitI = ok.slice(0, half), evalI = ok.slice(half);
-const sw = stackWeights([modelP, silP].map((P) => fitI.map((i) => P[i])), fitI.map((i) => ys[i]));
-const [wm, ws] = sw.agirliklar;
-const mix = panel.map((_, i) => (silP[i] ? modelP[i].map((v, j) => wm * v + ws * silP[i][j]) : null));
 const res = {
-  model: MODEL, panel: N, yanit_alinan: ok.length, sure_sn: Math.round((Date.now() - t0) / 1000),
-  tum_panel: { butunlesik: score(modelP, ok), silikon: score(silP, ok) },
-  degerlendirme_yarisi: { butunlesik: score(modelP, evalI), silikon: score(silP, evalI), topluluk: score(mix, evalI), agirliklar: { butunlesik: wm, silikon: ws } },
+  model: MODEL, istem: process.env.ISTEM || 'v1', panel_2020: N, yanit_2020: nP, kalibrasyon_2016: nC, sure_sn: Math.round((Date.now() - t0) / 1000),
+  silikon_katsayisi: Math.round((mB.theta.silikon ?? 0) * 1000) / 1000,
+  yalniz_dil_modeli: score(PS, okI),
+  butunlesik: score(PA, okI),
+  hibrit_butunlesik_artı_dil_modeli: score(PB, okI),
 };
 console.log(JSON.stringify(res, null, 2));
 try { mkdirSync(new URL('../reports/', import.meta.url), { recursive: true }); writeFileSync(new URL('../reports/llm_live.json', import.meta.url), JSON.stringify(res, null, 2)); } catch {}

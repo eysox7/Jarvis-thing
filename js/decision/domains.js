@@ -226,6 +226,17 @@ export const ILETISIM_TERIMLERI = [
 ];
 
 /**
+ * Silikon terimi: dil modelinin bu kişiyi canlandırarak verdiği seçim olasılığı faydaya log-olasılık
+ * olarak girer (log-doğrusal havuz / uzmanlar çarpımı). Katsayısı veriden öğrenilir: 0 = dil modeli
+ * bilgi katmıyor, 1 = olasılıklarına olduğu gibi güven. Kuram terimleriyle AYNI fayda fonksiyonunda —
+ * dil modeli ayrı bir tahminci değil, modelin bir bileşenidir. p.__silikon ensemble.attachSilicon ile dolar.
+ */
+export const SILIKON = {
+  id: 'silikon', ad: 'Dil modeli sağduyusu (silikon örneklem)', kuram: 'Argyle vd. (2023) silikon örneklem; log-doğrusal havuz', onsel: 0.5,
+  z: (f, p, a) => { const P = p?.__silikon?.[a.id]; return P === undefined ? 0 : Math.log(Math.max(0.01, P)); },
+};
+
+/**
  * Geçmiş davranış (durum bağımlılığı): önceki oy / marka / davranış en güçlü tek yordayıcıdır
  * (Heckman 1981; seçmen sadakati, marka sadakati). p.onceki = önceki seçimin kimliği.
  * Öğrenilen modelde 'onceki=X' demografik anahtarı ayrıca seçenekler arası GEÇİŞ matrisini öğrenir.
