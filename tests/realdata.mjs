@@ -215,6 +215,13 @@ if (args[0] === '--secimler') {
     const std = sc({ ...B.spec, alan: '__ham' }, fit({ ...A.spec, alan: '__ham' }, { haric: [...COMM, 'gecmis'], kuramGuveni: 3 }));
     const but = sc({ ...B.spec, serbest }, fit({ ...A.spec, serbest }, {}));
     const ele = sc({ ...B.spec, serbest }, fit({ ...A.spec, serbest }, { haric: ELESTIREL }));
+    // + hedef seçimin toplam paylarına (anket/sonuç) sabit kalibrasyonu: geçen seçimin yapısı + bu seçimin düzeyi
+    const target = ids.map((id) => te.filter((t) => t.secim === id).length / te.length);
+    const calib = (specB, model) => { const mm = { ...model, asc: { ...model.asc } }; for (let it = 0; it < 30; it++) { const PP = rowProbabilities(specB, mm, te); ids.forEach((id, j) => { const mean = PP.reduce((a, x) => a + x.P[j], 0) / PP.length; mm.asc[id] = (mm.asc[id] || 0) + Math.log(target[j] / mean); }); } return mm; };
+    const hsB = { ...B.spec, alan: '__ham' }, bsB = { ...B.spec, serbest };
+    const mStd = fit({ ...A.spec, alan: '__ham' }, { haric: [...COMM, 'gecmis'], kuramGuveni: 3 }), mBut = fit({ ...A.spec, serbest }, {});
+    const stdC = sc(hsB, calib(hsB, mStd)), butC = sc(bsB, calib(bsB, mBut));
+    console.log(`        + toplam paya kalibre: standart ${stdC.isabet_yuzde}% (ll ${stdC.log_kayip}) | bütünleşik ${butC.isabet_yuzde}% (ll ${butC.log_kayip})`);
     const cnt = {}; for (const t of tr) cnt[t.secim] = (cnt[t.secim] || 0) + 1; const maj = ids.reduce((a, b) => ((cnt[a] || 0) >= (cnt[b] || 0) ? a : b));
     console.log(`${full ? 'tam    ' : 'yapısal'} ${ya}→${yb}: çoğunluk ${(te.filter((t) => t.secim === maj).length / te.length * 100).toFixed(1)}% | standart ${std.isabet_yuzde}% (ll ${std.log_kayip}) | bütünleşik ${but.isabet_yuzde}% (ll ${but.log_kayip}) | eleştirelsiz ${ele.isabet_yuzde}% (ll ${ele.log_kayip})`);
     delete DECISION_DOMAINS.__ham;
@@ -236,6 +243,17 @@ if (args[0] === '--sifir') {
     const r = scoreProbs(rowProbabilities(spec, model, te).map((x, i) => ({ P: x.P, y: ids.indexOf(te[i].secim), w: 1 })));
     console.log(`${y} ${full ? 'tam    ' : 'yapısal'}: çoğunluk ${(Math.max(...target) * 100).toFixed(1)}% | yalnız kuram + toplam sonuç ${r.isabet_yuzde}% (ll ${r.log_kayip})`);
   }
+  process.exit(0);
+}
+// Hata analizi: seçimler arası (yapısal) karışıklık matrisi — hangi seçmen grubu yanlış tahmin ediliyor?
+if (args[0] === '--hata') {
+  const [ya, yb] = [Number(args[1] || 2016), Number(args[2] || 2020)];
+  const A = anes(ya, false), B = anes(yb, false), tr = cleanRows(A.rows), te = cleanRows(B.rows), ids = ['dem', 'rep', 'ucuncu', 'oy_yok'];
+  const m = fitChoiceModel(A.spec, tr, { demoSigma: tuneDemoSigma(A.spec, tr, {}), iters: 300 });
+  const P = rowProbabilities(B.spec, m, te), C = ids.map(() => ids.map(() => 0));
+  P.forEach((x, i) => { C[ids.indexOf(te[i].secim)][x.P.indexOf(Math.max(...x.P))]++; });
+  console.log(`gerçek \\ tahmin  ${ids.map((x) => x.padStart(7)).join('')}   isabet   ort.olasılık`);
+  ids.forEach((id, j) => { const n = C[j].reduce((a, b) => a + b, 0); const avgP = P.reduce((a, x) => a + x.P[j], 0) / P.length; console.log(`${id.padEnd(16)} ${C[j].map((v) => String(v).padStart(7)).join('')}   ${(C[j][j] / n * 100).toFixed(1)}%   tahmin payı ${(avgP * 100).toFixed(1)}% / gerçek ${(n / te.length * 100).toFixed(1)}%`); });
   process.exit(0);
 }
 if (args[0] === '--katsayi') {
