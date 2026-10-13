@@ -252,8 +252,28 @@ düzeyde taşır:
 
 ANES 2016'da her seçmenin eyaletinin gerçek sonucu topluluk bağlamı olarak verildiğinde (yapısal
 model): 5 katlı CV 63,0 → **64,0** (kuramsız standart 63,9); hiç bireysel eğitim verisi yokken 43,1 →
-**50,6**; 100 kişiyle öğrenmede 58,8 → **62,0**, 800 kişide 60,3 → **63,8**. ANES kamu dosyasında eşin
-ve ebeveynin oyu yok; aile ve ağ terimleri birim testleriyle doğrulandı.
+**50,6**; 100 kişiyle öğrenmede 58,8 → **62,0**, 800 kişide 60,3 → **63,8**.
+
+**Gerçek ağ verisiyle sınama — ANES 2000** (`fetch_anes.py` → `ANES2000*`). 2000 anketinde her
+seçmene siyaseti konuştuğu en çok dört kişi, bu kişinin eşi/akrabası olup olmadığı ve seçimde kime oy
+verdiği sorulmuş (Huckfeldt & Sprague geleneği). 1.534 seçmenin 401'inde eşin, 1.007'sinde tartışma
+ağının oyu biliniyor. Standart model aynı bilgiyi düz kategorik sütun olarak görür (adil kıyas):
+
+| ANES 2000, 5 katlı CV | Standart | Bütünleşik | Log-kayıp (std / büt) |
+|---|---|---|---|
+| Yapısal, ağ bilgisi yok | 59,6 | 60,8 | 0,970 / 0,957 |
+| Yapısal + eşin ve ağın oyu | 64,0 | **67,1** | 0,904 / **0,836** |
+| Tam (parti kimliği + termometre), ağ yok | **72,6** | 71,4 | 0,736 / 0,710 |
+| Tam + eşin ve ağın oyu | 72,8 | **73,5** | 0,743 / **0,665** |
+| Öğrenme eğrisi, yapısal + ağ: 50 / 200 / 1.600 kişi | 54,0 / 62,1 / 65,5 | **61,6 / 65,0 / 68,5** | — |
+
+- Aile ve çevre bilgisi bireysel özelliklerin ötesinde gerçek bilgi taşıyor: yapısal modelde +6,3, parti
+  kimliği varken bile +2,1 puan ve log-kayıpta belirgin düşüş. 1.600 kişide sosyal terimler çıkarılınca
+  68,5 → 65,7.
+- Gerçek veriden öğrenilen katsayılar literatür öncüllerine yakın: `aile` 1,68 ± 0,27 (öncül 1,5),
+  `ag` 1,31 ± 0,18 (öncül 1,5).
+- Sınır: kişinin "yakınım kime oy verdi" algısı kendi oyunu yansıtabilir (projeksiyon) ve bağların bir
+  kısmı homofilidir; bu yüzden tahmin gücü nedensel etkinin üst sınırı sayılmalı.
 
 ### Zengin sentetik seçmenler: hayat öyküsü, travma, aile, çevre (`tests/data/sentetik/`)
 
@@ -276,12 +296,29 @@ modeline (silikon betimi) gider.
 |---|---|---|---|
 | Yalnız sıradan anket (demografi, değerler, algılar) | 43,2 | 68,5 | 68,6 |
 | + hayat öyküsü, aile, ağ, mahalle | 43,2 | 76,7 | **80,3** (log-kayıp 0,550 / standart 0,751) |
-| + önceki oy | 43,2 | 76,2 | **80,5** |
+| + önceki oy (2018 dalgası) | 43,2 | 81,7 | **82,4** (log-kayıp 0,499 / 0,663) |
 | Öğrenme eğrisi, öykülü: 50 / 200 / 800 kişi | 42 / 44 / 43 | 70,8 / 74,3 / 75,8 | **76,2 / 79,2 / 79,9** |
 | Hiç bireysel veri yok (yalnız kuram) | 43,2 | — | **63,2** |
 
 Hayat öyküsü bilgisi isabeti 12 puan artırıyor; bu bilgiyle kuramlar kuramsız modeli her veri
 miktarında 4–5 puan geçiyor (sosyal terimler çıkarılınca −4/−5, eleştirel terimler çıkarılınca −1/−2 puan).
+
+**Panel: aynı kişiler, iki seçim (`--secimler-tr`).** Aynı 3.000 kişi 2018 koşullarında da oy verir:
+ekonomik zarar daha az (döviz krizi seçimden sonra), 2023 depremi yok, 2015–17 sonrası güvenlik gündemi
+ağır, sığınmacı gündemi zayıf. 2018 dağılımı 45,4 / 20,4 / 8,6 / 10,5 / 15,1; iki seçimde aynı oy %79.
+Bir seçimde öğrenip ötekini tahmin etmek (eş/ağ/mahalle ve önceki oy hariç):
+
+| Aktarım | Standart | Bütünleşik | Eleştirel terimler çıkarılınca | Toplam paya kalibre (std / büt) |
+|---|---|---|---|---|
+| 2018'de öğren → 2023 | 70,1 (ll 0,876) | **71,7** (ll 0,762) | 69,6 | 70,1 / **73,2** |
+| 2023'te öğren → 2018 | 67,6 (ll 0,919) | **72,4** (ll 0,730) | 69,1 | 69,4 / **72,8** |
+
+Üç yeni terim (`kolektif_travma`, `yabancilasma`, `afet_cezasi`) aynı seçim içinde neredeyse hiç katkı
+vermez (her veri miktarında ±0,2): girdileri (zorunlu göç, travma, deprem) zaten düz sütun olarak modelde.
+Değerleri aktarımda görünür: 2018 verisinde 2023 depremi yoktur, ama kuram "kayıp yaşayan iktidarı
+cezalandırır" bilgisini taşır. Deprem kaybı yaşayan 92 seçmende 2018→2023 isabeti 68,5 → **70,7**.
+Not: üretim zinciri ekonomik oy, afet cezası gibi mekanizmaları içerir; model denklemi kullanılmasa da
+bu bir "dünya böyle işliyorsa model yakalar mı" sınamasıdır, gerçek panelde tekrarlanmalı.
 
 ### Gerçek veride ölçülen başarım (`node tests/realdata.mjs`)
 
@@ -329,13 +366,14 @@ veriden öğrenilir. Groq gpt-oss modelleri ANES seçmenlerini betimlerinden can
 | Aynı, İngilizce ABD bağlamlı istem (120b) | 72,5 | 71,7 | 75,0 | −0,04 |
 | 2016 içi, 90 seçmen, betime eyalet sonucu eklendi (20b) | 50,0 (bağlamsız 55,6) | 63,3 | 67,8 | 0,03 |
 | Sentetik TR, 48 seçmen, betime hayat öyküsü eklendi (20b, `tests/llm_oyku.mjs`) | 56,3 (öyküsüz 37,5) | 72,9 | — | — |
+| Aynı, 96 seçmen (120b) | 57,3 (öyküsüz 37,5) | 76,0 | — | — |
 
 Öğrenilen katsayı her koşuda sıfıra yakın: dil modeli, modelin zaten bildiği bireysel betimi okuyor ve
 bağımsız bilgi katmıyor. Topluluk bağlamını metin olarak vermek de dil modelinin isabetini artırmadı;
 aynı bilgi modele yapılandırılmış terim (`topluluk`) olarak girince kazanç ölçüldü (yukarıda). Örneklemler
 küçük (48–120), farklar bu nedenle temkinle okunmalı. Hayat öyküsü metni ise dil modelinin isabetini
-37,5'ten 56,3'e çıkardı: dil modeli öyküden gerçek bilgi okuyor, ama aynı bilgiyi yapılandırılmış sütun
-olarak alan bütünleşik model yine önde (72,9). Ücretsiz Groq kotası günde 200 bin token.
+37,5'ten 56–57'ye çıkardı (20b ve 120b): dil modeli öyküden gerçek bilgi okuyor, ama aynı bilgiyi
+yapılandırılmış sütun olarak alan bütünleşik model yine önde (72,9–76,0). Ücretsiz Groq kotası günde 200 bin token.
 
 ### CSV biçimi
 

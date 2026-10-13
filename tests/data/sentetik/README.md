@@ -27,8 +27,20 @@
 | Eğitim | ilkokul ~%33, lise ~%40, üniversite ~%21, lisansüstü ~%6 | aynı |
 | En az bir çocukluk zorluğu (sert ceza dahil) | Türkiye ACE çalışmalarında yüksek | %71 |
 | Eşle aynı oy | %65–80 | %68 |
-| Önceki oyla aynı | %65–80 | %70 |
+| 2018 dağılımı (iktidar / ana muh. / milliyetçi / Kürt / katılmama) | ~46 / 20 / 8,5 / 10 / 15,5 | 45,4 / 20,4 / 8,6 / 10,5 / 15,1 |
+| İki seçimde (2018 → 2023) aynı oy | %75–80 | %79 |
 | Alevi seçmende ana muhalefet | çok yüksek | %84 |
 | Kürt seçmende Kürt hareketi / iktidar | ~%40–55 / ~%25–35 | %44 / %30 |
 
 Değerler yaklaşıktır; amaç kesin seçim tahmini değil, kuramların ve hayat öyküsünün model başarısına katkısını gerçekçi ve döngüsel olmayan bir veride ölçmektir.
+
+## 2018 dalgası (panel)
+
+Aynı kişiler 2018 koşullarında da oy verir (`onceki` sütunu): ekonomik zarar daha az (iş kaybının
+~%35'i, borcun %60'ı o tarihte vardı), 2023 depremi yok (yalnız 1999), tehdit algısı ve güvenlik
+gündemi daha yüksek, sığınmacı gündemi daha zayıf; kalıcı parti bağlılığı iki dalgayı bağlar. 2018
+dönemine ait ölçümler `*_2018` sütunlarındadır (`ekonomi_algisi_2018`, `hane_algisi_2018`,
+`tehdit_algisi_2018`, `is_kaybi_2018`, `borc_yuku_2018`, `deprem_maruziyeti_2018`). Dalga ayrı bir
+rastgele akışla üretilir; 2023 sütunları ve öyküler bundan etkilenmez. Aktarım testi:
+`node tests/realdata.mjs --secimler-tr`.
+
