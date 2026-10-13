@@ -13,7 +13,7 @@
 // Çalıştır: node tests/realdata.mjs [veri_adı ...]
 
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { parseCSV } from '../js/decision/data.js';
+import { parseCSV, prepareRows } from '../js/decision/data.js';
 import { crossValidate, fitChoiceModel, tuneDemoSigma, scoreProbs } from '../js/decision/estimate.js';
 import { rowProbabilities, resolveChoice, KURAM_OLCEGI } from '../js/decision/model.js';
 import { rng } from '../js/audience/personas.js';
@@ -63,6 +63,10 @@ const DATASETS = {
     }).map((r) => { for (const k of Object.keys(r.p)) if (r.p[k] === undefined) delete r.p[k]; return r; });
     return { spec, rows, attrs: [] };
   },
+  // Zengin sentetik Türkiye seçmenleri (tests/data/sentetik_uret.mjs): hayat öyküsü, travma, aile, ağ, mahalle
+  SENTETIK_TR() { return sentetikTR('tam'); },
+  SENTETIK_TR_onceki_yok() { return sentetikTR('onceki_yok'); },
+  SENTETIK_TR_oykusuz() { return sentetikTR('oykusuz'); },
   ANES2016() { return anes(2016, true); },
   ANES2016_yapisal() { return anes(2016, false); },
   ANES2020() { return anes(2020, true); },
@@ -117,6 +121,27 @@ const DATASETS = {
 // arasında ortak → bir seçimde öğrenip diğerinde tahmin edilebilir). İktidar 2016'da D, 2020'de R.
 // tam: parti kimliği + aday termometreleri dahil; yapisal: yalnızca toplumsal yapı, değerler ve algılar
 // (eleştirel kuramların asıl sınandığı model — "kim olduğun ve neye inandığın oyunu ne kadar belirler?")
+// Sürüm: tam = tüm sütunlar; onceki_yok = önceki oy hariç; oykusuz = yalnız sıradan anket (demografi,
+// değerler, algılar) — öykü (travma, tehdit, göç, deprem, iş kaybı, borç), aile/ağ/mahalle ve önceki oy yok
+const OYKU_SUTUN = ['tehdit_algisi', 'travma_skoru', 'cocuklukta_sert_ceza', 'zorunlu_goc', 'teror_maruziyeti', 'sehit_yakini', 'deprem_maruziyeti', 'is_kaybi', 'borc_yuku', 'ic_goc'];
+export function sentetikTR(surum = 'tam') {
+  const S = new URL('./data/sentetik/', import.meta.url);
+  const ALT = ['iktidar', 'ana_muhalefet', 'milliyetci', 'kurt_sol', 'oy_yok'];
+  const il = Object.fromEntries(parseCSV(readFileSync(new URL('TR_il_sonuclari.csv', S), 'utf8')).map((r) => [r.il, Object.fromEntries(ALT.map((a) => [a, num(r[a])]))]));
+  const hk = { iktidar: 1, ana_muhalefet: -1, kurt_sol: -1, milliyetci: -0.3 }, mh = { iktidar: -1, ana_muhalefet: 1, kurt_sol: 0.3, milliyetci: 0.3 };
+  const spec = { alan: 'siyaset', baglam: { bolge_paylari: il, iktidar_suresi_yil: 21, ekonomi_algisi: -0.4, tehdit: 0.3,
+    medya_yanliligi: { hukumete_yakin_kanal: hk, hukumete_yakin_hesaplar: hk, muhalif_kanal: mh, muhalif_hesaplar: mh } }, secenekler: [
+    { id: 'iktidar', ekonomi: 0.3, kultur: 0.8, kimlik: 'sag', iktidar: true, guclu_lider: 0.9 },
+    { id: 'ana_muhalefet', ekonomi: -0.3, kultur: -0.5, kimlik: 'sol' },
+    { id: 'milliyetci', ekonomi: 0.2, kultur: 0.6, kimlik: 'sag', guclu_lider: 0.6 },
+    { id: 'kurt_sol', ekonomi: -0.6, kultur: -0.6, kimlik: 'sol', azinlik_temsili: true, duzen_karsiti: true },
+    { id: 'oy_yok', tur: 'cekimser' }] };
+  let raw = parseCSV(readFileSync(new URL('TR_secmen.csv', S), 'utf8'));
+  const drop = surum === 'tam' ? [] : surum === 'onceki_yok' ? ['onceki'] : ['onceki', 'es_oyu', 'ebeveyn_oyu', 'il', ...OYKU_SUTUN, ...ALT.flatMap((a) => ['ag_' + a, 'cevre_' + a])];
+  raw = raw.map((r) => { const o = { ...r }; for (const k of drop) delete o[k]; return o; });
+  return { spec, rows: prepareRows(raw, spec).rows, attrs: [] };
+}
+
 export function anes(year, full) {
   const raw = load('ANES' + year);
   const inc = (v) => (!Number.isFinite(v) ? undefined : v <= 1 / 3 ? 'dusuk' : v <= 2 / 3 ? 'orta' : 'yuksek');
@@ -167,6 +192,8 @@ function plainDomain(base, attrs, rows) {
 const COMM = ILETISIM_TERIMLERI.map((t) => t.id);
 const ELESTIREL = ['kimlik_siyaseti', 'otoriter_dinamik', 'muzakere', 'medya_yanliligi', 'arac', 'cinsiyet_acigi', 'kultur_endustrisi', 'arama_maliyeti', 'kulturel_sermaye', 'gosteris', 'reklam_teshir', 'risk_toplumu', 'otoriteye_uyum', 'bakim_yuku'];
 const SOSYAL = ['aile', 'ag', 'topluluk'];
+// Kuramsız standart model: iletişim, geçmiş, sosyal (Columbia okulu) ve dil modeli terimleri yok; ham sütunlar seçeneğe özgü sabit olarak girer
+const STD_HARIC = [...COMM, 'gecmis', ...SOSYAL, 'silikon'];
 const args = process.argv.slice(2);
 const LIB = args[0] === '--yukle';   // başka betikten içe aktarım: ana akışı çalıştırma
 const cleanRows = (rows) => rows.filter((r) => r.secim && Object.values(r.ozel || {}).every((o) => Object.values(o).every((v) => typeof v !== 'number' || Number.isFinite(v))));
@@ -194,7 +221,7 @@ if (args[0] === '--egri') {
         acc.c.push(n ? test.filter((t) => t.secim === maj).length / test.length * 100 : NaN);
         const fit = (sp, o) => { if (n < 10) return {}; const sg = n >= 100 ? tuneDemoSigma(sp, train, o) : 0; return fitChoiceModel(sp, train, { ...o, demoSigma: sg, iters: 250 }); };
         const hs = { ...spec, alan: '__ham' };
-        acc.s.push(n < 10 ? NaN : score(hs, fit(hs, { haric: [...COMM, 'gecmis'], kuramGuveni: 3 })));
+        acc.s.push(n < 10 ? NaN : score(hs, fit(hs, { haric: STD_HARIC, kuramGuveni: 3 })));
         const bs = { ...spec, serbest };
         acc.b.push(score(bs, fit(bs, {})));
         acc.e.push(score(bs, fit(bs, { haric: ELESTIREL })));
@@ -218,14 +245,14 @@ if (args[0] === '--secimler') {
     const ids = ['dem', 'rep', 'ucuncu', 'oy_yok'];
     const sc = (specB, model) => scoreProbs(rowProbabilities(specB, model, te).map((x, i) => ({ P: x.P, y: ids.indexOf(te[i].secim), w: 1 })));
     const fit = (sp, o) => fitChoiceModel(sp, tr, { ...o, demoSigma: tuneDemoSigma(sp, tr, o), iters: 300 });
-    const std = sc({ ...B.spec, alan: '__ham' }, fit({ ...A.spec, alan: '__ham' }, { haric: [...COMM, 'gecmis'], kuramGuveni: 3 }));
+    const std = sc({ ...B.spec, alan: '__ham' }, fit({ ...A.spec, alan: '__ham' }, { haric: STD_HARIC, kuramGuveni: 3 }));
     const but = sc({ ...B.spec, serbest }, fit({ ...A.spec, serbest }, {}));
     const ele = sc({ ...B.spec, serbest }, fit({ ...A.spec, serbest }, { haric: ELESTIREL }));
     // + hedef seçimin toplam paylarına (anket/sonuç) sabit kalibrasyonu: geçen seçimin yapısı + bu seçimin düzeyi
     const target = ids.map((id) => te.filter((t) => t.secim === id).length / te.length);
     const calib = (specB, model) => { const mm = { ...model, asc: { ...model.asc } }; for (let it = 0; it < 30; it++) { const PP = rowProbabilities(specB, mm, te); ids.forEach((id, j) => { const mean = PP.reduce((a, x) => a + x.P[j], 0) / PP.length; mm.asc[id] = (mm.asc[id] || 0) + Math.log(target[j] / mean); }); } return mm; };
     const hsB = { ...B.spec, alan: '__ham' }, bsB = { ...B.spec, serbest };
-    const mStd = fit({ ...A.spec, alan: '__ham' }, { haric: [...COMM, 'gecmis'], kuramGuveni: 3 }), mBut = fit({ ...A.spec, serbest }, {});
+    const mStd = fit({ ...A.spec, alan: '__ham' }, { haric: STD_HARIC, kuramGuveni: 3 }), mBut = fit({ ...A.spec, serbest }, {});
     const stdC = sc(hsB, calib(hsB, mStd)), butC = sc(bsB, calib(bsB, mBut));
     console.log(`        + toplam paya kalibre: standart ${stdC.isabet_yuzde}% (ll ${stdC.log_kayip}) | bütünleşik ${butC.isabet_yuzde}% (ll ${butC.log_kayip})`);
     const cnt = {}; for (const t of tr) cnt[t.secim] = (cnt[t.secim] || 0) + 1; const maj = ids.reduce((a, b) => ((cnt[a] || 0) >= (cnt[b] || 0) ? a : b));
@@ -277,14 +304,14 @@ const out = [];
 const t0 = Date.now();
 for (const [name, mk] of Object.entries(DATASETS)) {
   if (only.length && !only.includes(name)) continue;
-  if (!existsSync(fileOf(name.split('_')[0]))) { console.log(`- ${name}: dosya yok, atlandı`); continue; }
+  if (!name.startsWith('SENTETIK') && !existsSync(fileOf(name.split('_')[0]))) { console.log(`- ${name}: dosya yok, atlandı`); continue; }
   const { spec, rows, attrs } = mk();
   const clean = cleanRows(rows);
   const base = DECISION_DOMAINS[spec.alan];
   DECISION_DOMAINS.__ham = plainDomain(base, attrs, clean);
   const cvO = { k: 5, seed: 3, demoSigma: 'oto' };
   const HARIC = process.env.HARIC ? process.env.HARIC.split(',') : [];
-  const std = crossValidate({ ...spec, alan: '__ham' }, clean, { ...cvO, haric: [...COMM, 'gecmis'], kuramGuveni: 3 });
+  const std = crossValidate({ ...spec, alan: '__ham' }, clean, { ...cvO, haric: STD_HARIC, kuramGuveni: 3 });
   // Hibrit: kuramın kapsamadığı ölçülmüş özellikler serbest terim olarak da girer (ölçek = std. sapma)
   const serbest = Object.fromEntries(attrs.map((k) => [k, DECISION_DOMAINS.__ham.terimler.find((t) => t.id === 'lin_' + k).sd]));
   const but = crossValidate(process.env.SERBEST === '0' ? spec : { ...spec, serbest }, clean, { ...cvO, haric: HARIC, kuramGuveni: Number(process.env.KG || 1), siniflar: Number(process.env.SINIF || 1), etkilesim: process.env.ETK === '1' });

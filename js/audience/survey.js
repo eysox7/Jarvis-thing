@@ -32,12 +32,18 @@ const EXTRA = {
   parti_kimligi: (v) => (Math.abs(v) < 0.2 ? 'kendini bağımsız görüyor' : `kendini ${Math.abs(v) > 0.8 ? 'güçlü biçimde ' : ''}${v > 0 ? 'sağ/muhafazakâr partili' : 'sol/ilerici partili'} görüyor`),
   medya_kaynagi: (v) => ({ sag_medya: 'sağ eğilimli medyayı izliyor', sol_medya: 'sol eğilimli medyayı izliyor' }[v] || ''),
   onceki: (v) => `geçen sefer "${v}" seçmişti`,
+  tehdit_algisi: (v) => (v >= 0.6 ? 'ülkenin güvenliğinin tehlikede olduğunu düşünüyor' : v <= 0.25 ? 'güvenlik kaygısı düşük' : ''),
+  travma_skoru: (v) => (v >= 0.4 ? 'çocukluğunda ağır travmalar yaşadı' : v > 0 ? 'çocukluğunda bazı zorluklar yaşadı' : ''),
+  zorunlu_goc: (v) => (v > 0 ? 'ailesiyle zorla göç etmek zorunda kaldı' : ''),
+  deprem_maruziyeti: (v) => (v >= 1 ? 'depremde evini/yakınlarını kaybetti' : v > 0 ? 'büyük bir deprem yaşadı' : ''),
+  is_kaybi: (v) => (v > 0 ? 'son yıllarda işini kaybetti' : ''),
 };
 
 export function describePersona(p) {
   const base = Object.keys(DIMENSIONS).filter((k) => p[k] !== undefined && p[k] !== null).map((k) => (LABEL[k] ? LABEL[k](p[k]) : `${k}: ${p[k]}`));
   const extra = Object.keys(EXTRA).filter((k) => p[k] !== undefined && p[k] !== null && p[k] !== '').map((k) => EXTRA[k](p[k]));
-  return [...base, ...extra].filter(Boolean).join(', ');
+  const d = [...base, ...extra].filter(Boolean).join(', ');
+  return p.__oyku ? `${d}. Hayat öyküsü: ${p.__oyku}` : d;
 }
 
 /** Nüfustan tabakalı örnek: seçilen boyutta her değerden sırayla alarak çeşitliliği korur. */

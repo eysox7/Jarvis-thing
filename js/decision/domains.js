@@ -31,7 +31,10 @@ const perceived = (p, k, d) => (p && p[k] !== undefined && p[k] !== null && p[k]
 // düşük eğitim, düşük bilişsel ihtiyaç, yaş, kırsallık. Kişi verisinde 'otoriterlik' (0..1) varsa o kullanılır.
 export const authoritarian = (f, p) => clamp(perceived(p, 'otoriterlik', 0.35 * f.dindarlik + 0.25 * (1 - f.egitim) + 0.15 * (1 - f.nfc) + 0.15 * f.yas + 0.1 * (1 - f.yerlesim)), 0, 1) - 0.5;
 // Normatif tehdit (Stenner) + güvencesizlik (Fromm, Özgürlükten Kaçış): bağlam tehdidi ve kişinin ekonomik kaygısı
-const threat = (f, p, ctx) => 1 + clamp(num(ctx?.tehdit), 0, 2) + 0.5 * Math.max(0, -perceived(p, 'ekonomi_algisi', num(ctx?.ekonomi_algisi, -0.2))) * (1 - f.gelir);
+// Tehdit (Stenner; Fromm): bağlamın tehdidi + kişinin beyan ettiği tehdit algısı (Thomas teoremi) + ekonomik güvencesizlik
+const threat = (f, p, ctx) => 1 + clamp(num(ctx?.tehdit), 0, 2) + 1.5 * perceived(p, 'tehdit_algisi', 0) + 0.5 * Math.max(0, -perceived(p, 'ekonomi_algisi', num(ctx?.ekonomi_algisi, -0.2))) * (1 - f.gelir);
+// Hane ekonomisi: beyan yoksa iş kaybı ve borç yükünden, o da yoksa gelirden
+const household = (f, p) => perceived(p, 'hane_algisi', p && (p.is_kaybi !== undefined || p.borc_yuku !== undefined) ? -0.6 * perceived(p, 'is_kaybi', 0) - 0.6 * perceived(p, 'borc_yuku', 0) + 0.3 : f.gelir - 0.4);
 const mainMedia = (p) => p?.medya || null;
 const partyPos = (a) => ({ ekonomi: num(a.ekonomi ?? a.konum?.ekonomi), kultur: num(a.kultur ?? a.konum?.kultur) });
 const isAbstain = (a) => a.tur === 'cekimser' || a.id === 'oy_kullanmama';
@@ -52,6 +55,7 @@ export const SIYASET = {
     lider: '0..1 lider/aday değerlendirmesi (valens)', anket: '0..1 beklenen oy payı (stratejik oy)',
     guclu_lider: '0..1 "güçlü lider / düzen" vaadi', duzen_karsiti: 'boolean — düzen karşıtı / popülist parti',
     tur: '"cekimser" → oy kullanmama seçeneği',
+    azinlik_temsili: 'boolean — marjinal/azınlık kimliğini temsil eden parti (kolektif travma terimi)',
   },
   baglam: { bolge_paylari: '{bölge: {seçenek_id: %}} bölge/il/ilçe sonuçları — kişinin p.bolge alanıyla topluluk bağlamı', ekonomi_algisi: '-1 (kötü) .. 1 (iyi) genel ekonomik algı (varsayılan -0.2)', konu_onemi: '{ekonomi: ağırlık, kultur: ağırlık} hangi eksen daha belirleyici (ör. kriz: {ekonomi: 2, kultur: 0.6})', iktidar_suresi_yil: 'görevdeki partinin iktidar süresi (yorgunluk etkisi)', onceki_paylar: '{seçenek_id|etiket: yüzde} önceki seçim sonucu — personalara geçmiş oy atanır', tehdit: '0..2 normatif/güvenlik tehdidi algısı (terör, göç, kriz)', medya_yanliligi: '{medya türü veya kişinin medya_kaynagi etiketi: {seçenek_id: -1..1}} medya sahipliği/yanlılığı', sosyal_yayilim: 'false → kampanya/değişiklik etkisinin hane ve tartışma ağı üzerinden yayılmasını kapatır (varsayılan açık)', sosyal_nedensellik: '0..1 kesitsel aile/ağ katsayısının nedensel payı (varsayılan 0.4; gerisi homofili)' },
   terimler: [
@@ -68,7 +72,7 @@ export const SIYASET = {
         return a.kimlik === p.ideoloji ? 0.5 + f.yas : 0;
       } },
     { id: 'ekonomik_oy', ad: 'Geriye dönük ekonomik oy', kuram: 'Fiorina (1981); Lewis-Beck (1988)', onsel: 1.4,
-      z: (f, p, a, ctx) => (a.iktidar ? perceived(p, 'ekonomi_algisi', num(ctx.ekonomi_algisi, -0.2)) + 0.5 * perceived(p, 'hane_algisi', f.gelir - 0.4) : 0) },
+      z: (f, p, a, ctx) => (a.iktidar ? perceived(p, 'ekonomi_algisi', num(ctx.ekonomi_algisi, -0.2)) + 0.5 * household(f, p) : 0) },
     { id: 'kurumsal_guven', ad: 'Sistem güveni', kuram: 'Easton (1965) — yaygın destek', onsel: 1.0,
       z: (f, p, a) => (a.iktidar ? f.kurumsal_guven - 0.5 : 0) },
     { id: 'iktidar_yorgunlugu', ad: 'İktidar yorgunluğu / değişim isteği', kuram: 'Maliyet-of-ruling (Paldam 1986); kuşak etkisi', onsel: 0.9,
@@ -87,6 +91,12 @@ export const SIYASET = {
       z: (f, p, a) => { const m = mainMedia(p) === 'sosyal' ? 1 : mainMedia(p) === 'tv' ? -0.5 : 0; return m * (a.iktidar ? -1 : a.duzen_karsiti ? 1 : 0); } },
     { id: 'kimlik_siyaseti', ad: 'Marjinal kimlik ve karşı-hegemonya', kuram: 'Crenshaw (1989) kesişimsellik; Gramsci karşı-hegemonya; Hall — marjinal gruplar kültürel liberal/çoğulcu partiye yönelir', onsel: 0.8,
       z: (f, p, a) => (isAbstain(a) || !p?.azinlik_kimlik ? 0 : (f.marginal - 0.2) * -partyPos(a).kultur) },
+    { id: 'kolektif_travma', ad: 'Kolektif travma ve mağduriyet', kuram: 'Gurr (1970) göreli yoksunluk; Alexander (2004) kültürel travma; Balcells (2012) — şiddet mağduriyeti kimliği siyasallaştırır', onsel: 1.0,
+      z: (f, p, a) => (a.azinlik_temsili ? (perceived(p, 'zorunlu_goc', 0) + 0.5 * perceived(p, 'teror_maruziyeti', 0)) * (f.marginal ? 1 : 0.3) : 0) },
+    { id: 'yabancilasma', ad: 'Travma ve siyasal yabancılaşma', kuram: 'Seeman (1959) yabancılaşma; çocukluk travması (ACE) düşük siyasal etkinlik ve katılımla ilişkili', onsel: 0.4,
+      z: (f, p, a) => (isAbstain(a) ? perceived(p, 'travma_skoru', 0) : 0) },
+    { id: 'afet_cezasi', ad: 'Afet sonrası iktidarı cezalandırma', kuram: 'Healy & Malhotra (2009); Gasper & Reeves (2011) — seçmen afet yönetimini oylar', onsel: 0.6,
+      z: (f, p, a) => (a.iktidar ? -perceived(p, 'deprem_maruziyeti', 0) : 0) },
     { id: 'cinsiyet_acigi', ad: 'Kuşaksal cinsiyet açığı', kuram: 'Inglehart & Norris (2000); Immerzeel vd. (2015) — feminist/kesişimsel', onsel: 0.5,
       z: (f, p, a) => (isAbstain(a) || !p?.cinsiyet ? 0 : (f.kadin - 0.5) * -partyPos(a).kultur * (0.4 + 0.6 * (1 - f.yas))) },
     { id: 'katilmama', ad: 'Katılmama eğilimi', kuram: 'Riker & Ordeshook (1968) — oy hesabı', onsel: 1.2,
@@ -240,7 +250,8 @@ const share01 = (v) => { const x = num(v, NaN); return Number.isFinite(x) ? (x >
 const embedded = (f) => 0.4 * (1 - f.yerlesim) + 0.3 * f.yas + 0.3 * f.dindarlik;
 export const SOSYAL_TERIMLERI = [
   { id: 'aile', ad: 'Aile / hane etkisi', kuram: 'Zuckerman (2005) sosyal mantık; Jennings & Niemi (1968) aileden aktarım', onsel: 1.5,
-    z: (f, p, a) => (p?.aile_tercihi !== undefined && p.aile_tercihi !== null && String(p.aile_tercihi) === a.id ? 1 : 0) },
+    // Eş/hane tercihi tam ağırlık, ebeveynin tercihi (kuşaklar arası aktarım, zamanla zayıflar) 0.6
+    z: (f, p, a) => (p?.aile_tercihi != null && String(p.aile_tercihi) === a.id ? 1 : 0) + (p?.ebeveyn_tercihi != null && String(p.ebeveyn_tercihi) === a.id ? 0.6 : 0) },
   { id: 'ag', ad: 'Tartışma ağı', kuram: 'Huckfeldt & Sprague (1995); Lazarsfeld vd. (1944) Columbia okulu; Katz iki aşamalı akış', onsel: 1.5,
     z: (f, p, a) => { const v = share01(p?.ag_paylari?.[a.id]); return v === null ? 0 : v; } },
   { id: 'topluluk', ad: 'Topluluk / mahalle bağlamı', kuram: 'Park — insan ekolojisi (Chicago); Berelson vd. (1954); Huckfeldt (1986) bağlam etkisi', onsel: 0.7,

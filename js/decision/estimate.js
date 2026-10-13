@@ -8,7 +8,7 @@
 // isabet, log-kayıp, Brier ve kalibrasyon hatası (ECE) raporlar ve iki temel modelle kıyaslar.
 
 import { features, DIMENSIONS, rng } from '../audience/personas.js';
-import { resolveChoice, coefficients, zMatrix, predictChoice, rowResolved, rowProbabilities, KURAM_OLCEGI } from './model.js';
+import { resolveChoice, coefficients, zMatrix, predictChoice, rowResolved, rowProbabilities, KURAM_OLCEGI, demoKey } from './model.js';
 import { ensureComm } from './communication.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
@@ -21,7 +21,7 @@ function precompute(resolved, rows) {
   return rows.map((r, i) => {
     const f = features(r.p);
     const { r: rr, mask } = rowResolved(resolved, r);
-    return { p: r.p, y: altIndex[r.secim], w: r.w ?? 1, mask, zs: zMatrix(rr, f, r.p, i), keys: Object.entries(r.p).filter(([, v]) => v === null || typeof v !== 'object').map(([k, v]) => k + '=' + v) };
+    return { p: r.p, y: altIndex[r.secim], w: r.w ?? 1, mask, zs: zMatrix(rr, f, r.p, i), keys: Object.entries(r.p).filter(([, v]) => v === null || typeof v !== 'object').map(([k, v]) => demoKey(k, v)) };
   }).filter((x) => x.y !== undefined && (!x.mask || x.mask[x.y]));
 }
 

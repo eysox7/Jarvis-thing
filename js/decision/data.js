@@ -28,14 +28,22 @@ const NUMERIC = {
   konum_ekonomi: { al: ['konum_ekonomi', 'ekonomik_konum', 'sol_sag', 'lr_self', 'left_right'], to: [-1, 1] },
   konum_kultur: { al: ['konum_kultur', 'kulturel_konum', 'muhafazakarlik', 'liberal_muhafazakar'], to: [-1, 1] },
   parti_kimligi: { al: ['parti_kimligi', 'party_id', 'partisanship'], to: [-1, 1] },
+  // Hayat öyküsü: travma, tehdit, ekonomik şok, kolektif deneyim (Fromm, Stenner, Gurr, Beck)
+  tehdit_algisi: { al: ['tehdit_algisi', 'tehdit', 'threat'], to: [0, 1] },
+  travma_skoru: { al: ['travma_skoru', 'ace', 'ace_skoru', 'cocukluk_travmasi'], to: [0, 1], from: [0, 7] },
+  borc_yuku: { al: ['borc_yuku', 'borc', 'debt'], to: [0, 1] },
+  is_kaybi: { al: ['is_kaybi', 'issiz_kaldi', 'job_loss'], to: [0, 1], from: [0, 1] },
+  zorunlu_goc: { al: ['zorunlu_goc', 'koy_bosaltma', 'displacement'], to: [0, 1], from: [0, 1] },
+  teror_maruziyeti: { al: ['teror_maruziyeti', 'catisma_maruziyeti', 'violence_exposure'], to: [0, 1], from: [0, 1] },
+  deprem_maruziyeti: { al: ['deprem_maruziyeti', 'afet_maruziyeti', 'disaster'], to: [0, 1], from: [0, 2] },
 };
-const CAT_EXTRA = { medya_kaynagi: ['medya_kaynagi', 'medya_kanali', 'izlenen_kanal', 'kanal'] };
+const CAT_EXTRA = { medya_kaynagi: ['medya_kaynagi', 'medya_kanali', 'izlenen_kanal', 'kanal'], etnik_koken: ['etnik_koken', 'etnisite', 'ethnicity', 'anadil'], inanc: ['inanc', 'mezhep', 'din', 'religion'], meslek: ['meslek', 'occupation'] };
 const SCALES = [[0, 1], [-1, 1], [1, 5], [1, 7], [0, 10], [1, 10], [0, 100], [-3, 3], [-5, 5]];
-function numericColumn(raw, col, to) {
+function numericColumn(raw, col, to, from) {
   const vals = raw.map((r) => String(r[col] ?? '').trim()).filter((v) => v !== '').map((v) => Number(v.replace(',', '.'))).filter(Number.isFinite);
   if (!vals.length) return null;
   const lo = Math.min(...vals), hi = Math.max(...vals);
-  const [a, b] = SCALES.find(([x, y]) => lo >= x && hi <= y) || [lo, hi];
+  const [a, b] = from || SCALES.find(([x, y]) => lo >= x && hi <= y) || [lo, hi];
   return (v) => { const t = String(v ?? '').trim(), n = Number(t.replace(',', '.')); if (t === '' || !Number.isFinite(n) || b === a) return undefined; return Math.round((to[0] + (n - a) / (b - a) * (to[1] - to[0])) * 1000) / 1000; };
 }
 const VALUE_ALIASES = {
@@ -100,7 +108,7 @@ export function prepareRows(raw, spec) {
     for (const [dim, al] of Object.entries(ALIASES)) if (al[fc]) dimOf[c] = dim;
   }
   const numOf = {};
-  for (const c of cols) for (const [k, d] of Object.entries(NUMERIC)) if (d.al.includes(fold(c))) { const fn = numericColumn(raw, c, d.to); if (fn) numOf[c] = { k, fn }; }
+  for (const c of cols) for (const [k, d] of Object.entries(NUMERIC)) if (d.al.includes(fold(c))) { const fn = numericColumn(raw, c, d.to, d.from); if (fn) numOf[c] = { k, fn }; }
   const catOf = {};
   for (const c of cols) for (const [k, al] of Object.entries(CAT_EXTRA)) if (al.includes(fold(c))) catOf[c] = k;
   const choiceCol = cols.find((c) => CHOICE_COLS[fold(c)]);
@@ -108,8 +116,11 @@ export function prepareRows(raw, spec) {
   const wCol = cols.find((c) => ['agirlik', 'weight', 'w'].includes(fold(c)));
   const idCol = cols.find((c) => ['kisi', 'katilimci', 'respondent', 'musteri', 'musteri_id', 'kisi_id'].includes(fold(c)));
   // Sosyal bağlam sütunları: aile (eş/ebeveyn/hane tercihi), ağ_<seçenek> (çevredeki pay), cevre_<seçenek> / bolge_<seçenek> (topluluk payı), bolge
-  const famCol = cols.find((c) => ['aile_tercihi', 'aile', 'es_oyu', 'es_tercihi', 'ebeveyn_oyu', 'ebeveyn_tercihi', 'hane_tercihi', 'spouse', 'parent_vote'].includes(fold(c)));
+  const famCol = cols.find((c) => ['aile_tercihi', 'aile', 'es_oyu', 'es_tercihi', 'hane_tercihi', 'spouse'].includes(fold(c)))
+    || cols.find((c) => ['ebeveyn_oyu', 'ebeveyn_tercihi', 'parent_vote'].includes(fold(c)));
+  const parentCol = cols.find((c) => c !== famCol && ['ebeveyn_oyu', 'ebeveyn_tercihi', 'parent_vote', 'baba_oyu', 'anne_oyu'].includes(fold(c)));
   const regionCol = cols.find((c) => ['bolge', 'il', 'ilce', 'sehir', 'mahalle', 'region', 'state', 'eyalet'].includes(fold(c)));
+  const storyCol = cols.find((c) => ['oyku', 'hayat_oykusu', 'backstory', 'biyografi'].includes(fold(c)));
   const shareCols = [];
   for (const c of cols) for (const a of alts) for (const [pre, k] of [['ag_', 'ag_paylari'], ['cevre_', 'cevre_paylari'], ['bolge_', 'cevre_paylari']]) if (fold(c) === pre + fold(a.id)) shareCols.push({ c, alt: a.id, k });
   const pastCol = cols.find((c) => ['onceki', 'onceki_secim', 'onceki_oy', 'gecmis_oy', 'gecmis', 'previous', 'past'].includes(fold(c)));
@@ -137,7 +148,10 @@ export function prepareRows(raw, spec) {
     for (const [c, { k, fn }] of Object.entries(numOf)) { const v = fn(r[c]); if (v !== undefined) p[k] = v; }
     for (const [c, k] of Object.entries(catOf)) if (r[c] !== '' && r[c] !== undefined) p[k] = fold(r[c]);
     if (famCol && r[famCol] !== '' && r[famCol] !== undefined) p.aile_tercihi = altIds.get(fold(r[famCol])) || fold(r[famCol]);
+    if (parentCol && r[parentCol] !== '' && r[parentCol] !== undefined) p.ebeveyn_tercihi = altIds.get(fold(r[parentCol])) || fold(r[parentCol]);
     if (regionCol && r[regionCol] !== '' && r[regionCol] !== undefined) p.bolge = String(r[regionCol]).trim();
+    // Hayat öyküsü metni: modele değil dil modeline (silikon) gider; görünmez alan
+    if (storyCol && String(r[storyCol] ?? '').trim()) Object.defineProperty(p, '__oyku', { value: String(r[storyCol]).trim(), enumerable: false, configurable: true, writable: true });
     for (const { c, alt, k } of shareCols) { const v = Number(String(r[c] ?? '').replace(',', '.')); if (r[c] !== '' && Number.isFinite(v)) (p[k] ||= {})[alt] = v; }
     if (pastCol && r[pastCol] !== '' && r[pastCol] !== undefined) p.onceki = altIds.get(fold(r[pastCol])) || fold(r[pastCol]);
     const w = wCol ? Number(r[wCol]) : 1;

@@ -13,6 +13,8 @@ import { rng } from '../audience/personas.js';
 import { socialStructure, diffuse } from './social.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
+/** Kişi alanı → demografik anahtar. Sürekli sayılar (algı, tehdit, borç…) 0.25'lik dilimlere ayrılır. */
+export const demoKey = (k, v) => k + '=' + (typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 4) / 4 : v);
 const pct = (x) => Math.round(x * 1000) / 10;
 const num01 = (v, d) => (Number.isFinite(+v) && v !== null && v !== '' ? Math.max(0, Math.min(1, +v)) : d);
 
@@ -56,7 +58,7 @@ export function coefficients(resolved, model = {}, overrides = {}) {
 export function thetaFor(coef, termId, p) {
   let t = coef.theta[termId] || 0;
   const e = coef.etk && coef.etk[termId];
-  if (e) for (const k in p) { if (p[k] !== null && typeof p[k] === 'object') continue; const c = e[k + '=' + p[k]]; if (c) t += c; }
+  if (e) for (const k in p) { if (p[k] !== null && typeof p[k] === 'object') continue; const c = e[demoKey(k, p[k])]; if (c) t += c; }
   return t;
 }
 
@@ -102,7 +104,7 @@ export function demoUtility(demo, altId, p) {
   const d = demo && demo[altId];
   if (!d) return 0;
   let v = 0;
-  for (const k in p) { if (p[k] !== null && typeof p[k] === 'object') continue; const c = d[k + '=' + p[k]]; if (c) v += c; }
+  for (const k in p) { if (p[k] !== null && typeof p[k] === 'object') continue; const c = d[demoKey(k, p[k])]; if (c) v += c; }
   return v;
 }
 

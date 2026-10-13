@@ -324,6 +324,23 @@ console.log('\n[24] Nüfus düzeyinde sosyal yayılma: hane, homofili ağı, top
   ok(JSON.stringify(off.paylar) === JSON.stringify(plain.paylar), 'baglam.sosyal_yayilim=false yayılmayı kapatır');
 }
 
+console.log('\n[25] Hayat öyküsü: travma, tehdit, deprem, ebeveyn ve öykü metni');
+{
+  const sp = { alan: 'siyaset', secenekler: [{ id: 'I', ekonomi: 0.3, kultur: 0.8, kimlik: 'sag', iktidar: true, guclu_lider: 0.9 }, { id: 'M', ekonomi: -0.3, kultur: -0.5, kimlik: 'sol' }, { id: 'K', ekonomi: -0.6, kultur: -0.6, kimlik: 'sol', azinlik_temsili: true }, { id: 'Y', tur: 'cekimser' }] };
+  const csv = 'travma_skoru;tehdit_algisi;deprem_maruziyeti;zorunlu_goc;es_oyu;ebeveyn_oyu;etnik_koken;oyku;secim\n7;1;2;1;M;K;kurt;Köyü boşaltıldı.;K\n0;0;0;0;I;I;turk;Sakin bir çocukluk.;I\n';
+  const rows = prepareRows(parseCSV(csv), sp).rows;
+  ok(rows[0].p.travma_skoru === 1 && rows[0].p.deprem_maruziyeti === 1 && rows[1].p.travma_skoru === 0, 'CSV: travma (0–7) ve deprem (0–2) sabit ölçekle 0–1\'e');
+  ok(rows[0].p.aile_tercihi === 'M' && rows[0].p.ebeveyn_tercihi === 'K' && rows[0].p.etnik_koken === 'kurt', 'eş ve ebeveyn tercihi ayrı alanlar; etnik köken tanınır');
+  ok(rows[0].p.__oyku === 'Köyü boşaltıldı.' && !Object.keys(rows[0].p).includes('__oyku'), 'öykü metni görünmez alan (modele değil dil modeline)');
+  ok(describePersona(rows[0].p).includes('Hayat öyküsü: Köyü boşaltıldı.'), 'silikon betimi öyküyü taşır');
+  const P = (p) => predictPerson(sp, p).olasiliklar;
+  ok(P({ azinlik_kimlik: 'evet', zorunlu_goc: 1 }).K > P({ azinlik_kimlik: 'evet', zorunlu_goc: 0 }).K, 'kolektif travma (Gurr): zorunlu göç azınlık temsilcisi partiye yöneltir');
+  ok(P({ travma_skoru: 1 }).Y > P({ travma_skoru: 0 }).Y, 'yabancılaşma: çocukluk travması katılmamayı artırır');
+  ok(P({ deprem_maruziyeti: 1 }).I < P({ deprem_maruziyeti: 0 }).I, 'afet cezası: depremde kayıp iktidar olasılığını düşürür');
+  ok(P({ otoriterlik: 0.9, tehdit_algisi: 1 }).I > P({ otoriterlik: 0.9, tehdit_algisi: 0 }).I, 'Stenner: beyan edilen tehdit otoriter yatkınlığı etkinleştirir');
+  ok(P({ ebeveyn_tercihi: 'K' }).K > P({}).K, 'ebeveynin tercihi aktarılır (Jennings & Niemi)');
+}
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ karar testleri geçti');
