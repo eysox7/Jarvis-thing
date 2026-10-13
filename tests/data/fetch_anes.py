@@ -90,6 +90,13 @@ for y, v in V.items():
 # Z1–Z24: siyaseti konuştuğu en çok 4 kişi; her biri için yakınlık (eş/akraba/akraba değil) ve
 # "bu kişi seçimde kime oy verdi?" (yanıtlayıcının algısı). es_oyu = eş/partner olan kişinin oyu;
 # ag_<seçenek> = eş dışındaki kişilerin oy payları; ag_n = oyu bilinen eş dışı kişi sayısı.
+FIPS = {1: 'AL', 2: 'AK', 4: 'AZ', 5: 'AR', 6: 'CA', 8: 'CO', 9: 'CT', 10: 'DE', 11: 'DC', 12: 'FL', 13: 'GA', 15: 'HI', 16: 'ID', 17: 'IL',
+        18: 'IN', 19: 'IA', 20: 'KS', 21: 'KY', 22: 'LA', 23: 'ME', 24: 'MD', 25: 'MA', 26: 'MI', 27: 'MN', 28: 'MS', 29: 'MO', 30: 'MT', 31: 'NE',
+        32: 'NV', 33: 'NH', 34: 'NJ', 35: 'NM', 36: 'NY', 37: 'NC', 38: 'ND', 39: 'OH', 40: 'OK', 41: 'OR', 42: 'PA', 44: 'RI', 45: 'SC', 46: 'SD',
+        47: 'TN', 48: 'TX', 49: 'UT', 50: 'VT', 51: 'VA', 53: 'WA', 54: 'WV', 55: 'WI', 56: 'WY'}
+
+# Eyalet bağlamı: tests/data/real/eyalet_2000.csv — 2000 başkanlık seçiminin eyalet sonuçları (kamuya açık;
+# kaynak: Wikipedia "2000 United States presidential election", Results by state tablosu)
 def anes2000():
     d = load(2000)
     def g(c): return d[c]
@@ -129,7 +136,8 @@ def anes2000():
         'beyaz': g('V001006a').map(lambda r: 1 if r == 50 else 0 if 0 < r < 88 else ''),
         'ilgi5': g('V000301').where(g('V000301') > 0),
         'guven5': g('V001534').map({1: 1, 2: 2, 3: 4, 4: 5}), 'ekonomi5': ek,
-        'term_dem': term('V000360'), 'term_rep': term('V000361'), 'medya_sag': '', 'medya_sol': '', 'eyalet': '',
+        'term_dem': term('V000360'), 'term_rep': term('V000361'), 'medya_sag': '', 'medya_sol': '',
+        'eyalet': g('V000080').map(lambda x: FIPS.get(int(x), '')),
         'es_oyu': es, 'ag_n': agn,
     })
     for k in VOTE.values(): out['ag_' + k] = [x[k] if x else '' for x in agp]

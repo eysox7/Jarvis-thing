@@ -162,8 +162,9 @@ export function anes(year, full, ag = true) {
   const raw = load('ANES' + year);
   const inc = (v) => (!Number.isFinite(v) ? undefined : v <= 1 / 3 ? 'dusuk' : v <= 2 / 3 ? 'orta' : 'yuksek');
   const D = year !== 2020, R = !D, Y0 = year === 2000;   // 2000 ve 2016'da iktidar Demokrat
-  // Topluluk bağlamı: eyaletin gerçek 2016 sonucu (kamuya açık; yalnız 2016 kamu dosyasında eyalet var)
-  const bolge = D && existsSync(new URL('eyalet_2016.csv', DIR)) ? Object.fromEntries(load('eyalet_2016').map((r) => [r.eyalet, { dem: num(r.dem), rep: num(r.rep), ucuncu: num(r.ucuncu) }])) : null;
+  // Topluluk bağlamı: eyaletin gerçek seçim sonucu (kamuya açık; 2000 ve 2016 kamu dosyalarında eyalet var)
+  const EY = 'eyalet_' + (Y0 ? 2000 : 2016);   // 2020 kamu dosyasında eyalet gizli
+  const bolge = D && existsSync(new URL(EY + '.csv', DIR)) ? Object.fromEntries(load(EY).map((r) => [r.eyalet, { dem: num(r.dem), rep: num(r.rep), ucuncu: num(r.ucuncu) }])) : null;
   const spec = { alan: 'siyaset', baglam: { ...(bolge && process.env.TOPLULUK !== '0' ? { bolge_paylari: bolge } : {}), ekonomi_algisi: Y0 ? 0.3 : D ? -0.1 : -0.3, iktidar_suresi_yil: D ? 8 : 4, medya_yanliligi: { sag_medya: { rep: 1, dem: -1 }, sol_medya: { dem: 1, rep: -1 } } }, secenekler: [
     { id: 'dem', ad: Y0 ? 'Gore (D)' : D ? 'Clinton (D)' : 'Biden (D)', iktidar: D, ekonomi: -0.4, kultur: -0.45, kimlik: 'sol' },
     Y0 ? { id: 'rep', ad: 'Bush (R)', iktidar: false, ekonomi: 0.35, kultur: 0.6, kimlik: 'sag', guclu_lider: 0.4 }

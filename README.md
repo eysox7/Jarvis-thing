@@ -257,25 +257,30 @@ model): 5 katlı CV 63,0 → **64,0** (kuramsız standart 63,9); hiç bireysel e
 **Gerçek ağ verisiyle sınama — ANES 2000** (`fetch_anes.py` → `ANES2000*`). 2000 anketinde her
 seçmene siyaseti konuştuğu en çok dört kişi, bu kişinin eşi/akrabası olup olmadığı ve seçimde kime oy
 verdiği sorulmuş (Huckfeldt & Sprague geleneği). 1.534 seçmenin 401'inde eşin, 1.007'sinde tartışma
-ağının oyu biliniyor. Standart model aynı bilgiyi düz kategorik sütun olarak görür (adil kıyas):
+ağının oyu biliniyor; eyaletin gerçek 2000 sonucu topluluk bağlamıdır (`tests/data/real/eyalet_2000.csv`).
+Standart model aynı bilgiyi düz kategorik sütun olarak görür (adil kıyas):
 
 | ANES 2000, 5 katlı CV | Standart | Bütünleşik | Log-kayıp (std / büt) |
 |---|---|---|---|
-| Yapısal, ağ bilgisi yok | 59,6 | 60,8 | 0,970 / 0,957 |
-| Yapısal + eşin ve ağın oyu | 64,0 | **67,1** | 0,904 / **0,836** |
-| Tam (parti kimliği + termometre), ağ yok | **72,6** | 71,4 | 0,736 / 0,710 |
-| Tam + eşin ve ağın oyu | 72,8 | **73,5** | 0,743 / **0,665** |
-| Öğrenme eğrisi, yapısal + ağ: 50 / 200 / 1.600 kişi | 54,0 / 62,1 / 65,5 | **61,6 / 65,0 / 68,5** | — |
+| Yapısal, ağ bilgisi yok | 59,6 | 60,4 | 0,975 / 0,952 |
+| Yapısal + eşin ve ağın oyu | 65,4 | **67,3** | 0,898 / **0,833** |
+| Tam (parti kimliği + termometre), ağ yok | **71,7** | 71,3 | 0,746 / 0,707 |
+| Tam + eşin ve ağın oyu | 71,9 | **73,6** | 0,739 / **0,663** |
+| Öğrenme eğrisi, yapısal + ağ (eyaletsiz ölçüm): 50 / 200 / 1.600 kişi | 54,0 / 62,1 / 65,5 | **61,6 / 65,0 / 68,5** | — |
 
 - Aile ve çevre bilgisi bireysel özelliklerin ötesinde gerçek bilgi taşıyor: yapısal modelde +6,3, parti
   kimliği varken bile +2,1 puan ve log-kayıpta belirgin düşüş. 1.600 kişide sosyal terimler çıkarılınca
   68,5 → 65,7.
-- Gerçek veriden öğrenilen katsayılar literatür öncüllerine yakın: `aile` 1,68 ± 0,27 (öncül 1,5),
-  `ag` 1,31 ± 0,18 (öncül 1,5).
-- Sağlamlık (eş hariç, yalnız ağ): tüm ağ +3,7, yalnız akraba olmayanlar +1,7, yalnız "sık konuşulan"
+- Gerçek veriden öğrenilen katsayılar literatür öncüllerine yakın: `aile` 1,67 ± 0,27 (öncül 1,5),
+  `ag` 1,30 ± 0,18 (öncül 1,5). Hiç eğitim verisi yokken (yalnız kuram + seçimin toplam sonucu) aile ve
+  ağ bilgisi isabeti 54,8'den **59,1**'e çıkarıyor.
+- Topluluk (eyalet sonucu) 2000'de katkı vermedi: CV'de 67,3 / 67,4 (bağlamsız), veri yokken 54,6 / 54,8.
+  2016'da aynı bağlam veri yokken +7,5 puandı. Olası açıklama: eyaletlerin partizan ayrışması 2000'den
+  sonra derinleşti; eyalet ayrıca kaba bir birim, mahalle düzeyi veri gerekir.
+- Sağlamlık (eş hariç, yalnız ağ; eyalet bağlamı olmadan): tüm ağ +3,7, yalnız akraba olmayanlar +1,7, yalnız "sık konuşulan"
   kişiler +0,9 puan (352 kişi). Ağın katkısı kuramlı ve kuramsız modelde aynı; bütünleşik modelin farkı
-  (67,1 / 64,0) esas olarak eş teriminden geliyor: kuramsız model eşin oyunu küçültülmüş sabitlerle
-  öğrenirken kuram öncülü büyük katsayıya (1,68) izin veriyor.
+  esas olarak eş teriminden geliyor: kuramsız model eşin oyunu küçültülmüş sabitlerle
+  öğrenirken kuram öncülü büyük katsayıya (1,67) izin veriyor.
 - Sınır: kişinin "yakınım kime oy verdi" algısı kendi oyunu yansıtabilir (projeksiyon) ve bağların bir
   kısmı homofilidir; bu yüzden tahmin gücü nedensel etkinin üst sınırı sayılmalı.
 
