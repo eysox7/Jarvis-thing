@@ -290,6 +290,22 @@ değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diye
 **Gündelik:** şehirlerarası ulaşım (210 kişi) 26,2 / 43,8 / **54,8** (Becker'in zaman maliyeti);
 işe gidiş türü (453 kişi) 48,1 / 67,1 / **67,5**.
 
+### Yapay zekâ modelin içinde: gerçek test (`node tests/llm_live.mjs`)
+
+Dil modeli ayrı bir tahminci değil, faydaya giren bir terimdir: z = log P_dil modeli(seçenek), katsayısı
+veriden öğrenilir. Groq gpt-oss modelleri ANES seçmenlerini betimlerinden canlandırdı:
+
+| Koşu | Yalnız dil modeli | Bütünleşik (dil modelsiz) | Bütünleşik + dil modeli | Öğrenilen katsayı |
+|---|---|---|---|---|
+| 2016'da öğren → 2020, 120 seçmen, Türkçe istem (120b) | 58,3 | 72,5 | 74,2 | −0,06 |
+| Aynı, İngilizce ABD bağlamlı istem (120b) | 72,5 | 71,7 | 75,0 | −0,04 |
+| 2016 içi, 90 seçmen, betime eyalet sonucu eklendi (20b) | 50,0 (bağlamsız 55,6) | 63,3 | 67,8 | 0,03 |
+
+Öğrenilen katsayı her koşuda sıfıra yakın: dil modeli, modelin zaten bildiği bireysel betimi okuyor ve
+bağımsız bilgi katmıyor. Topluluk bağlamını metin olarak vermek de dil modelinin isabetini artırmadı;
+aynı bilgi modele yapılandırılmış terim (`topluluk`) olarak girince kazanç ölçüldü (yukarıda). Örneklemler
+küçük (90–120), farklar bu nedenle temkinle okunmalı. Ücretsiz Groq kotası günde 200 bin token.
+
 ### CSV biçimi
 
 ```
