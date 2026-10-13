@@ -6,6 +6,7 @@
 //   ticaret : Car (ABD otomobil satın alma tercihi, 4654 kişi; fiyat, yakıt, statü, menzil),
 //             Heating (Kaliforniya ısıtma sistemi seçimi, 900 hane)
 //   gündelik: TravelMode (Avustralya şehirlerarası ulaşım, 210 kişi), Mode (işe gidiş türü, 453 kişi)
+//   sentetik: SENTETIK_TR (3000 Türkiye seçmeni; hayat öyküsü, travma, aile, ağ — tests/data/sentetik_uret.mjs)
 // Kıyas (kişi düzeyinde 5 katlı çapraz doğrulama, görülmemiş veri):
 //   çoğunluk   — herkese en sık seçenek
 //   standart   — kuramsız koşullu logit: özellikler doğrusal + tüm kişi değişkenleri seçeneğe özgü

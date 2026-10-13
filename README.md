@@ -251,9 +251,37 @@ düzeyde taşır:
   (varsayılan 0,4); `baglam.sosyal_yayilim: false` kapatır.
 
 ANES 2016'da her seçmenin eyaletinin gerçek sonucu topluluk bağlamı olarak verildiğinde (yapısal
-model): 5 katlı CV 63,0 → **64,2** (kuramsız standart 63,6); hiç bireysel eğitim verisi yokken 43,1 →
+model): 5 katlı CV 63,0 → **64,0** (kuramsız standart 63,9); hiç bireysel eğitim verisi yokken 43,1 →
 **50,6**; 100 kişiyle öğrenmede 58,8 → **62,0**, 800 kişide 60,3 → **63,8**. ANES kamu dosyasında eşin
 ve ebeveynin oyu yok; aile ve ağ terimleri birim testleriyle doğrulandı.
+
+### Zengin sentetik seçmenler: hayat öyküsü, travma, aile, çevre (`tests/data/sentetik/`)
+
+Kuramların işleyebilmesi için kişinin yalnız demografisi değil hayat öyküsü de gerekir. `node
+tests/data/sentetik_uret.mjs` 3.000 Türkiye seçmeni üretir: doğum yeri ve ailesi (SES, dindarlık,
+etnik köken, inanç, babanın partisi), çocukluk travmaları (yoksulluk, ev içi şiddet, ebeveyn kaybı,
+sert ceza, 90'larda zorunlu göç, çatışma, şehit yakını), iç göç, eğitim, iş, borç, iş kaybı, 1999/2023
+depremleri, eşi (homogami), tartışma ağı, mahallesi ve medya diyeti — ve her biri için Türkçe bir hayat
+öyküsü metni. Üretim nedensel bir zincirdir ve karar modelinin fayda denklemini **kullanmaz** (gizli kişisel
+eğilim, ölçüm hatası, etkileşimler); dağılımlar kamu istatistiklerinin genel düzeyine kalibredir
+(ayrıntı: [tests/data/sentetik/README.md](tests/data/sentetik/README.md)).
+
+Öykü sütunları modele kuram terimi olarak girer: tehdit beyanı Stenner'in otoriter dinamiğini etkinleştirir;
+iş kaybı/borç hane algısına (Fromm, Fiorina); zorunlu göç ve çatışma maruziyeti `kolektif_travma`
+(Gurr; Alexander; Balcells); çocukluk travması `yabancilasma` (katılmama; Seeman); depremde kayıp
+`afet_cezasi` (Healy & Malhotra); eşin ve ebeveynin oyu `aile` terimine. Öykü metni modele değil dil
+modeline (silikon betimi) gider.
+
+| Sentetik TR, 5 katlı CV (3.000 kişi) | Çoğunluk | Kuramsız standart | Bütünleşik |
+|---|---|---|---|
+| Yalnız sıradan anket (demografi, değerler, algılar) | 43,2 | 68,5 | 68,6 |
+| + hayat öyküsü, aile, ağ, mahalle | 43,2 | 76,7 | **80,3** (log-kayıp 0,550 / standart 0,751) |
+| + önceki oy | 43,2 | 76,2 | **80,5** |
+| Öğrenme eğrisi, öykülü: 50 / 200 / 800 kişi | 42 / 44 / 43 | 70,8 / 74,3 / 75,8 | **76,2 / 79,2 / 79,9** |
+| Hiç bireysel veri yok (yalnız kuram) | 43,2 | — | **63,2** |
+
+Hayat öyküsü bilgisi isabeti 12 puan artırıyor; bu bilgiyle kuramlar kuramsız modeli her veri
+miktarında 4–5 puan geçiyor (sosyal terimler çıkarılınca −4/−5, eleştirel terimler çıkarılınca −1/−2 puan).
 
 ### Gerçek veride ölçülen başarım (`node tests/realdata.mjs`)
 
@@ -267,12 +295,12 @@ değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diye
 
 | Test | Çoğunluk | Standart | Bütünleşik | Eleştirel terimler çıkarılınca |
 |---|---|---|---|---|
-| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 58,7 | **70,3** | 70,1 |
-| Seçimler arası, yapısal: 2020 → 2016 (2016'da eyalet bağlamı) | 35,7 | 57,3 | **62,5** | 60,6 |
-| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | **80,4** | 79,9 | 78,7 |
-| Gerçek iş akışı: 2016'da öğren + 2020'nin toplam paylarına (anket) kalibre et → 2020, yapısal | 47,1 | 61,6 | **70,9** | — |
-| Aynı iş akışı, tam model (parti kimliği + termometre) | 47,1 | **81,3** | 80,8 | — |
-| Aynı seçim, 5 katlı CV, yapısal 2020 | 47,1 | 73,7 | 73,5 | — |
+| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 59,6 | **70,2** | 70,0 |
+| Seçimler arası, yapısal: 2020 → 2016 (2016'da eyalet bağlamı) | 35,7 | 57,2 | **62,5** | 60,7 |
+| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | 79,8 | **79,9** | 78,6 |
+| Gerçek iş akışı: 2016'da öğren + 2020'nin toplam paylarına (anket) kalibre et → 2020, yapısal | 47,1 | 61,8 | **70,9** | — |
+| Aynı iş akışı, tam model (parti kimliği + termometre) | 47,1 | **81,2** | 80,8 | — |
+| Aynı seçim, 5 katlı CV, yapısal 2020 | 47,1 | 73,6 | 73,4 | — |
 | Az veri: 2016'dan 100 kişiyle öğren (`--egri`) | 33,7 | 58,7 | **62,0** | 59,4 |
 | Az veri: 50 kişi | 33,5 | 33,1 | **58,1** | 57,3 |
 | Hiç bireysel veri yok — yalnız kuram + seçimin toplam sonucu, 2020 yapısal (`--sifir`) | 47,1 | — | **68,8** | — |
@@ -282,8 +310,8 @@ değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diye
 - Kuramın değeri **az veride**, **yeni bir seçime/bağlama taşımada** ve **veri yokken** ortaya çıkar
   (iktidar değişince kuram ekonomik oyu ve iktidar yorgunluğunu doğru tarafa taşır; kuramsız model
   çöker). Bol veriyle aynı seçimin içinde ise esnek kuramsız model ile başa baş gider.
-- Diğer siyasi veriler (5 katlı CV): Şili 1988 plebisiti 32,9 / 65,2 / **67,0**; İngiltere BEPS
-  47,2 / **67,6** / 66,7 (log-kayıpta bütünleşik daha iyi).
+- Diğer siyasi veriler (5 katlı CV): Şili 1988 plebisiti 32,9 / 67,4 / **67,5**; İngiltere BEPS
+  47,2 / **67,1** / 66,9 (log-kayıpta bütünleşik daha iyi: 0,845 / 0,861 ve 0,771 / 0,779).
 
 **Ticaret:** otomobil tercihi (4.654 kişi, 6 seçenek) çoğunluk 32,2 / standart 40,2 / bütünleşik 40,1;
 ısıtma sistemi (900 hane) her model çoğunlukta 63,7 — veride kişi bilgisi çok az, kuram ek katkı vermiyor.
