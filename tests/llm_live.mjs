@@ -59,10 +59,29 @@ const CACHE_F = new URL('./data/cache/llm_cache.json', import.meta.url);
 const cache = existsSync(CACHE_F) ? JSON.parse(readFileSync(CACHE_F, 'utf8')) : {};
 const tag = (process.env.LLM_SAHTE ? 'sahte|' : MODEL + '|') + (process.env.ISTEM || 'v1') + '|';
 const chat = process.env.LLM_SAHTE ? fakeChat : realChat;
+// İstem v2: İngilizce, ABD seçim bağlamı, ANES'e özgü seçmen betimi (dil modelinin eğitim verisine en yakın biçim)
+const V2 = process.env.ISTEM === 'v2';
+const SYS2 = `You simulate American voters. For EACH respondent profile, estimate how that specific person actually behaved in the given US presidential election, as a survey researcher who knows the ANES data would.
+Take party-relevant cues seriously (ideology, race, religiosity, education, authoritarian child-rearing values, economic perceptions, trust, media diet, political attention). Non-voting is common among low-attention, young, low-income citizens.
+Return ONLY JSON: {"yanitlar":[{"no":1,"olasiliklar":{"dem":0.0,"rep":0.0,"ucuncu":0.0,"oy_yok":0.0}}]} (probabilities sum to 1).`;
+const brief2 = (year) => () => `Election: ${year} US presidential election. Options: dem = ${year === 2016 ? 'Hillary Clinton (Democrat, incumbent party)' : 'Joe Biden (Democrat)'}; rep = ${year === 2016 ? 'Donald Trump (Republican)' : 'Donald Trump (Republican, incumbent)'}; ucuncu = third-party candidate; oy_yok = did not vote.`;
+const lvl = { dusuk: 'low', orta: 'medium', yuksek: 'high' };
+const betim2 = (p) => [
+  p.yas && `age ${p.yas}`, p.cinsiyet && (p.cinsiyet === 'kadin' ? 'woman' : 'man'),
+  p.azinlik_kimlik && (p.azinlik_kimlik === 'evet' ? 'non-white (racial/ethnic minority)' : 'white'),
+  p.egitim && { ilkokul: 'less than high school', lise: 'high school / some college', universite: "bachelor's degree", lisansustu: 'graduate degree' }[p.egitim],
+  p.gelir && `${lvl[p.gelir]} income (tercile)`, p.ideoloji && { sol: 'liberal', merkez: 'moderate / no ideology', sag: 'conservative' }[p.ideoloji],
+  p.dindarlik && `religiosity ${lvl[p.dindarlik]}`, p.kurumsal_guven && `trust in federal government ${lvl[p.kurumsal_guven]}`,
+  p.ekonomi_algisi !== undefined && `thinks the national economy got ${p.ekonomi_algisi > 0.2 ? 'better' : p.ekonomi_algisi < -0.2 ? 'worse' : 'about the same'} over the last year`,
+  p.otoriterlik !== undefined && `authoritarian child-rearing values ${p.otoriterlik >= 0.7 ? 'high (obedience, respect, good manners)' : p.otoriterlik <= 0.3 ? 'low (independence, curiosity, self-reliance)' : 'medium'}`,
+  p.bilissel_ihtiyac && `pays attention to politics ${p.bilissel_ihtiyac === 'yuksek' ? 'always / most of the time' : 'only sometimes or never'}`,
+  p.medya_kaynagi && { sag_medya: 'watches Fox News programs', sol_medya: 'watches MSNBC (Maddow)', notr_medya: 'watches neither Fox nor MSNBC' }[p.medya_kaynagi],
+].filter(Boolean).join(', ');
+const opt = (year) => (V2 ? { sistem: SYS2, brief: brief2(year), betim: betim2 } : {});
 const t0 = Date.now();
 console.log(`${process.env.LLM_SAHTE ? 'SAHTE MODEL (akış denetimi)' : 'Groq ' + MODEL} ile ${N} (2020) + ${NCAL} (2016) seçmen canlandırılıyor…`);
-const nP = await attachSilicon(B.spec, panel, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi });
-const nC = await attachSilicon(A.spec, calib, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi });
+const nP = await attachSilicon(B.spec, panel, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi, ...opt(2020) });
+const nC = await attachSilicon(A.spec, calib, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi, ...opt(2016) });
 writeFileSync(CACHE_F, JSON.stringify(cache));
 
 // 2020 toplam paylarına (anket yerine tüm 2020 örneklemi) sabit kalibrasyonu

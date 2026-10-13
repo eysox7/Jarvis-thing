@@ -31,15 +31,17 @@ function brief(resolved) {
  * @param {Array<{p}>} people  persona taşıyan nesneler
  * @param {Function} chat      async (system, user) → metin
  */
-export async function siliconProbs(spec, people, chat, { batch = 6 } = {}) {
+export async function siliconProbs(spec, people, chat, o = {}) {
+  const batch = o.batch || 6;
   if (typeof chat !== 'function') throw new Error('silikon örneklem için model bağlantısı gerekli');
   const resolved = resolveChoice(spec);
   const ids = resolved.alts.map((a) => a.id);
   const out = new Array(people.length).fill(null);
   for (let i = 0; i < people.length; i += batch) {
     const part = people.slice(i, i + batch);
-    const user = brief(resolved) + '\n\nPERSONALAR:\n' + part.map((x, j) => `${j + 1}. ${describePersona(x.p)}`).join('\n');
-    const parsed = extractJson(await chat(SYSTEM, user));
+    // o.sistem / o.brief / o.betim: bağlama özgü istem (ör. başka dil, ülke bağlamı, veri setine özgü betim)
+    const user = (o.brief ? o.brief(resolved) : brief(resolved)) + (o.brief ? '\n\nPERSONAS:\n' : '\n\nPERSONALAR:\n') + part.map((x, j) => `${j + 1}. ${(o.betim || describePersona)(x.p)}`).join('\n');
+    const parsed = extractJson(await chat(o.sistem || SYSTEM, user));
     const list = Array.isArray(parsed?.yanitlar) ? parsed.yanitlar : [];
     part.forEach((_, j) => {
       const a = list.find((r) => Number(r.no) === j + 1) || list[j];
