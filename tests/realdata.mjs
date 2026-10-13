@@ -63,8 +63,10 @@ const DATASETS = {
     }).map((r) => { for (const k of Object.keys(r.p)) if (r.p[k] === undefined) delete r.p[k]; return r; });
     return { spec, rows, attrs: [] };
   },
-  ANES2016() { return anes(true); },
-  ANES2016_yapisal() { return anes(false); },
+  ANES2016() { return anes(2016, true); },
+  ANES2016_yapisal() { return anes(2016, false); },
+  ANES2020() { return anes(2020, true); },
+  ANES2020_yapisal() { return anes(2020, false); },
   Car() {
     const raw = load('Car');
     const alts = ['1', '2', '3', '4', '5', '6'];
@@ -111,40 +113,35 @@ const DATASETS = {
 };
 
 
-// ANES 2016: Clinton (iktidar partisi) / Trump / üçüncü aday / oy kullanmama.
+// ANES 2016 / 2020: Demokrat / Cumhuriyetçi / üçüncü aday / oy kullanmama (seçenek kimlikleri yıllar
+// arasında ortak → bir seçimde öğrenip diğerinde tahmin edilebilir). İktidar 2016'da D, 2020'de R.
 // tam: parti kimliği + aday termometreleri dahil; yapisal: yalnızca toplumsal yapı, değerler ve algılar
 // (eleştirel kuramların asıl sınandığı model — "kim olduğun ve neye inandığın oyunu ne kadar belirler?")
-function anes(full) {
-  const raw = load('ANES2016');
-  const auth = { cocuk1: 2, cocuk2: 2, cocuk3: 1, cocuk4: 2 };   // otoriter yanıt kodu
-  const inc = tertile(raw.map((r) => (num(r.gelir28) > 0 ? num(r.gelir28) : NaN)));
-  const spec = { alan: 'siyaset', baglam: { ekonomi_algisi: -0.1, iktidar_suresi_yil: 8 }, secenekler: [
-    { id: 'clinton', ad: 'Clinton (D)', iktidar: true, ekonomi: -0.4, kultur: -0.45, kimlik: 'sol' },
-    { id: 'trump', ad: 'Trump (R)', ekonomi: 0.35, kultur: 0.8, kimlik: 'sag', guclu_lider: 0.8, duzen_karsiti: true },
-    { id: 'ucuncu', ad: 'Johnson/Stein/diğer', ekonomi: 0.2, kultur: -0.3, kimlik: 'merkez' },
+export function anes(year, full) {
+  const raw = load('ANES' + year);
+  const inc = (v) => (!Number.isFinite(v) ? undefined : v <= 1 / 3 ? 'dusuk' : v <= 2 / 3 ? 'orta' : 'yuksek');
+  const D = year === 2016, R = !D;
+  const spec = { alan: 'siyaset', baglam: { ekonomi_algisi: D ? -0.1 : -0.3, iktidar_suresi_yil: D ? 8 : 4 }, secenekler: [
+    { id: 'dem', ad: D ? 'Clinton (D)' : 'Biden (D)', iktidar: D, ekonomi: -0.4, kultur: -0.45, kimlik: 'sol' },
+    { id: 'rep', ad: 'Trump (R)', iktidar: R, ekonomi: 0.35, kultur: 0.8, kimlik: 'sag', guclu_lider: 0.8, duzen_karsiti: D },
+    { id: 'ucuncu', ad: 'Üçüncü aday', ekonomi: 0.2, kultur: -0.3, kimlik: 'merkez' },
     { id: 'oy_yok', ad: 'Oy kullanmadı', tur: 'cekimser' }] };
   const rows = raw.map((r, i) => {
-    const oy = num(r.oy);
-    const secim = oy === 1 ? 'clinton' : oy === 2 ? 'trump' : oy >= 3 ? 'ucuncu' : 'oy_yok';
-    const items = Object.entries(auth).map(([k, a]) => { const v = num(r[k]); return v === a ? 1 : v === 3 ? 0.5 : v > 0 ? 0 : NaN; }).filter(Number.isFinite);
-    const ideo = num(r.ideoloji7), edu = num(r.egitim_k), age = num(r.yas), tr = num(r.hukumete_guven), ek = num(r.ekonomi5), pid = num(r.parti7);
+    const ideo = num(r.ideoloji7), age = num(r.yas), tr = num(r.guven5), ek = num(r.ekonomi5), pid = num(r.parti7), au = num(r.otoriterlik);
     const p = {
-      yas: age > 0 ? yasBand(age) : undefined, cinsiyet: num(r.cinsiyet_k) === 2 ? 'kadin' : num(r.cinsiyet_k) === 1 ? 'erkek' : undefined,
-      egitim: edu >= 1 && edu <= 8 ? 'ilkokul' : edu <= 12 && edu >= 9 ? 'lise' : edu === 13 ? 'universite' : edu >= 14 && edu <= 16 ? 'lisansustu' : undefined,
-      gelir: inc(num(r.gelir28) > 0 ? num(r.gelir28) : NaN),
+      yas: age > 0 ? yasBand(age) : undefined, cinsiyet: r.cinsiyet || undefined, egitim: r.egitim || undefined, gelir: inc(num(r.gelir_yuzdelik)),
       ideoloji: ideo >= 1 && ideo <= 3 ? 'sol' : ideo >= 5 && ideo <= 7 ? 'sag' : ideo === 4 || ideo === 99 ? 'merkez' : undefined,
-      dindarlik: num(r.din_onem) === 2 ? 'dusuk' : num(r.din_onem) === 1 ? (num(r.ibadet) >= 1 && num(r.ibadet) <= 2 ? 'yuksek' : 'orta') : undefined,
-      azinlik_kimlik: num(r.irk) === 1 ? 'hayir' : num(r.irk) > 1 ? 'evet' : undefined,
+      dindarlik: r.dindarlik || undefined, azinlik_kimlik: r.beyaz === '1' ? 'hayir' : r.beyaz === '0' ? 'evet' : undefined,
       kurumsal_guven: tr >= 1 && tr <= 2 ? 'yuksek' : tr === 3 ? 'orta' : tr >= 4 ? 'dusuk' : undefined,
       ekonomi_algisi: ek >= 1 && ek <= 5 ? (3 - ek) / 2 : undefined,
-      otoriterlik: items.length ? Math.round(items.reduce((a, b) => a + b, 0) / items.length * 8) / 8 : undefined,
+      otoriterlik: Number.isFinite(au) ? Math.round(au * 8) / 8 : undefined,
     };
     if (full && pid >= 1 && pid <= 7) p.parti_kimligi = (pid - 4) / 3;
     for (const k of Object.keys(p)) if (p[k] === undefined) delete p[k];
-    const row = { kisi: i, w: 1, secim, p };
+    const row = { kisi: year + '-' + i, w: 1, secim: r.secim, p };
     if (full) {
-      const tc = num(r.term_clinton), tt = num(r.term_trump);
-      row.ozel = { clinton: tc >= 0 && tc <= 100 ? { lider: tc / 100 } : {}, trump: tt >= 0 && tt <= 100 ? { lider: tt / 100 } : {} };
+      const td = num(r.term_dem), tp = num(r.term_rep);
+      row.ozel = { dem: Number.isFinite(td) ? { lider: td / 100 } : {}, rep: Number.isFinite(tp) ? { lider: tp / 100 } : {} };
     }
     return row;
   });
@@ -195,6 +192,26 @@ if (args[0] === '--egri') {
       const m = (a) => (a.every(Number.isNaN) ? '  —  ' : (a.reduce((x, y) => x + y, 0) / a.length).toFixed(1).padStart(5));
       console.log(`${String(n).padStart(8)} | ${m(acc.c)}    | ${m(acc.s)}    | ${m(acc.b)}      | ${m(acc.e)}`);
     }
+    delete DECISION_DOMAINS.__ham;
+  }
+  process.exit(0);
+}
+// Seçimler arası geçerlilik: bir seçimde öğren, diğer seçimi (farklı iktidar, farklı aday) tahmin et.
+if (args[0] === '--secimler') {
+  const COMBOS = [[2016, 2020], [2020, 2016]];
+  for (const full of [false, true]) for (const [ya, yb] of COMBOS) {
+    const A = anes(ya, full), B = anes(yb, full);
+    const tr = cleanRows(A.rows), te = cleanRows(B.rows);
+    DECISION_DOMAINS.__ham = plainDomain(DECISION_DOMAINS.siyaset, A.attrs, tr);
+    const serbest = Object.fromEntries(A.attrs.map((k) => [k, DECISION_DOMAINS.__ham.terimler.find((t) => t.id === 'lin_' + k).sd]));
+    const ids = ['dem', 'rep', 'ucuncu', 'oy_yok'];
+    const sc = (specB, model) => scoreProbs(rowProbabilities(specB, model, te).map((x, i) => ({ P: x.P, y: ids.indexOf(te[i].secim), w: 1 })));
+    const fit = (sp, o) => fitChoiceModel(sp, tr, { ...o, demoSigma: tuneDemoSigma(sp, tr, o), iters: 300 });
+    const std = sc({ ...B.spec, alan: '__ham' }, fit({ ...A.spec, alan: '__ham' }, { haric: [...COMM, 'gecmis'], kuramGuveni: 3 }));
+    const but = sc({ ...B.spec, serbest }, fit({ ...A.spec, serbest }, {}));
+    const ele = sc({ ...B.spec, serbest }, fit({ ...A.spec, serbest }, { haric: ELESTIREL }));
+    const cnt = {}; for (const t of tr) cnt[t.secim] = (cnt[t.secim] || 0) + 1; const maj = ids.reduce((a, b) => ((cnt[a] || 0) >= (cnt[b] || 0) ? a : b));
+    console.log(`${full ? 'tam    ' : 'yapısal'} ${ya}→${yb}: çoğunluk ${(te.filter((t) => t.secim === maj).length / te.length * 100).toFixed(1)}% | standart ${std.isabet_yuzde}% (ll ${std.log_kayip}) | bütünleşik ${but.isabet_yuzde}% (ll ${but.log_kayip}) | eleştirelsiz ${ele.isabet_yuzde}% (ll ${ele.log_kayip})`);
     delete DECISION_DOMAINS.__ham;
   }
   process.exit(0);
