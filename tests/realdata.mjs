@@ -135,6 +135,8 @@ export function anes(year, full) {
       kurumsal_guven: tr >= 1 && tr <= 2 ? 'yuksek' : tr === 3 ? 'orta' : tr >= 4 ? 'dusuk' : undefined,
       ekonomi_algisi: ek >= 1 && ek <= 5 ? (3 - ek) / 2 : undefined,
       otoriterlik: Number.isFinite(au) ? Math.round(au * 8) / 8 : undefined,
+      // Siyasete dikkat → bilişsel ihtiyaç (ELM merkezî yol; Habermas'ın akılcı-eleştirel kamusu)
+      bilissel_ihtiyac: num(r.ilgi5) >= 1 && num(r.ilgi5) <= 2 ? 'yuksek' : num(r.ilgi5) >= 3 ? 'dusuk' : undefined,
     };
     if (full && pid >= 1 && pid <= 7) p.parti_kimligi = (pid - 4) / 3;
     for (const k of Object.keys(p)) if (p[k] === undefined) delete p[k];

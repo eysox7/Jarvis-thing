@@ -8,7 +8,7 @@ Ortak sütunlar (iki yılda aynı anlam):
   otoriterlik  0..1 — çocuk yetiştirme bataryası (Feldman & Stenner 1997; Adorno'nun F-ölçeğinin halefi)
   ideoloji7, parti7 (1 güçlü Demokrat .. 7 güçlü Cumhuriyetçi), dindarlik, egitim, gelir_yuzdelik,
   yas, cinsiyet, beyaz, guven5 (1 hükümete hep güvenir .. 5 hiç), ekonomi5 (1 çok iyileşti .. 5 çok kötüleşti),
-  term_dem, term_rep (aday termometreleri 0..100)
+  ilgi5 (siyasete dikkat: 1 her zaman .. 5 hiç), term_dem, term_rep (aday termometreleri 0..100)
 """
 import os, urllib.request
 import pandas as pd
@@ -21,10 +21,10 @@ BASE = 'https://raw.githubusercontent.com/jamesmartherus/anesr/master/data/times
 V = {
     2016: dict(vote='V162034a', turn=None, auth=[('V162239', 2), ('V162240', 2), ('V162241', 1), ('V162242', 2)],
                ideo='V161126', pid='V161158x', edu='V161270', inc='V161361x', age='V161267', sex='V161342',
-               race='V161310x', trust='V161215', econ='V161140x', tdem='V161086', trep='V161087'),
+               race='V161310x', att='V161003', trust='V161215', econ='V161140x', tdem='V161086', trep='V161087'),
     2020: dict(vote='V202073', turn='V202109x', auth=[('V202266', 2), ('V202267', 2), ('V202268', 1), ('V202269', 2)],
                ideo='V201200', pid='V201231x', edu='V201511x', inc='V202468x', age='V201507x', sex='V201600',
-               race='V201549x', trust='V201233', econ='V201327x', tdem='V201151', trep='V201152'),
+               race='V201549x', att='V201005', trust='V201233', econ='V201327x', tdem='V201151', trep='V201152'),
 }
 
 def load(y):
@@ -70,6 +70,7 @@ for y, v in V.items():
         'gelir_yuzdelik': inc.rank(pct=True).round(3),
         'yas': d[v['age']].where(d[v['age']] > 0), 'cinsiyet': d[v['sex']].map({1: 'erkek', 2: 'kadin'}),
         'beyaz': d[v['race']].map(lambda r: 1 if r == 1 else 0 if r > 1 else ''),
+        'ilgi5': d[v['att']].where(d[v['att']] > 0),
         'guven5': d[v['trust']].where(d[v['trust']] > 0), 'ekonomi5': d[v['econ']].where(d[v['econ']] > 0),
         'term_dem': d[v['tdem']].where(d[v['tdem']].between(0, 100)), 'term_rep': d[v['trep']].where(d[v['trep']].between(0, 100)),
     })

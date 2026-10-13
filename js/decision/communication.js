@@ -22,9 +22,14 @@ export function commMessage(resolved, a) {
   if (a.iletisim && typeof a.iletisim === 'object') return { domain: resolved.domain.id === 'gundelik' ? 'genel' : resolved.domain.id, ...a.iletisim };
   const ctx = resolved.ctx || {};
   if (resolved.domain.id === 'siyaset') {
-    const ideo = Math.max(-1, Math.min(1, 0.6 * num(a.ekonomi) + 0.4 * num(a.kultur)));
+    const ideoOf = (x) => Math.max(-1, Math.min(1, 0.6 * num(x.ekonomi) + 0.4 * num(x.kultur)));
+    const ideo = ideoOf(a);
+    // Egemen blok (Gramsci; Hall'un "egemen kod"u): bağlam vermezse iktidardaki partinin ideolojisi —
+    // egemen okuma ülkeye ve döneme göre değişir, sabit bir "sağ" ya da "sol" değildir.
+    const inc = resolved.alts.find((x) => x.iktidar);
+    const H = ctx.egemen_ideoloji !== undefined ? num(ctx.egemen_ideoloji) : inc ? ideoOf(inc) : 0.5;
     return {
-      domain: 'siyaset',
+      domain: 'siyaset', egemen_ideoloji: H,
       institution: { tur: a.iktidar ? 'parti_iktidar' : 'parti_muhalefet', ideoloji: ideo, hegemonik: a.iktidar ? 0.9 : 0.35, guvenilirlik: 0.3 + 0.35 * num(a.lider, 0.5) },
       channels: a.iktidar ? ['tv', 'sosyal'] : ['sosyal', 'yuz_yuze'],
       hegemonic: a.iktidar ? 0.8 : -0.4,
