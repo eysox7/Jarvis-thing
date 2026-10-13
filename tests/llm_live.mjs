@@ -4,7 +4,7 @@
 //   - silikon   : dil modelinin kişi başı olasılıkları
 //   - topluluk  : ağırlıklar panelin yarısında öğrenilir, diğer yarısında ölçülür
 // Anahtar: GROQ_API_KEY ortam değişkeni veya /root/.secrets/groq.env (asla repoya yazılmaz, ekrana basılmaz).
-// Çalıştır: python3 tests/data/fetch_anes.py && NODE_USE_ENV_PROXY=1 node tests/llm_live.mjs [kişi=120] [model=llama-3.3-70b-versatile]
+// Çalıştır: python3 tests/data/fetch_anes.py && NODE_USE_ENV_PROXY=1 node tests/llm_live.mjs [kişi=120] [model=openai/gpt-oss-120b]
 // (NODE_USE_ENV_PROXY=1: Node'un fetch'i ortamdaki HTTPS_PROXY'yi kullansın.) LLM_SAHTE=1 → yalnızca akış denetimi, sonuç değildir.
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -14,7 +14,7 @@ import { rowProbabilities } from '../js/decision/model.js';
 import { rng } from '../js/audience/personas.js';
 
 process.argv[2] = process.argv[2] || '120';
-const N = Number(process.argv[2]), MODEL = process.argv[3] || 'llama-3.3-70b-versatile';
+const N = Number(process.argv[2]), MODEL = process.argv[3] || 'openai/gpt-oss-120b';
 let KEY = process.env.GROQ_API_KEY;
 if (!KEY && existsSync('/root/.secrets/groq.env')) KEY = (readFileSync('/root/.secrets/groq.env', 'utf8').match(/GROQ_API_KEY=(\S+)/) || [])[1];
 if (!KEY && !process.env.LLM_SAHTE) { console.error('GROQ_API_KEY yok'); process.exit(2); }
@@ -22,16 +22,21 @@ if (!KEY && !process.env.LLM_SAHTE) { console.error('GROQ_API_KEY yok'); process
 // Akış denetimi için sahte model: her personaya eşit olasılık (gerçek sonuç DEĞİLDİR)
 const fakeChat = async (system, user) => JSON.stringify({ yanitlar: (user.match(/^\d+\. /gm) || []).map((_, i) => ({ no: i + 1, olasiliklar: { dem: 0.25, rep: 0.25, ucuncu: 0.25, oy_yok: 0.25 } })) });
 
-async function realChat(system, user, tries = 4) {
+async function realChat(system, user, tries = 10) {
   for (let t = 0; t < tries; t++) {
     let res;
     try {
       res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST', headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: MODEL, temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+        body: JSON.stringify({ model: MODEL, temperature: 0.2, response_format: { type: 'json_object' }, ...(MODEL.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}), messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
       });
     } catch (e) { throw new Error(`api.groq.com erişilemedi (ağ politikası?): ${e.cause?.code || e.message}`); }
-    if (res.status === 429 || res.status >= 500) { await new Promise((r) => setTimeout(r, 2000 * 2 ** t)); continue; }
+    // Ücretsiz katman dakikada token sınırlı: Groq'un bildirdiği bekleme süresine uy
+    if (res.status === 429 || res.status >= 500) {
+      const ra = Number(res.headers.get('retry-after')) || Math.min(60, 3 * 2 ** t);
+      process.stdout.write(`  (hız sınırı, ${ra} sn bekleniyor)\n`);
+      await new Promise((r) => setTimeout(r, ra * 1000 + 500)); continue;
+    }
     if (!res.ok) throw new Error(`Groq ${res.status}: ${(await res.text()).slice(0, 200)}`);
     return (await res.json()).choices[0].message.content;
   }

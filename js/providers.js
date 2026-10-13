@@ -8,7 +8,7 @@ export const KINDS = ['openai', 'gemini', 'anthropic', 'ollama'];
 export const PRESETS = {
   groq: {
     label: 'Groq', kind: 'openai', baseUrl: 'https://api.groq.com/openai/v1',
-    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-120b', 'qwen/qwen3-32b'],
+    models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'llama-3.3-70b-versatile'],
     keyUrl: 'https://console.groq.com/keys',
   },
   gemini: {
