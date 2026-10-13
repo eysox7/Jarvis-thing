@@ -29,6 +29,8 @@
 | Eşle aynı oy | %65–80 | %68 |
 | 2018 dağılımı (iktidar / ana muh. / milliyetçi / Kürt / katılmama) | ~46 / 20 / 8,5 / 10 / 15,5 | 45,4 / 20,4 / 8,6 / 10,5 / 15,1 |
 | İki seçimde (2018 → 2023) aynı oy | %75–80 | %79 |
+| Tartışma ağında kişinin oyuyla aynı oy payı | ANES 2000 gerçek ağ bataryası: %59,0 (oy verenlerde %66,3) | %58,4 (%62,8) |
+| Eşle aynı oy (ağ bataryasındaki eşler) | ANES 2000: %76,3 (oy verenlerde %80,6; algı, projeksiyonla şişebilir) | %68,5 (%71,3) — düşük taraf: aile etkisini küçümser, kuram kazancını şişirmez |
 | Alevi seçmende ana muhalefet | çok yüksek | %84 |
 | Kürt seçmende Kürt hareketi / iktidar | ~%40–55 / ~%25–35 | %44 / %30 |
 
