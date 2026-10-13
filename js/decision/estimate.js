@@ -8,7 +8,7 @@
 // isabet, log-kayıp, Brier ve kalibrasyon hatası (ECE) raporlar ve iki temel modelle kıyaslar.
 
 import { features, DIMENSIONS, rng } from '../audience/personas.js';
-import { resolveChoice, coefficients, zMatrix, predictChoice, rowResolved, rowProbabilities } from './model.js';
+import { resolveChoice, coefficients, zMatrix, predictChoice, rowResolved, rowProbabilities, KURAM_OLCEGI } from './model.js';
 import { ensureComm } from './communication.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
@@ -39,7 +39,7 @@ export function fitChoiceModel(spec, rows, o = {}) {
   const terms = resolved.terms.filter((t) => t.id !== 'iletisim' && !(o.haric || []).includes(t.id));
   const K = terms.length;
   const tIdx = terms.map((t) => resolved.terms.indexOf(t));
-  const prior = coefficients(resolved, o.baslangic || {});
+  const prior = coefficients(resolved, { ...(o.baslangic || {}), theta: o.baslangic?.theta || {} });   // öncül = kuramın tam büyüklüğü
   const sigT = o.kuramGuveni ?? 1.0, sigA = 3, sigD = Number.isFinite(+o.demoSigma) && +o.demoSigma > 0 ? +o.demoSigma : 0.25;
 
   // Parametre vektörü: [θ_1..θ_K, ASC_1..ASC_{J-1}, demo...]
@@ -336,6 +336,7 @@ export function calibrateShares(spec, targets, o = {}) {
   if (!(tot > 0)) throw new Error('hedef paylar geçersiz');
   for (const id of Object.keys(targets)) if (!resolved.alts.some((a) => a.id === id)) throw new Error(`bilinmeyen seçenek: ${id}`);
   const model = { ...(o.model || {}), asc: { ...(o.model?.asc || {}) } };
+  if (!model.theta && model.kuram_olcegi === undefined) model.kuram_olcegi = o.kuramOlcegi ?? KURAM_OLCEGI;
   let last;
   for (let it = 0; it < (o.iters || 25); it++) {
     last = predictChoice(spec, { ...o, n: o.n || 1500, model, explain: false, aralik: false }).paylar;

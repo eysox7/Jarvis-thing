@@ -32,9 +32,15 @@ export function resolveChoice(spec = {}) {
 }
 
 /** Katsayılar: kuram öncülü ← öğrenilmiş model ← açık geçersiz kılma. */
+// Kuram ölçeği: bireysel veri yokken sabitler toplam paylara (seçim sonucu, pazar payı) oturtulduğunda
+// öncüller kişi düzeyindeki etkiyi abartır (gürültü, terimler arası örtüşme). ANES 2016'da seçilen
+// ölçek (0,4), görülmemiş 2020 seçiminde log-kaybı 1,12 → 0,83'e, isabeti 67,0 → 68,3'e taşıdı.
+// calibrateShares bunu model.kuram_olcegi olarak koyar; öğrenilmiş modelde (model.theta) uygulanmaz.
+export const KURAM_OLCEGI = 0.4;
 export function coefficients(resolved, model = {}, overrides = {}) {
   const theta = {};
-  for (const t of resolved.terms) theta[t.id] = t.onsel;
+  const k = model.theta ? 1 : Number.isFinite(+resolved.ctx?.kuram_olcegi) ? +resolved.ctx.kuram_olcegi : Number.isFinite(+model.kuram_olcegi) ? +model.kuram_olcegi : 1;
+  for (const t of resolved.terms) theta[t.id] = t.onsel * k;
   Object.assign(theta, model.theta || {}, overrides.theta || {});
   const asc = {};
   for (const a of resolved.alts) asc[a.id] = Number.isFinite(+a.asc) ? +a.asc : 0;

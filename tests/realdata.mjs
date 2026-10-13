@@ -15,7 +15,7 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { parseCSV } from '../js/decision/data.js';
 import { crossValidate, fitChoiceModel, tuneDemoSigma, scoreProbs } from '../js/decision/estimate.js';
-import { rowProbabilities, resolveChoice } from '../js/decision/model.js';
+import { rowProbabilities, resolveChoice, KURAM_OLCEGI } from '../js/decision/model.js';
 import { rng } from '../js/audience/personas.js';
 import { DECISION_DOMAINS, ILETISIM_TERIMLERI } from '../js/decision/domains.js';
 
@@ -228,7 +228,7 @@ if (args[0] === '--sifir') {
     const { spec, rows } = anes(y, full); const te = cleanRows(rows);
     const ids = ['dem', 'rep', 'ucuncu', 'oy_yok'];
     const target = ids.map((id) => te.filter((t) => t.secim === id).length / te.length);
-    const model = { asc: {} };
+    const model = { asc: {}, kuram_olcegi: KURAM_OLCEGI };   // yalnız kuram, toplam paylara oturtulmuş
     for (let it = 0; it < 40; it++) {
       const P = rowProbabilities(spec, model, te), mean = ids.map((_, j) => P.reduce((a, x) => a + x.P[j], 0) / P.length);
       ids.forEach((id, j) => { model.asc[id] = (model.asc[id] || 0) + Math.log(target[j] / mean[j]); });
