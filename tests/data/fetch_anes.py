@@ -85,3 +85,57 @@ for y, v in V.items():
     out = out[out['secim'] != '']
     out.to_csv(os.path.join(CACHE, f'ANES{y}.csv'), index=False)
     print(f'ANES{y}.csv', out.shape, out['secim'].value_counts().to_dict())
+
+# ---- ANES 2000: aynı ortak sütunlar + GERÇEK tartışma ağı bataryası (Huckfeldt & Sprague geleneği) ----
+# Z1–Z24: siyaseti konuştuğu en çok 4 kişi; her biri için yakınlık (eş/akraba/akraba değil) ve
+# "bu kişi seçimde kime oy verdi?" (yanıtlayıcının algısı). es_oyu = eş/partner olan kişinin oyu;
+# ag_<seçenek> = eş dışındaki kişilerin oy payları; ag_n = oyu bilinen eş dışı kişi sayısı.
+def anes2000():
+    d = load(2000)
+    def g(c): return d[c]
+    turn, pres = g('V001241'), g('V001249')
+    sec = ['oy_yok' if t in (1, 2, 3) else ('dem' if v == 1 else 'rep' if v == 3 else 'ucuncu' if v in (2, 4, 5, 6, 7) else '') if t == 4 else ''
+           for t, v in zip(turn, pres)]
+    AUTH = [('V001586', 5), ('V001587', 1), ('V001588', 5), ('V001589', 5)]   # saygı, itaat, görgü, uslu olmak
+    def auth(i):
+        vals = [1.0 if g(c).iat[i] == a else 0.5 if g(c).iat[i] == 3 else 0.0 if g(c).iat[i] in (1, 5) else None for c, a in AUTH]
+        vals = [x for x in vals if x is not None]
+        return round(sum(vals) / len(vals), 3) if vals else ''
+    imp, att = g('V000872'), g('V000879')
+    din = [('dusuk' if i == 5 else ('yuksek' if a in (1, 2) else 'orta') if i == 1 else '') for i, a in zip(imp, att)]
+    edu = [{1: 'ilkokul', 2: 'ilkokul', 3: 'lise', 4: 'lise', 5: 'lise', 6: 'universite', 7: 'lisansustu'}.get(e, '') for e in g('V000913')]
+    inc = g('V000994').where(g('V000994').between(1, 22))
+    q3, q3a, q3b = g('V000814'), g('V000815'), g('V000816')
+    ek = [(1 if a == 1 else 2) if q == 1 else 3 if q == 5 else (5 if b == 1 else 4) if q == 3 else '' for q, a, b in zip(q3, q3a, q3b)]
+    VOTE = {1: 'dem', 3: 'rep', 5: 'ucuncu', 7: 'oy_yok'}
+    BLOK = [('V001703', 'V001710'), ('V001711', 'V001718'), ('V001719', 'V001726'), ('V001727', 'V001734')]
+    es, agp, agn = [], [], []
+    for i in range(len(d)):
+        e, cnt = '', {}
+        for rel, vt in BLOK:
+            v = VOTE.get(int(g(vt).iat[i]))
+            if not v: continue
+            if g(rel).iat[i] == 1: e = v
+            else: cnt[v] = cnt.get(v, 0) + 1
+        n = sum(cnt.values())
+        es.append(e); agn.append(n); agp.append({k: round(cnt.get(k, 0) / n, 3) for k in VOTE.values()} if n else None)
+    term = lambda c: g(c).where(g(c).between(0, 100))
+    out = pd.DataFrame({
+        'secim': sec, 'otoriterlik': [auth(i) for i in range(len(d))],
+        'ideoloji7': g('V000446').where(g('V000446').between(1, 7)),
+        'parti7': (g('V000523') + 1).where(g('V000523').between(0, 6)),
+        'dindarlik': din, 'egitim': edu, 'gelir_yuzdelik': inc.rank(pct=True).round(3),
+        'yas': g('V000908').where(g('V000908') > 0), 'cinsiyet': g('V001029').map({1: 'erkek', 2: 'kadin'}),
+        'beyaz': g('V001006a').map(lambda r: 1 if r == 50 else 0 if 0 < r < 88 else ''),
+        'ilgi5': g('V000301').where(g('V000301') > 0),
+        'guven5': g('V001534').map({1: 1, 2: 2, 3: 4, 4: 5}), 'ekonomi5': ek,
+        'term_dem': term('V000360'), 'term_rep': term('V000361'), 'medya_sag': '', 'medya_sol': '', 'eyalet': '',
+        'es_oyu': es, 'ag_n': agn,
+    })
+    for k in VOTE.values(): out['ag_' + k] = [x[k] if x else '' for x in agp]
+    out = out[out['secim'] != '']
+    out.to_csv(os.path.join(CACHE, 'ANES2000.csv'), index=False)
+    print('ANES2000.csv', out.shape, out['secim'].value_counts().to_dict(), 'eş oyu bilinen', int((out['es_oyu'] != '').sum()), 'ağ bilinen', int((out['ag_n'] > 0).sum()))
+
+if __name__ == '__main__':
+    anes2000()

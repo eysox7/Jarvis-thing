@@ -72,6 +72,11 @@ const DATASETS = {
   ANES2016_yapisal() { return anes(2016, false); },
   ANES2020() { return anes(2020, true); },
   ANES2020_yapisal() { return anes(2020, false); },
+  // ANES 2000: gerçek tartışma ağı bataryası (eşin oyu + konuşulan en çok 4 kişinin oyu)
+  ANES2000() { return anes(2000, true); },
+  ANES2000_yapisal() { return anes(2000, false); },
+  ANES2000_agsiz() { return anes(2000, true, false); },
+  ANES2000_yapisal_agsiz() { return anes(2000, false, false); },
   Car() {
     const raw = load('Car');
     const alts = ['1', '2', '3', '4', '5', '6'];
@@ -143,15 +148,16 @@ export function sentetikTR(surum = 'tam') {
   return { spec, rows: prepareRows(raw, spec).rows, attrs: [] };
 }
 
-export function anes(year, full) {
+export function anes(year, full, ag = true) {
   const raw = load('ANES' + year);
   const inc = (v) => (!Number.isFinite(v) ? undefined : v <= 1 / 3 ? 'dusuk' : v <= 2 / 3 ? 'orta' : 'yuksek');
-  const D = year === 2016, R = !D;
+  const D = year !== 2020, R = !D, Y0 = year === 2000;   // 2000 ve 2016'da iktidar Demokrat
   // Topluluk bağlamı: eyaletin gerçek 2016 sonucu (kamuya açık; yalnız 2016 kamu dosyasında eyalet var)
   const bolge = D && existsSync(new URL('eyalet_2016.csv', DIR)) ? Object.fromEntries(load('eyalet_2016').map((r) => [r.eyalet, { dem: num(r.dem), rep: num(r.rep), ucuncu: num(r.ucuncu) }])) : null;
-  const spec = { alan: 'siyaset', baglam: { ...(bolge && process.env.TOPLULUK !== '0' ? { bolge_paylari: bolge } : {}), ekonomi_algisi: D ? -0.1 : -0.3, iktidar_suresi_yil: D ? 8 : 4, medya_yanliligi: { sag_medya: { rep: 1, dem: -1 }, sol_medya: { dem: 1, rep: -1 } } }, secenekler: [
-    { id: 'dem', ad: D ? 'Clinton (D)' : 'Biden (D)', iktidar: D, ekonomi: -0.4, kultur: -0.45, kimlik: 'sol' },
-    { id: 'rep', ad: 'Trump (R)', iktidar: R, ekonomi: 0.35, kultur: 0.8, kimlik: 'sag', guclu_lider: 0.8, duzen_karsiti: D },
+  const spec = { alan: 'siyaset', baglam: { ...(bolge && process.env.TOPLULUK !== '0' ? { bolge_paylari: bolge } : {}), ekonomi_algisi: Y0 ? 0.3 : D ? -0.1 : -0.3, iktidar_suresi_yil: D ? 8 : 4, medya_yanliligi: { sag_medya: { rep: 1, dem: -1 }, sol_medya: { dem: 1, rep: -1 } } }, secenekler: [
+    { id: 'dem', ad: Y0 ? 'Gore (D)' : D ? 'Clinton (D)' : 'Biden (D)', iktidar: D, ekonomi: -0.4, kultur: -0.45, kimlik: 'sol' },
+    Y0 ? { id: 'rep', ad: 'Bush (R)', iktidar: false, ekonomi: 0.35, kultur: 0.6, kimlik: 'sag', guclu_lider: 0.4 }
+      : { id: 'rep', ad: 'Trump (R)', iktidar: R, ekonomi: 0.35, kultur: 0.8, kimlik: 'sag', guclu_lider: 0.8, duzen_karsiti: D },
     { id: 'ucuncu', ad: 'Üçüncü aday', ekonomi: 0.2, kultur: -0.3, kimlik: 'merkez' },
     { id: 'oy_yok', ad: 'Oy kullanmadı', tur: 'cekimser' }] };
   const rows = raw.map((r, i) => {
@@ -171,6 +177,14 @@ export function anes(year, full) {
     const ms = num(r.medya_sag), ml = num(r.medya_sol);
     if (Number.isFinite(ms) && Number.isFinite(ml)) p.medya_kaynagi = ms > ml ? 'sag_medya' : ml > ms ? 'sol_medya' : 'notr_medya';
     if (full && pid >= 1 && pid <= 7) p.parti_kimligi = (pid - 4) / 3;
+    // Gerçek sosyal bağ (yalnız 2000): eşin oyu → aile; eş dışındaki tartışma ağının oy payları → ag.
+    // ag_cogunluk: aynı bilgi düz kategorik sütun olarak — kuramsız standart model de ağı görebilsin (adil kıyas)
+    if (ag && r.es_oyu) p.aile_tercihi = r.es_oyu;
+    if (ag && num(r.ag_n) > 0) {
+      p.ag_paylari = Object.fromEntries(['dem', 'rep', 'ucuncu', 'oy_yok'].map((k) => [k, num(r['ag_' + k])]));
+      const top = Object.entries(p.ag_paylari).sort((a, b) => b[1] - a[1]);
+      p.ag_cogunluk = top[0][1] > (top[1]?.[1] ?? 0) ? top[0][0] : 'karisik';
+    }
     for (const k of Object.keys(p)) if (p[k] === undefined) delete p[k];
     const row = { kisi: year + '-' + i, w: 1, secim: r.secim, p };
     if (full) {
