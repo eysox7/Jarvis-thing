@@ -245,7 +245,7 @@ düzeyde taşır:
 - **Nüfus düzeyi (tahminde):** sentetik nüfus hanelere (eğitim/yaş/dindarlık/ideoloji homogamisi),
   homofili tartışma ağlarına (kanaat önderleri daha çok bağlı — iki aşamalı akış) ve topluluklara
   örülür. Bir kampanya ya da ne-olur değişikliğinin bireysel etkisi bu bağlar üzerinden yayılır;
-  sonuçta `sosyal_yayilim.sosyal_carpan` (tipik ×1,2–1,4; kazanç sınırı kaçak dengeyi önler) ve doğrudan/toplam paylar raporlanır.
+  sonuçta `sosyal_yayilim.sosyal_carpan` (tipik ×1,2–1,5; ANES 2000'den öğrenilen aile/ağ katsayılarıyla bir kampanyada doğrudan +4,2 puan → toplam +6,1, ×1,45; kazanç sınırı kaçak dengeyi önler) ve doğrudan/toplam paylar raporlanır.
   Müdahale yokken tahmin değişmez: bireysel model çevrenin bileşimini zaten taşır. Kesitsel
   katsayıların ancak bir kısmı nedenseldir (homofili; Aral vd. 2009) — `baglam.sosyal_nedensellik`
   (varsayılan 0,4); `baglam.sosyal_yayilim: false` kapatır.
@@ -272,6 +272,10 @@ ağının oyu biliniyor. Standart model aynı bilgiyi düz kategorik sütun olar
   68,5 → 65,7.
 - Gerçek veriden öğrenilen katsayılar literatür öncüllerine yakın: `aile` 1,68 ± 0,27 (öncül 1,5),
   `ag` 1,31 ± 0,18 (öncül 1,5).
+- Sağlamlık (eş hariç, yalnız ağ): tüm ağ +3,7, yalnız akraba olmayanlar +1,7, yalnız "sık konuşulan"
+  kişiler +0,9 puan (352 kişi). Ağın katkısı kuramlı ve kuramsız modelde aynı; bütünleşik modelin farkı
+  (67,1 / 64,0) esas olarak eş teriminden geliyor: kuramsız model eşin oyunu küçültülmüş sabitlerle
+  öğrenirken kuram öncülü büyük katsayıya (1,68) izin veriyor.
 - Sınır: kişinin "yakınım kime oy verdi" algısı kendi oyunu yansıtabilir (projeksiyon) ve bağların bir
   kısmı homofilidir; bu yüzden tahmin gücü nedensel etkinin üst sınırı sayılmalı.
 
