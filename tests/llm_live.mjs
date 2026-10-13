@@ -48,16 +48,19 @@ process.argv.splice(2, process.argv.length, '--yukle');
 const { anes } = await import('./realdata.mjs');
 const ids = ['dem', 'rep', 'ucuncu', 'oy_yok'];
 const A = anes(2016, false), B = anes(2020, false);
-const tr = A.rows, all = B.rows;
 const shuffle = (arr, seed) => { const r = rng(seed), idx = arr.map((_, i) => i); for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; } return idx.map((i) => arr[i]); };
-const panel = shuffle(all, 2020).slice(0, N);
+// SOSYAL=1: aynı seçim (2016) içinde ölçüm; dil modeline seçmenin topluluk bağlamı (eyaletinin sonucu) da verilir
+const SOS = process.env.SOSYAL === '1';
 const NCAL = Number(process.env.KALIBRASYON_N || 150);
-const calib = shuffle(tr, 2016).slice(0, NCAL);   // 2016'dan dil modeliyle de betimlenen eğitim alt kümesi
+const calib = shuffle(A.rows, 2016).slice(0, NCAL);   // 2016'dan dil modeliyle de betimlenen eğitim alt kümesi
+const panel = SOS ? shuffle(A.rows.filter((r) => !calib.includes(r)), 77).slice(0, N) : shuffle(B.rows, 2020).slice(0, N);
+const tr = SOS ? A.rows.filter((r) => !panel.includes(r)) : A.rows, all = B.rows;
+const TEST = SOS ? A : B;
 
 // Dil modeli yanıt önbelleği (aynı kişi için yeniden çağırma yok; repoya girmez)
 const CACHE_F = new URL('./data/cache/llm_cache.json', import.meta.url);
 const cache = existsSync(CACHE_F) ? JSON.parse(readFileSync(CACHE_F, 'utf8')) : {};
-const tag = (process.env.LLM_SAHTE ? 'sahte|' : MODEL + '|') + (process.env.ISTEM || 'v1') + '|';
+const tag = (process.env.LLM_SAHTE ? 'sahte|' : MODEL + '|') + (SOS ? 'v3s' : process.env.ISTEM || 'v1') + '|';
 const chat = process.env.LLM_SAHTE ? fakeChat : realChat;
 // İstem v2: İngilizce, ABD seçim bağlamı, ANES'e özgü seçmen betimi (dil modelinin eğitim verisine en yakın biçim)
 const V2 = process.env.ISTEM === 'v2';
@@ -77,31 +80,41 @@ const betim2 = (p) => [
   p.bilissel_ihtiyac && `pays attention to politics ${p.bilissel_ihtiyac === 'yuksek' ? 'always / most of the time' : 'only sometimes or never'}`,
   p.medya_kaynagi && { sag_medya: 'watches Fox News programs', sol_medya: 'watches MSNBC (Maddow)', notr_medya: 'watches neither Fox nor MSNBC' }[p.medya_kaynagi],
 ].filter(Boolean).join(', ');
-const opt = (year) => (V2 ? { sistem: SYS2, brief: brief2(year), betim: betim2 } : {});
+const stateRes = A.spec.baglam.bolge_paylari || {};
+const betim3 = (p) => betim2(p) + (p.bolge && stateRes[p.bolge] ? `, lives in ${p.bolge} (statewide 2016 presidential result: Clinton ${stateRes[p.bolge].dem}%, Trump ${stateRes[p.bolge].rep}%)` : '');
+const opt = (year) => (SOS ? { sistem: SYS2, brief: brief2(year), betim: betim3 } : V2 ? { sistem: SYS2, brief: brief2(year), betim: betim2 } : {});
 const t0 = Date.now();
-console.log(`${process.env.LLM_SAHTE ? 'SAHTE MODEL (akış denetimi)' : 'Groq ' + MODEL} ile ${N} (2020) + ${NCAL} (2016) seçmen canlandırılıyor…`);
-const nP = await attachSilicon(B.spec, panel, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi, ...opt(2020) });
+console.log(`${process.env.LLM_SAHTE ? 'SAHTE MODEL (akış denetimi)' : 'Groq ' + MODEL} ile ${N} (${SOS ? 2016 : 2020}) + ${NCAL} (2016) seçmen canlandırılıyor…`);
+// Kıyas: aynı panel, bağlamsız betim (v2) → topluluk bilgisi dil modelinin kendi isabetini artırıyor mu
+let PS0 = null;
+if (SOS) {
+  const tag0 = tag.replace('v3s|', 'v2|');
+  await attachSilicon(A.spec, panel, chat, { batch: 6, cache, anahtar: (row) => tag0 + row.kisi, sistem: SYS2, brief: brief2(2016), betim: betim2 });
+  PS0 = panel.map((x) => (x.p.__silikon ? ids.map((id) => x.p.__silikon[id]) : null));
+}
+const nP = await attachSilicon(TEST.spec, panel, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi, ...opt(SOS ? 2016 : 2020) });
 const nC = await attachSilicon(A.spec, calib, chat, { batch: 6, cache, anahtar: (row) => tag + row.kisi, ...opt(2016) });
 writeFileSync(CACHE_F, JSON.stringify(cache));
 
 // 2020 toplam paylarına (anket yerine tüm 2020 örneklemi) sabit kalibrasyonu
 const target = ids.map((id) => all.filter((t) => t.secim === id).length / all.length);
-const calibrate = (model) => { const mm = { ...model, asc: { ...model.asc } }; for (let it = 0; it < 30; it++) { const PP = rowProbabilities(B.spec, mm, all); ids.forEach((id, j) => { mm.asc[id] += Math.log(target[j] / (PP.reduce((a, x) => a + x.P[j], 0) / PP.length)); }); } return mm; };
+const calibrate = (model) => { if (SOS) return model; const mm = { ...model, asc: { ...model.asc } }; for (let it = 0; it < 30; it++) { const PP = rowProbabilities(B.spec, mm, all); ids.forEach((id, j) => { mm.asc[id] += Math.log(target[j] / (PP.reduce((a, x) => a + x.P[j], 0) / PP.length)); }); } return mm; };
 const sg = tuneDemoSigma(A.spec, tr, { haric: ['silikon'] });
 // (a) bütünleşik, dil modelsiz   (b) HİBRİT: dil modeli fayda terimi, katsayısı 2016 alt kümesinden öğrenilir
 const mA = calibrate(fitChoiceModel(A.spec, tr, { demoSigma: sg, iters: 300, haric: ['silikon'] }));
 const mB = calibrate(fitChoiceModel(A.spec, tr, { demoSigma: sg, iters: 300 }));
 const okI = panel.map((_, i) => i).filter((i) => panel[i].p.__silikon);
 const ys = panel.map((x) => ids.indexOf(x.secim));
-const PA = rowProbabilities(B.spec, mA, panel).map((x) => x.P), PB = rowProbabilities(B.spec, mB, panel).map((x) => x.P);
+const PA = rowProbabilities(TEST.spec, mA, panel).map((x) => x.P), PB = rowProbabilities(TEST.spec, mB, panel).map((x) => x.P);
 const PS = panel.map((x) => (x.p.__silikon ? ids.map((id) => x.p.__silikon[id]) : null));
 const score = (Ps, I) => scoreProbs(I.map((i) => ({ P: Ps[i], y: ys[i], w: 1 })));
 const res = {
-  model: MODEL, istem: process.env.ISTEM || 'v1', panel_2020: N, yanit_2020: nP, kalibrasyon_2016: nC, sure_sn: Math.round((Date.now() - t0) / 1000),
+  model: MODEL, istem: SOS ? 'v3s (topluluk bağlamlı, 2016 içi)' : process.env.ISTEM || 'v1', panel: N, yanit_panel: nP, kalibrasyon_2016: nC, sure_sn: Math.round((Date.now() - t0) / 1000),
   silikon_katsayisi: Math.round((mB.theta.silikon ?? 0) * 1000) / 1000,
   yalniz_dil_modeli: score(PS, okI),
+  ...(PS0 ? { yalniz_dil_modeli_baglamsiz: score(PS0, okI.filter((i) => PS0[i])) } : {}),
   butunlesik: score(PA, okI),
   hibrit_butunlesik_artı_dil_modeli: score(PB, okI),
 };
 console.log(JSON.stringify(res, null, 2));
-try { mkdirSync(new URL('../reports/', import.meta.url), { recursive: true }); writeFileSync(new URL('../reports/llm_live.json', import.meta.url), JSON.stringify(res, null, 2)); } catch {}
+try { mkdirSync(new URL('../reports/', import.meta.url), { recursive: true }); writeFileSync(new URL(SOS ? '../reports/llm_live_sosyal.json' : '../reports/llm_live.json', import.meta.url), JSON.stringify(res, null, 2)); } catch {}

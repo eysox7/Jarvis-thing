@@ -10,9 +10,11 @@ import { predict as audiencePredict } from '../audience/engine.js';
 import { DECISION_DOMAINS, ILETISIM, GECMIS, ILETISIM_TERIMLERI, isAbstain, SILIKON, SOSYAL_TERIMLERI } from './domains.js';
 import { ensureComm } from './communication.js';
 import { rng } from '../audience/personas.js';
+import { socialStructure, diffuse } from './social.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 const pct = (x) => Math.round(x * 1000) / 10;
+const num01 = (v, d) => (Number.isFinite(+v) && v !== null && v !== '' ? Math.max(0, Math.min(1, +v)) : d);
 
 /** Seçim tanımını doğrular ve motorun kullanacağı biçime getirir. */
 export function resolveChoice(spec = {}) {
@@ -213,6 +215,9 @@ export function predictChoice(spec, opts = {}) {
     for (const c of cls) personProbs(resolved, c.coef, f, p, i, zs).P.forEach((q, j) => { P[j] += c.pay * q; });
     return { p, f, zs, P };
   });
+  const direct = new Array(J).fill(0);
+  for (const x of people) for (let j = 0; j < J; j++) direct[j] += x.P[j];
+  const sosyal = socialSpread(spec, opts, resolved, cls, coef, people, popOpts.seed);
 
   const shares = new Array(J).fill(0), firsts = new Array(J).fill(0);
   let entropy = 0;
@@ -234,6 +239,10 @@ export function predictChoice(spec, opts = {}) {
   };
   // Seçim tahmini biçimi: katılım ve geçerli oy payları (çekimser hariç)
   const abst = resolved.alts.map((a, j) => (isAbstain(a) ? j : -1)).filter((j) => j >= 0);
+  if (sosyal) result.sosyal_yayilim = {
+    ...sosyal,
+    dogrudan_paylar: Object.fromEntries(resolved.alts.map((a, j) => [a.id, pct(direct[j] / N)])),
+  };
   if (resolved.domain.id === 'siyaset' && abst.length) {
     const absShare = abst.reduce((s, j) => s + shares[j], 0) / N;
     result.katilim_yuzde = pct(1 - absShare);
@@ -267,7 +276,7 @@ export function predictChoice(spec, opts = {}) {
         const m = Math.max(...V), e = V.map((v) => Math.exp(v - m)), sum = e.reduce((a, b) => a + b, 0);
         s += e[wi] / sum;
       }
-      return { terim: t.id, ad: t.ad, kuram: t.kuram, katsayi: r3(coef.theta[t.id]), kazanan_payina_etki_puan: r3((shares[wi] - s) / N * 100) };
+      return { terim: t.id, ad: t.ad, kuram: t.kuram, katsayi: r3(coef.theta[t.id]), kazanan_payina_etki_puan: r3((direct[wi] - s) / N * 100) };
     }).filter(Boolean).filter((x) => Math.abs(x.kazanan_payina_etki_puan) >= 0.05)
       .sort((a, b) => Math.abs(b.kazanan_payina_etki_puan) - Math.abs(a.kazanan_payina_etki_puan));
   }
@@ -278,6 +287,41 @@ export function predictChoice(spec, opts = {}) {
   }
   if (opts.keepPeople) result._people = people;
   return result;
+}
+
+/**
+ * Sosyal yayılma: nüfusu hane + homofili ağı + topluluk olarak örer; müdahalenin (kampanya veya
+ * whatIf değişikliği) bireysel etkisini bağlar üzerinden yayar. Taban: müdahalesiz senaryo
+ * (opts.sosyalTaban ya da kampanyasız aynı tanım). Müdahale yoksa hiçbir şey değişmez.
+ */
+function socialSpread(spec, opts, resolved, cls, coef, people, seed) {
+  if (opts.sosyal === false || resolved.ctx.sosyal_yayilim === false) return null;
+  const taban = opts.sosyalTaban || (spec.kampanya ? { ...spec, kampanya: undefined } : null);
+  if (!taban) return null;
+  const th = { aile: coef.theta.aile || 0, ag: coef.theta.ag || 0, topluluk: coef.theta.topluluk || 0 };
+  if (!th.aile && !th.ag && !th.topluluk) return null;
+  const rr = resolveChoice(taban);
+  if (rr.alts.map((a) => a.id).join('|') !== resolved.alts.map((a) => a.id).join('|')) return null;
+  const pop = people.map((x) => x.p);
+  rr.ctx.iletisim = campaignEffects(rr, taban.kampanya, { population: pop });
+  ensureComm(rr, pop);
+  const clsR = classCoefs(rr, opts.model, { theta: opts.theta, asc: opts.asc });
+  const R = people.map((x, i) => {
+    const zs = zMatrix(rr, x.f, x.p, i), P = new Array(rr.alts.length).fill(0);
+    for (const c of clsR) personProbs(rr, c.coef, x.f, x.p, i, zs).P.forEach((q, j) => { P[j] += c.pay * q; });
+    return P;
+  });
+  const net = socialStructure(pop, people.map((x) => x.f), seed);
+  const P0 = people.map((x) => x.P), P = diffuse(P0, R, net, th, { nedensellik: num01(resolved.ctx.sosyal_nedensellik, 0.4) });
+  people.forEach((x, i) => { x.P = P[i]; });
+  // Sosyal çarpan: en çok değişen seçenekte toplam etki / doğrudan (bireysel) etki
+  const mean = (M, j) => M.reduce((s, q) => s + q[j], 0) / M.length;
+  const jj = resolved.alts.map((_, j) => j).sort((a, b) => Math.abs(mean(P0, b) - mean(R, b)) - Math.abs(mean(P0, a) - mean(R, a)))[0];
+  const d0 = mean(P0, jj) - mean(R, jj);
+  const hane = net.es.reduce((s, e) => s + (e >= 0 ? 1 : 0), 0) / pop.length;
+  return { taban_paylar: Object.fromEntries(rr.alts.map((a, j) => [a.id, pct(mean(R, j))])),
+    sosyal_carpan: Math.abs(d0) > 0.002 ? { secenek: resolved.alts[jj].id, carpan: r3((mean(P, jj) - mean(R, jj)) / d0) } : undefined,
+    hane_icinde_yuzde: pct(hane), ortalama_ag_buyuklugu: r3(net.ag.reduce((s, a) => s + a.length, 0) / pop.length), katsayilar: { aile: r3(th.aile), ag: r3(th.ag), topluluk: r3(th.topluluk) } };
 }
 
 /** Laplace yaklaşık sonsalından parametre çekip payları yeniden hesaplar → %5–95 aralık. */
@@ -317,7 +361,7 @@ export function whatIf(spec, changes, opts = {}) {
     }),
     kampanya: changes.kampanya ?? spec.kampanya,
   };
-  const after = predictChoice(changed, { ...opts, explain: false, aralik: false });
+  const after = predictChoice(changed, { ...opts, explain: false, aralik: false, sosyalTaban: { ...spec, kampanya: undefined } });
   return {
     once: base.paylar, sonra: after.paylar,
     degisim_puan: Object.fromEntries(Object.keys(base.paylar).map((k) => [k, r3(after.paylar[k] - base.paylar[k])])),

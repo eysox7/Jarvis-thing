@@ -297,6 +297,33 @@ console.log('\n[23] Sosyal bağlam: aile, ağ, topluluk');
   ok(rows[0].p.aile_tercihi === 'L' && rows[0].p.ag_paylari.L === 0.7 && rows[0].p.bolge === 'Konya', 'CSV: aile, ağ ve bölge sütunları tanınır');
 }
 
+console.log('\n[24] Nüfus düzeyinde sosyal yayılma: hane, homofili ağı, topluluk');
+{
+  const { socialStructure } = await import('../js/decision/social.js');
+  const { features } = await import('../js/audience/personas.js');
+  const pop = samplePopulation({ n: 1500, seed: 3 }), F = pop.map(features);
+  const net = socialStructure(pop, F, 3);
+  const pairs = [...net.es].map((e, i) => [i, e]).filter(([i, e]) => e > i);
+  ok(pairs.every(([i, e]) => net.es[e] === i && pop[i].cinsiyet !== pop[e].cinsiyet && pop[i].yerlesim === pop[e].yerlesim), 'hane: eşleşme karşılıklı, karşı cins, aynı yerleşim');
+  const share = pairs.length * 2 / pop.length;
+  ok(share > 0.35 && share < 0.7, `hane içindeki yetişkin oranı makul (%${Math.round(share * 100)})`);
+  const d = (i, j) => Math.abs(F[i].ideoloji - F[j].ideoloji);
+  const tie = net.ag.flatMap((l, i) => l.map((j) => d(i, j))), rnd = pop.map((_, i) => d(i, (i * 7 + 13) % pop.length));
+  const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  ok(avg(tie) < 0.75 * avg(rnd), `homofili: bağlı kişiler ideolojide rastgele çiftlerden yakın (${avg(tie).toFixed(2)} < ${avg(rnd).toFixed(2)})`);
+  const sp = { alan: 'siyaset', secenekler: [{ id: 'A', ekonomi: -0.4, kultur: -0.3, iktidar: true }, { id: 'B', ekonomi: 0.4, kultur: 0.5 }, { id: 'C', ekonomi: 0, kultur: 0 }] };
+  const camp = { ...sp, kampanya: { secenek: 'B', mesaj: { konu: 'ekonomi', ton: 'olumlu', kanal: 'tv' } } };
+  const r = predictChoice(camp, { n: 1500, explain: false, aralik: false });
+  const plain = predictChoice(camp, { n: 1500, explain: false, aralik: false, sosyal: false });
+  const s = r.sosyal_yayilim;
+  ok(s && JSON.stringify(s.dogrudan_paylar) === JSON.stringify(plain.paylar), 'yayılma raporu bireysel (doğrudan) payları taşır');
+  ok(s.sosyal_carpan && s.sosyal_carpan.carpan > 1.05 && s.sosyal_carpan.carpan < 2.5, `sosyal çarpan: kampanya etkisi bağlar üzerinden büyür ama kaçmaz (×${s.sosyal_carpan?.carpan})`);
+  const none = predictChoice(sp, { n: 1500, explain: false, aralik: false });
+  ok(!none.sosyal_yayilim, 'müdahale yokken yayılma tahmini değiştirmez (bireysel model çevre bileşimini zaten taşır)');
+  const off = predictChoice({ ...camp, baglam: { sosyal_yayilim: false } }, { n: 1500, explain: false, aralik: false });
+  ok(JSON.stringify(off.paylar) === JSON.stringify(plain.paylar), 'baglam.sosyal_yayilim=false yayılmayı kapatır');
+}
+
 console.log('');
 if (fails.length) { console.log(`✖ ${fails.length} başarısız`); process.exit(1); }
 console.log('✔ karar testleri geçti');

@@ -690,7 +690,7 @@ def({
 
 def({
   name: 'decision_data_import',
-  desc: 'Kurumun bireysel verisini (anket, seçim sonrası anket, satış/CRM, conjoint) CSV olarak senaryoya yükler. Sütunlar: persona alanları (yas, cinsiyet, egitim, gelir, ideoloji…) + secim; opsiyonel agirlik, kisi (aynı kişinin birden çok seçimi: panel/conjoint), onceki (önceki oy/marka — en güçlü yordayıcı), satıra özgü "<özellik>_<seçenek>" (ör. fiyat_A) ve "var_<seçenek>"; eleştirel/Chicago kuram girdileri (otomatik ölçeklenir): otoriterlik, sol_sag / konum_ekonomi, konum_kultur, ekonomi_algisi, hane_algisi, parti_kimligi, medya_kaynagi. Veri uydurma — yalnızca kullanıcının verdiği veriyi yükle.',
+  desc: 'Kurumun bireysel verisini (anket, seçim sonrası anket, satış/CRM, conjoint) CSV olarak senaryoya yükler. Sütunlar: persona alanları (yas, cinsiyet, egitim, gelir, ideoloji…) + secim; opsiyonel agirlik, kisi (aynı kişinin birden çok seçimi: panel/conjoint), onceki (önceki oy/marka — en güçlü yordayıcı), satıra özgü "<özellik>_<seçenek>" (ör. fiyat_A) ve "var_<seçenek>"; eleştirel/Chicago kuram girdileri (otomatik ölçeklenir): otoriterlik, sol_sag / konum_ekonomi, konum_kultur, ekonomi_algisi, hane_algisi, parti_kimligi, medya_kaynagi; sosyal bağlam: es_oyu / ebeveyn_oyu / aile_tercihi (hanenin tercihi), ag_<seçenek> (siyaset konuşulan çevrede pay), cevre_<seçenek> veya il / bolge (+ baglam.bolge_paylari) topluluk payı. Veri uydurma — yalnızca kullanıcının verdiği veriyi yükle.',
   params: { senaryo: 'string (zorunlu)', csv: 'string (zorunlu) — başlık satırlı CSV metni' },
   run: (a) => {
     const { spec, id } = scenarioOf({ senaryo: a.senaryo });

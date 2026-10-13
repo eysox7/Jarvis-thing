@@ -233,6 +233,28 @@ Ana akım kuramların yanında eleştirel okullar da faydaya terim olarak girer 
 Kuramın kapsamadığı ölçülmüş özellikler `spec.serbest = {özellik: ölçek}` ile serbest doğrusal terim
 olarak eklenir; bütünleşik model böylece kuramsız standart modeli kapsar.
 
+### Sosyal bağlam: karar yalnız bireysel değildir
+
+İnsan oyunu ve tercihini ailesinin, konuştuğu çevrenin ve yaşadığı topluluğun içinde verir (Columbia
+okulu: Lazarsfeld, Berelson & Gaudet; Huckfeldt & Sprague; Zuckerman; Chicago: Park). Model bunu iki
+düzeyde taşır:
+
+- **Kişi düzeyi (veri varsa):** `aile` (eşin/ebeveynin/hanenin tercihi), `ag` (siyaset konuşulan
+  çevrede seçeneklerin payı), `topluluk` (il/bölge sonucu; kırsal, yaşlı, dindar — topluluğa gömülü —
+  kişide daha güçlü). Katsayılar veriden öğrenilir.
+- **Nüfus düzeyi (tahminde):** sentetik nüfus hanelere (eğitim/yaş/dindarlık/ideoloji homogamisi),
+  homofili tartışma ağlarına (kanaat önderleri daha çok bağlı — iki aşamalı akış) ve topluluklara
+  örülür. Bir kampanya ya da ne-olur değişikliğinin bireysel etkisi bu bağlar üzerinden yayılır;
+  sonuçta `sosyal_yayilim.sosyal_carpan` (tipik ×1,3–1,4) ve doğrudan/toplam paylar raporlanır.
+  Müdahale yokken tahmin değişmez: bireysel model çevrenin bileşimini zaten taşır. Kesitsel
+  katsayıların ancak bir kısmı nedenseldir (homofili; Aral vd. 2009) — `baglam.sosyal_nedensellik`
+  (varsayılan 0,4); `baglam.sosyal_yayilim: false` kapatır.
+
+ANES 2016'da her seçmenin eyaletinin gerçek sonucu topluluk bağlamı olarak verildiğinde (yapısal
+model): 5 katlı CV 63,0 → **64,2** (kuramsız standart 63,6); hiç bireysel eğitim verisi yokken 43,1 →
+**50,6**; 100 kişiyle öğrenmede 58,8 → **62,0**, 800 kişide 60,3 → **63,8**. ANES kamu dosyasında eşin
+ve ebeveynin oyu yok; aile ve ağ terimleri birim testleriyle doğrulandı.
+
 ### Gerçek veride ölçülen başarım (`node tests/realdata.mjs`)
 
 Gerçek insanların gerçek kararları, görülmemiş veride. Kıyas: **standart** = kuramsız koşullu logit
@@ -277,7 +299,9 @@ yas;cinsiyet;egitim;gelir;ideoloji;onceki_oy;kisi;fiyat_A;var_C;secim
 
 Kuram girdisi sütunları da tanınır ve ölçekleri (0–1, 1–5, 1–7, 0–10, 0–100…) otomatik dönüştürülür:
 `otoriterlik`, `sol_sag` / `konum_ekonomi`, `konum_kultur`, `ekonomi_algisi`, `hane_algisi`, `parti_kimligi`,
-`medya_kaynagi` (kanal yanlılığı `baglam.medya_yanliligi` ile). Persona sütunlarının hepsi isteğe bağlı; Türkçe karakter, büyük/küçük harf ve sayısal yaş
+`medya_kaynagi` (kanal yanlılığı `baglam.medya_yanliligi` ile). Sosyal bağlam sütunları: `es_oyu` /
+`ebeveyn_oyu` / `aile_tercihi`, `ag_<seçenek>` (konuşulan çevrede pay), `cevre_<seçenek>` ya da `il` /
+`bolge` (`baglam.bolge_paylari` ile). Persona sütunlarının hepsi isteğe bağlı; Türkçe karakter, büyük/küçük harf ve sayısal yaş
 otomatik eşlenir. Seçim, seçenek kimliği ya da adıyla eşleşebilir.
 
 ### Sentetik doğrulama (bilinen "gerçek" modellerle — `npm run validate`)
