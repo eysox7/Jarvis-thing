@@ -266,11 +266,11 @@ Standart model aynı bilgiyi düz kategorik sütun olarak görür (adil kıyas):
 | Yapısal + eşin ve ağın oyu | 65,4 | **67,3** | 0,898 / **0,833** |
 | Tam (parti kimliği + termometre), ağ yok | **71,7** | 71,3 | 0,746 / 0,707 |
 | Tam + eşin ve ağın oyu | 71,9 | **73,6** | 0,739 / **0,663** |
-| Öğrenme eğrisi, yapısal + ağ (eyaletsiz ölçüm): 50 / 200 / 1.600 kişi | 54,0 / 62,1 / 65,5 | **61,6 / 65,0 / 68,5** | — |
+| Öğrenme eğrisi, yapısal + ağ: 50 / 200 / 1.600 kişi | 56,6 / 62,2 / 66,3 | **61,6 / 64,5 / 68,8** | — |
 
 - Aile ve çevre bilgisi bireysel özelliklerin ötesinde gerçek bilgi taşıyor: yapısal modelde +6,3, parti
   kimliği varken bile +2,1 puan ve log-kayıpta belirgin düşüş. 1.600 kişide sosyal terimler çıkarılınca
-  68,5 → 65,7.
+  68,8 → 66,6.
 - Gerçek veriden öğrenilen katsayılar literatür öncüllerine yakın: `aile` 1,67 ± 0,27 (öncül 1,5),
   `ag` 1,30 ± 0,18 (öncül 1,5). Hiç eğitim verisi yokken (yalnız kuram + seçimin toplam sonucu) aile ve
   ağ bilgisi isabeti 54,8'den **59,1**'e çıkarıyor.
