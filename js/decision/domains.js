@@ -85,6 +85,8 @@ export const SIYASET = {
       z: (f, p, a, ctx) => { const s = ctx?.medya_yanliligi?.[p?.medya_kaynagi ?? mainMedia(p)]?.[a.id]; return s === undefined ? 0 : num(s) * (0.4 + 0.6 * f.kurumsal_guven); } },
     { id: 'arac', ad: 'Araç mesajdır', kuram: 'McLuhan (1964); Innis — sosyal medya düzen karşıtlığını, TV yerleşik düzeni besler', onsel: 0.4,
       z: (f, p, a) => { const m = mainMedia(p) === 'sosyal' ? 1 : mainMedia(p) === 'tv' ? -0.5 : 0; return m * (a.iktidar ? -1 : a.duzen_karsiti ? 1 : 0); } },
+    { id: 'kimlik_siyaseti', ad: 'Marjinal kimlik ve karşı-hegemonya', kuram: 'Crenshaw (1989) kesişimsellik; Gramsci karşı-hegemonya; Hall — marjinal gruplar kültürel liberal/çoğulcu partiye yönelir', onsel: 0.8,
+      z: (f, p, a) => (isAbstain(a) || !p?.azinlik_kimlik ? 0 : (f.marginal - 0.2) * -partyPos(a).kultur) },
     { id: 'cinsiyet_acigi', ad: 'Kuşaksal cinsiyet açığı', kuram: 'Inglehart & Norris (2000); Immerzeel vd. (2015) — feminist/kesişimsel', onsel: 0.5,
       z: (f, p, a) => (isAbstain(a) || !p?.cinsiyet ? 0 : (f.kadin - 0.5) * -partyPos(a).kultur * (0.4 + 0.6 * (1 - f.yas))) },
     { id: 'katilmama', ad: 'Katılmama eğilimi', kuram: 'Riker & Ordeshook (1968) — oy hesabı', onsel: 1.2,

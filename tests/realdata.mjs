@@ -162,7 +162,7 @@ function plainDomain(base, attrs, rows) {
 }
 
 const COMM = ILETISIM_TERIMLERI.map((t) => t.id);
-const ELESTIREL = ['otoriter_dinamik', 'muzakere', 'medya_yanliligi', 'arac', 'cinsiyet_acigi', 'kultur_endustrisi', 'arama_maliyeti', 'kulturel_sermaye', 'gosteris', 'reklam_teshir', 'risk_toplumu', 'otoriteye_uyum', 'bakim_yuku'];
+const ELESTIREL = ['kimlik_siyaseti', 'otoriter_dinamik', 'muzakere', 'medya_yanliligi', 'arac', 'cinsiyet_acigi', 'kultur_endustrisi', 'arama_maliyeti', 'kulturel_sermaye', 'gosteris', 'reklam_teshir', 'risk_toplumu', 'otoriteye_uyum', 'bakim_yuku'];
 const args = process.argv.slice(2);
 const cleanRows = (rows) => rows.filter((r) => r.secim && Object.values(r.ozel || {}).every((o) => Object.values(o).every((v) => typeof v !== 'number' || Number.isFinite(v))));
 

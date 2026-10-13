@@ -224,6 +224,7 @@ Ana akım kuramların yanında eleştirel okullar da faydaya terim olarak girer 
 - **Chicago okulu** — Thomas teoremi (kişinin beyan ettiği konum ve algı demografik tahminin yerine
   geçer), Becker (zamanın fırsat maliyeti, işletme maliyeti, akılcı bağımlılık), Stigler (arama
   maliyeti), Thaler (varsayılan), Mead/Blumer (sembolik etkileşim — kitle motorunda)
+- **Crenshaw / Gramsci** — marjinal kimlik ve karşı-hegemonya (kesişimsellik)
 - **Bourdieu / Veblen / Baudrillard** — kültürel sermaye, gösterişçi tüketim; **Beck** — risk
   toplumu; **feminist** — kuşaksal cinsiyet açığı, bakım yükü
 - Bilinçli olarak eklenmeyen: "yoksul statükoyu destekler" (sistemi meşrulaştırma) — büyük
@@ -244,13 +245,13 @@ değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diye
 
 | Test | Çoğunluk | Standart | Bütünleşik | Eleştirel terimler çıkarılınca |
 |---|---|---|---|---|
-| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 59,5 | **68,2** | 67,7 |
-| Seçimler arası, yapısal: 2020 → 2016 | 35,7 | 55,7 | **60,4** | 58,2 |
-| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | 79,3 | 79,0 | 77,6 |
+| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 59,5 | **69,4** | 68,3 |
+| Seçimler arası, yapısal: 2020 → 2016 | 35,7 | 55,7 | **61,7** | 59,9 |
+| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | 79,3 | 79,3 | 77,8 |
 | Aynı seçim, 5 katlı CV, yapısal 2020 | 47,1 | 73,7 | 73,5 | — |
 | Az veri: 2016'dan 100 kişiyle öğren (`--egri`) | 33,7 | 56,7 | **60,2** | 58,0 |
 | Az veri: 50 kişi | 33,5 | 33,1 | **57,0** | 56,1 |
-| Hiç bireysel veri yok — yalnız kuram + seçimin toplam sonucu, 2020 yapısal (`--sifir`) | 47,1 | — | **68,3** | — |
+| Hiç bireysel veri yok — yalnız kuram + seçimin toplam sonucu, 2020 yapısal (`--sifir`) | 47,1 | — | **68,8** | — |
 
 - Otoriter dinamik terimi (Frankfurt Okulu) iki seçimde de anlamlı: katsayı 0,34 ± 0,14 (2016),
   0,30 ± 0,10 (2020).
