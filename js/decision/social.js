@@ -64,12 +64,14 @@ const nbrMean = (P, list, J) => { const m = new Array(J).fill(0); for (const k o
  * Sosyal yayılma (ortalama alan dengesi). P0: bireysel model olasılıkları (müdahaleli),
  * R: taban senaryo olasılıkları (müdahalesiz), th: {aile, ag, topluluk} katsayıları.
  * Kesitsel katsayılar homofiliyi (benzerin benzeri seçmesi) de taşır; nedensel pay `nedensellik`
- * (Aral, Muchnik & Sundararajan 2009: görünen bulaşmanın >%50'si homofili). Kazanç 0.8'i aşarsa
- * (devrilme/kaçak denge) ölçeklenir: tek, kararlı denge.
+ * (Aral, Muchnik & Sundararajan 2009: görünen bulaşmanın >%50'si homofili). Kazanç 0.45'i aşarsa
+ * ölçeklenir: tek, kararlı denge ve çarpan ≲ 1.5 (devrilme/kaçak denge yok).
  */
 export function diffuse(P0, R, net, th0, { tur = 15, sonum = 0.5, nedensellik = 0.4 } = {}) {
-  const gain = 0.25 * nedensellik * (Math.abs(th0.aile) + Math.abs(th0.ag) + 1.4 * Math.abs(th0.topluluk));
-  const k = nedensellik * Math.min(1, 0.8 / Math.max(1e-9, gain));
+  // Kazanç ≈ p(1−p) × Σθ × J/(J−1): iki seçenekte bir seçeneğe kayış diğerinden de düşer (etki ikiye katlanır)
+  const J0 = P0[0].length;
+  const gain = 0.25 * nedensellik * (Math.abs(th0.aile) + Math.abs(th0.ag) + 1.4 * Math.abs(th0.topluluk)) * J0 / Math.max(1, J0 - 1);
+  const k = nedensellik * Math.min(1, 0.45 / Math.max(1e-9, gain));
   const th = { aile: k * th0.aile, ag: k * th0.ag, topluluk: k * th0.topluluk };
   const J = P0[0].length, L0 = P0.map((q) => q.map((x) => Math.log(Math.max(1e-12, x))));
   const Rn = R.map((_, i) => (net.ag[i].length ? nbrMean(R, net.ag[i], J) : null));

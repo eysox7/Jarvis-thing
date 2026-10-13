@@ -245,7 +245,7 @@ düzeyde taşır:
 - **Nüfus düzeyi (tahminde):** sentetik nüfus hanelere (eğitim/yaş/dindarlık/ideoloji homogamisi),
   homofili tartışma ağlarına (kanaat önderleri daha çok bağlı — iki aşamalı akış) ve topluluklara
   örülür. Bir kampanya ya da ne-olur değişikliğinin bireysel etkisi bu bağlar üzerinden yayılır;
-  sonuçta `sosyal_yayilim.sosyal_carpan` (tipik ×1,3–1,4) ve doğrudan/toplam paylar raporlanır.
+  sonuçta `sosyal_yayilim.sosyal_carpan` (tipik ×1,2–1,4; kazanç sınırı kaçak dengeyi önler) ve doğrudan/toplam paylar raporlanır.
   Müdahale yokken tahmin değişmez: bireysel model çevrenin bileşimini zaten taşır. Kesitsel
   katsayıların ancak bir kısmı nedenseldir (homofili; Aral vd. 2009) — `baglam.sosyal_nedensellik`
   (varsayılan 0,4); `baglam.sosyal_yayilim: false` kapatır.
