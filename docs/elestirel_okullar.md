@@ -25,6 +25,12 @@ geldiğinde katsayı veriden öğrenilir. Aşağıdaki büyüklükler logit biri
 | **Columbia okulu — Lazarsfeld, Berelson & Gaudet; Katz (iki aşamalı akış)** | Oy bir grup kararıdır; etki kanaat önderleri ve yüz yüze çevre üzerinden akar | `aile` (hanenin tercihi), `ag` (tartışma ağında pay); nüfusta homofili ağı + kanaat önderleri daha çok bağlı → kampanya etkisi yayılır (sosyal çarpan) | Hane içi bulaşma: doğrudan etkinin ~%60'ı diğer üyeye (Nickerson 2008); eşlerin oy uyumu ~%80–90 (Zuckerman 2005) |
 | **Huckfeldt & Sprague; Park — kentsel ekoloji** | Bağlam (komşuluk, il) bireysel özelliklerin ötesinde etkiler; topluluğa gömülü kişide güçlü | `topluluk`: log(bölge payı) × gömülülük (kırsal, yaş, dindarlık) | ANES 2016 eyalet bağlamı: CV 63,0 → 64,2; veri yokken 43,1 → 50,6 |
 | **Homofili — McPherson, Smith-Lovin & Cook 2001; Aral vd. 2009** | Benzer benzerle bağ kurar; görünen bulaşmanın yarıdan fazlası seçilimdir | Yayılmada kesitsel katsayının nedensel payı 0,4 (`sosyal_nedensellik`); müdahale yokken tahmin değişmez | Aral, Muchnik & Sundararajan 2009 |
+| **Gurr — göreli yoksunluk; Alexander — kültürel travma; Balcells** | Kolektif şiddet ve yerinden edilme kimliği siyasallaştırır | `kolektif_travma`: (zorunlu göç + ½ çatışma maruziyeti) × marjinal kimlik × azınlığı temsil eden parti | Balcells 2012 (İspanya iç savaşı mağduriyeti kuşaklar boyu oy); sentetik TR'de test |
+| **Seeman — yabancılaşma; ACE literatürü** | Çocukluk travması siyasal etkinlik duygusunu ve katılımı düşürür | `yabancilasma`: travma skoru × oy kullanmama | Öncül 0,4 |
+| **Healy & Malhotra; Gasper & Reeves** | Seçmen afet yönetimini oylar; kayıp yaşayan iktidarı cezalandırır | `afet_cezasi`: −deprem kaybı × iktidar | Healy & Malhotra 2009; Gasper & Reeves 2011 |
+
+Hayat öyküsü sütunları (travma, tehdit, deprem, zorunlu göç, iş kaybı, borç, ebeveyn oyu) CSV'den otomatik tanınır;
+zengin sentetik Türkiye verisi (`tests/data/sentetik/`) ile öykü bilgisi isabeti 68,6 → 80,3'e çıkarır.
 
 ## Bilinçli olarak EKLENMEYENLER
 - **Sistemi meşrulaştırma (Jost) — "yoksul statükoyu destekler"**: 151.794 kişilik testte etki yok ya da ters
