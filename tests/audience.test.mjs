@@ -74,8 +74,8 @@ const rep1 = P({ repetition: 1, channels: ['haber_sitesi'] }).sonuc.erisim_yuzde
 ok(rep8 > rep1, 'Gündem belirleme: tekrar erişimi artırır');
 const repW = P({ representation: 1 }, { target: { cinsiyet: 'kadin' } }).sonuc.ortalama_tutum, stW = P({ representation: -1 }, { target: { cinsiyet: 'kadin' } }).sonuc.ortalama_tutum;
 ok(repW > stW, 'Feminist eleştiri: kapsayıcı temsil kadınlarda tutumu artırır');
-const spLow = P({ domain: 'siyaset', institution: 'parti_iktidar', controversy: 0 }).sonuc.paylasim_yuzde;
-const spHigh = P({ domain: 'siyaset', institution: 'parti_iktidar', controversy: 1 }).sonuc.paylasim_yuzde;
+const spLow = P({ domain: 'siyaset', institution: 'parti_iktidar', hegemonic: 1, controversy: 0 }).sonuc.paylasim_yuzde;
+const spHigh = P({ domain: 'siyaset', institution: 'parti_iktidar', hegemonic: 1, controversy: 1 }).sonuc.paylasim_yuzde;
 ok(spLow !== spHigh, 'Suskunluk sarmalı: tartışmalılık ifade/paylaşımı değiştirir');
 
 console.log('\n[5] Mercekler ve araçlar');

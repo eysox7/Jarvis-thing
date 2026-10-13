@@ -23,7 +23,11 @@ export function resolveChoice(spec = {}) {
   if (new Set(alts.map((a) => a.id)).size !== alts.length) throw new Error('seçenek kimlikleri benzersiz olmalı');
   const ctx = { ...(spec.baglam || spec.context || {}) };
   if (domain.hazirla) Object.assign(ctx, domain.hazirla(alts, ctx));
-  const terms = [...domain.terimler, ...ILETISIM_TERIMLERI, ILETISIM, GECMIS];
+  // Serbest (kuramsız) özellik terimleri: kuramın kapsamadığı ölçülmüş özellikler için veriden öğrenilen
+  // doğrusal katsayı (öncül 0, gevşek). spec.serbest = {özellik: ölçek} — bütünleşik model kuramsız modeli kapsar.
+  const free = Object.entries(spec.serbest || {}).map(([k, sc]) => ({ id: 'serbest_' + k, ad: k + ' (serbest)', kuram: 'veriden öğrenilen doğrusal etki', onsel: 0, sigma: 2,
+    z: (f, p, a) => (a[k] === undefined || a[k] === null ? 0 : (Number(a[k]) || 0) / (Number(sc) || 1)) }));
+  const terms = [...domain.terimler, ...free, ...ILETISIM_TERIMLERI, ILETISIM, GECMIS];
   return { domain, alts, ctx, terms };
 }
 

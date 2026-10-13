@@ -57,7 +57,7 @@ export function fitChoiceModel(spec, rows, o = {}) {
   const nP = intBase + (useInt ? K * D : 0);
   const mu = new Float64Array(nP), sig = new Float64Array(nP).fill(sigD);
   for (let q = intBase; q < nP; q++) sig[q] = sigD * 0.6;
-  terms.forEach((t, k) => { mu[k] = prior.theta[t.id] ?? t.onsel; sig[k] = sigT; });
+  terms.forEach((t, k) => { mu[k] = prior.theta[t.id] ?? t.onsel; sig[k] = t.sigma ?? sigT; });
   for (let j = 1; j < J; j++) sig[K + j - 1] = sigA;
   const x = Float64Array.from(mu);
   const ascOf = (j) => (j === 0 ? 0 : x[K + j - 1]);

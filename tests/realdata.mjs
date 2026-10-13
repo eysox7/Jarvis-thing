@@ -105,7 +105,7 @@ function plainDomain(base, attrs, rows) {
   const scale = {};
   for (const k of attrs) { const v = rows.flatMap((r) => Object.values(r.ozel || {}).map((o) => o[k])).filter(Number.isFinite); const m = v.reduce((a, b) => a + b, 0) / v.length; scale[k] = { m, s: Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length) || 1 }; }
   return { ...base, id: 'ham_' + base.id, hazirla: undefined,
-    terimler: attrs.map((k) => ({ id: 'lin_' + k, ad: k, kuram: '—', onsel: 0, z: (f, p, a) => (a[k] === undefined ? 0 : (Number(a[k]) - scale[k].m) / scale[k].s) })) };
+    terimler: attrs.map((k) => ({ id: 'lin_' + k, ad: k, kuram: '—', onsel: 0, sd: scale[k].s, z: (f, p, a) => (a[k] === undefined ? 0 : (Number(a[k]) - scale[k].m) / scale[k].s) })) };
 }
 
 const COMM = ILETISIM_TERIMLERI.map((t) => t.id);
@@ -121,7 +121,9 @@ for (const [name, mk] of Object.entries(DATASETS)) {
   DECISION_DOMAINS.__ham = plainDomain(base, attrs, clean);
   const cvO = { k: 5, seed: 3, demoSigma: 'oto' };
   const std = crossValidate({ ...spec, alan: '__ham' }, clean, { ...cvO, haric: [...COMM, 'gecmis'], kuramGuveni: 3 });
-  const but = crossValidate(spec, clean, { ...cvO, kuramGuveni: Number(process.env.KG || 1) });
+  // Hibrit: kuramın kapsamadığı ölçülmüş özellikler serbest terim olarak da girer (ölçek = std. sapma)
+  const serbest = Object.fromEntries(attrs.map((k) => [k, DECISION_DOMAINS.__ham.terimler.find((t) => t.id === 'lin_' + k).sd]));
+  const but = crossValidate(process.env.SERBEST === '0' ? spec : { ...spec, serbest }, clean, { ...cvO, kuramGuveni: Number(process.env.KG || 1) });
   delete DECISION_DOMAINS.__ham;
   const res = { veri: name, alan: spec.alan, n: clean.length,
     cogunluk: std.cogunluk_isabet_yuzde, standart: std.isabet_yuzde, butunlesik: but.isabet_yuzde,

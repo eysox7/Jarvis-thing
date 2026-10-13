@@ -217,6 +217,32 @@ export const THEORIES = [
       return { shift: 0.9 * m.representation * w, att: 0.4 * m.representation * w, opp: m.representation < 0 ? -1.5 * m.representation * w : 0 };
     },
   },
+  {
+    id: 'otoriter_kisilik', ad: 'Otoriter kişilik & otoriter dinamik', kurucu: 'Adorno vd. (1950); Fromm (1941); Stenner (2005)', gelenek: 'elestirel', asama: 'birey',
+    ozet: 'Düzen ve uyum yatkınlığı otorite kaynaklı, korku çerçeveli mesaja boyun eğdirir; tehdit müzakereyi kapatır.',
+    apply: ({ f, m }) => {
+      const A = 0.35 * f.dindarlik + 0.25 * (1 - f.egitim) + 0.15 * (1 - f.nfc) + 0.15 * f.yas + 0.1 * (1 - f.yerlesim) - 0.5;
+      const fear = m.frame === 'korku' ? 1 : 0;
+      return { shift: 0.6 * A * (m.hegemonic + 0.6 * fear), cred: 0.4 * A * Math.max(0, m.hegemonic), delib: -0.4 * Math.max(0, A) * fear };
+    },
+  },
+  {
+    id: 'ayrim', ad: 'Ayrım & kültürel sermaye', kurucu: 'P. Bourdieu (1979); Veblen (1899)', gelenek: 'elestirel', asama: 'birey',
+    ozet: 'Beğeni sınıf habitusudur: nitelikli mesaj kültürel sermayesi yükseklerde, ticari kitle mesajı alt katmanlarda karşılık bulur.',
+    apply: ({ f, m }) => {
+      const cap = 0.6 * f.egitim + 0.4 * f.gelir - 0.45;
+      return { att: 0.8 * (m.quality - 0.5) * cap, shift: -0.3 * m.commercial * cap };
+    },
+  },
+  {
+    id: 'sembolik_etkilesim', ad: 'Sembolik etkileşim & referans grupları', kurucu: 'Chicago okulu: Mead, Cooley, Blumer, Park', gelenek: 'ana_akim', asama: 'birey',
+    ozet: 'Anlam etkileşimde kurulur: yüz yüze aktarılan mesaj topluluğa gömülü kişide (kırsal, yaşlı, kanaat önderi) daha güçlü işler.',
+    apply: ({ f, channels }) => {
+      if (!channels.includes('yuz_yuze')) return null;
+      const emb = 0.5 * (1 - f.yerlesim) + 0.3 * f.yas + 0.2 * f.leader;
+      return { shift: 0.5 * emb, share: 0.4 * emb, cred: 0.3 * emb };
+    },
+  },
 ];
 
 export const THEORY_BY_ID = Object.fromEntries(THEORIES.map((t) => [t.id, t]));
