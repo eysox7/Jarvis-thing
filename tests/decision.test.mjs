@@ -422,6 +422,13 @@ console.log('\n[28] Hane temelli yaşam seyri verisi (tests/data/sentetik/hane)'
     ok(!story.some((x, i) => new RegExp(`kendisi ${raw[i].secim}`).test(x.oyku)), 'öykü kişinin kendi oyunu söylemez');
     ok(raw.every((r) => r.siyasi_ilgi !== '' && r.tv_saat !== '' && r.tv_kanal_turu), 'iletişim ekolojisi sütunları (ilgi, TV saati, kanal türü) her kişide');
   }
+  const FI = new URL('./data/sentetik/hane_kal_il/', import.meta.url);
+  if (existsSync(new URL('il_sabitleri.json', FI))) {
+    const off = JSON.parse(readFileSync(new URL('il_sabitleri.json', FI), 'utf8')), v = Object.values(off);
+    ok(v.length > 30 && v.every((x) => x.length === 5 && Math.abs(x.reduce((a, b) => a + b, 0)) < 0.05), `il sabitleri: ${v.length} il × 5 blok, il içinde ortalanmış`);
+    const ri = parseCSV(readFileSync(new URL('TR_hane_secmen.csv', FI), 'utf8'));
+    ok(Math.abs(ri.filter((r) => r.secim === 'iktidar').length / ri.length - 0.43) < 0.03, 'il kalibrasyonu ulusal toplamı bozmaz');
+  }
 }
 
 console.log('');
