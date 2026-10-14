@@ -36,7 +36,7 @@ const panel = idx.slice(0, N).map((i) => Bh[i]);
 const ids = spec.secenekler.map((a) => a.id), ys = panel.map((x) => ids.indexOf(x.secim));
 const CACHE_F = new URL('./data/cache/llm_cache.json', import.meta.url);
 const cache = existsSync(CACHE_F) ? JSON.parse(readFileSync(CACHE_F, 'utf8')) : {};
-const SYS = `Türkiye'deki gerçek seçmenleri canlandırıyorsun. 24 Haziran 2018 milletvekili genel seçiminde her kişinin ne yaptığını olasılık olarak tahmin et. Seçenekler: iktidar (Cumhur İttifakı: AK Parti ve MHP), ana_muhalefet (CHP), milliyetci (İYİ Parti), kurt_sol (HDP), oy_yok (oy kullanmadı). Yalnız JSON döndür.`;
+const SYS = `Türkiye'deki gerçek seçmenleri canlandırıyorsun. 24 Haziran 2018 milletvekili genel seçiminde her kişinin ne yaptığını olasılık olarak tahmin et. Seçenekler: iktidar (Cumhur İttifakı: AK Parti ve MHP), ana_muhalefet (CHP), milliyetci (İYİ Parti), kurt_sol (HDP), oy_yok (oy kullanmadı). Yalnız şu biçimde JSON döndür: {"yanitlar":[{"no":1,"olasiliklar":{"iktidar":0.5,"ana_muhalefet":0.2,"milliyetci":0.1,"kurt_sol":0.1,"oy_yok":0.1}}]} — her persona için bir öğe, olasılıkların toplamı 1.`;
 const brief = () => 'Haziran 2018 genel seçimi. Her personanın seçeneklere olasılık dağılımını ver.';
 const key = (x) => `${MODEL}|cses18|${x.kisi}`;
 const t0 = Date.now();

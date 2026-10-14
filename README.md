@@ -458,7 +458,11 @@ Hiçbir gerçek bireysel kayıt eğitime girmeden, sentetik ailelerde eğitilen 
 | 200 kişi | 73,2 | **77,7** |
 
 Not: kalibrasyon A yarısının tamamının *toplam* çapraz tablolarını kullandı; senaryonun doğru adı "yayımlanmış
-çapraz tablolar (ör. anket şirketlerinin oy × demografi raporları) + az sayıda bireysel kayıt"tır. Kalibrasyonun öğrettikleri: Türkiye'de sol-sağ öz-konumlaması büyük ölçüde bir parti
+çapraz tablolar (ör. anket şirketlerinin oy × demografi raporları) + az sayıda bireysel kayıt"tır.
+
+**Dil modeli gerçek Türk seçmenini canlandırabiliyor mu?** (`tests/llm_tr_gercek.mjs`, B yarısından 96 kişi,
+Groq gpt-oss-20b, anket betiminden): dil modeli tek başına 71,9 (log-kayıp 1,008) — yalnız kuramın (75,0; 0,774)
+altında; A yarısında öğrenilmiş bütünleşik model 78,1 (0,688); A + kalibre sentetik aileler **81,3** (0,641). Kalibrasyonun öğrettikleri: Türkiye'de sol-sağ öz-konumlaması büyük ölçüde bir parti
 kimliği etiketi; eğitimin etkisi üreticinin varsaydığından ~3 kat güçlü, dinin etkisi daha zayıf; Alevi kimliği
 daha belirleyici; Kürt kimliğinin iktidar oyuna "cezası" sanılandan küçük (2018'de Kürt seçmenin ~%49'u iktidara).
 
