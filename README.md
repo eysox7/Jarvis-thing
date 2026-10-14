@@ -447,6 +447,7 @@ cinsiyet) göre ayarlandı; B yarısına dokunulmadı:
 | Yalnız kuram (hiç veri yok) | 72,5 (ll 0,827) | 73,2 (ll 0,809) |
 | Kalibrasyonsuz sentetik ailelerde öğrenilmiş | 69,9 (ll 0,860) | 69,6 (ll 0,899) |
 | **Kalibre sentetik ailelerde öğrenilmiş** (`tests/data/sentetik/hane_kal/`) | **75,8** (ll **0,747**) | 73,2 (ll 0,800) |
+| **+ gerçek il sonuçlarına kalibre coğrafya** (`tests/data/sentetik/hane_kal_il/`) | **76,4** (ll 0,724) | **73,9** (ll 0,773) |
 | Diğer gerçek yarıda öğrenilmiş — üst sınır | 76,4 (ll 0,705) | 73,9 (ll 0,714) |
 
 Kalibrasyon iki bölünmede de aynı çarpanları seçti ve sentetik veriyi iki yönde de düzeltti (~70 → 73–76);
@@ -468,11 +469,21 @@ altında; A yarısında öğrenilmiş bütünleşik model 78,1 (0,688); A + kali
 kimliği etiketi; eğitimin etkisi üreticinin varsaydığından ~3 kat güçlü, dinin etkisi daha zayıf; Alevi kimliği
 daha belirleyici; Kürt kimliğinin iktidar oyuna "cezası" sanılandan küçük (2018'de Kürt seçmenin ~%49'u iktidara).
 
-**Sentetik coğrafya gerçekçi değil.** Sentetik ailelerin il düzeyi oy payları gerçek 2023 il sonuçlarıyla
-(YSK, `tests/data/fetch_tr_il.py`; örneklemde yeterli kişisi olan 43 il) karşılaştırıldı: Kürt hareketi payı orta
-düzeyde tutuyor (r ≈ 0,65), milliyetçi ~0,5, ama iktidar payında ilişki zayıf (r = 0,18; kalibre veride 0,07) ve
-iktidar / ana muhalefet payında ortalama mutlak hata 10–12 puan. Kalibrasyon kişi düzeyindeki ilişkileri
-düzeltti, il düzeyindeki dağılımı düzeltmedi; il hedefli kalibrasyon yapılmadı.
+**Sentetik coğrafyayı gerçek il sonuçlarına kalibre etmek** (`node tests/data/hane_il_kalibre.mjs`). Kişi düzeyi
+kalibrasyon il dağılımını düzeltmemişti: sentetik ailelerin il payları gerçek 2023 il sonuçlarıyla (YSK,
+`tests/data/fetch_tr_il.py`; yeterli kişisi olan 42 il) iktidar payında hiç ilişkili değildi (r ≈ 0). Üreticiye
+her il için beş bloğun fayda kayması eklendi ve yalnız **2023** il paylarına göre yinelemeli ayarlandı (örneklem
+büyüklüğüyle büzülmüş log-oran adımı). Hedefe dokunmayan iki sınama:
+
+| İl düzeyi korelasyon (iktidar / ana muh. / milliyetçi / Kürt / katılmama) | Önce | Sonra |
+|---|---|---|
+| Aynı kişilerin sentetik **2018** oyu ↔ gerçek 2018 il sonuçları | 0,09 / 0,39 / 0,48 / 0,63 / 0,06 | **0,92 / 0,85 / 0,80 / 0,93** / −0,05 |
+| **Başka tohumla yeni kişiler** ↔ gerçek 2023 (örneklem gürültüsü değil gerçek coğrafya mı?) | 0,21 / 0,43 / 0,32 / 0,63 / −0,07 | **0,67 / 0,66 / 0,58 / 0,82 / 0,34** |
+
+Coğrafya yeni kişilere de taşınıyor; katılmamanın il dağılımı zayıf kalıyor. İl kalibreli ailelerde öğrenilen
+model gerçek seçmeni iki bölünmede de gerçek veride öğrenilmiş model kadar isabetle tahmin ediyor (yukarıdaki
+tablo; olasılık kalitesinde gerçek veri hâlâ önde). Ana muhalefet payında ~9 puanlık ortalama hata düzey farkı:
+üretici ulusal toplamı kendi hedefinde (%29) tutuyor, YSK eşlemesinde bu blok il ortalamasında %19.
 
 **İletişim mekanizmalarının gücü — ANES 2016 + 2020 havuzu (10.553 kişi).** Tek seçimde belirsiz kalan mercek
 katsayıları havuzda daralıyor: medya etkisinin dikkat × ELM ikna edilebilirliği × Hall okuma konumuyla

@@ -27,6 +27,9 @@ const NH = Number(process.argv[2] || 1300), SEED = Number(process.argv[3] || 202
 import { existsSync as _ex, readFileSync as _rd } from 'node:fs';
 const KAL_F = process.env.HANE_KAL;   // yalnız açıkça verilirse (varsayılan veri kalibrasyonsuz)
 const KAL = { din: 1, kurt_ikt: 1, kurt_sol: 1, alevi: 1, egit: 1, otoriter: 1, ideo: 0, mill_kadin: 0, ...(KAL_F && _ex(KAL_F) ? JSON.parse(_rd(KAL_F, 'utf8')) : {}) };
+// İl sabitleri (tests/data/hane_il_kalibre.mjs gerçek YSK il sonuçlarından ayarlar): il → 5 bloğun fayda kayması.
+// Yalnız HANE_IL verilirse; rastgele çekiliş sayısını değiştirmez.
+const ILK = process.env.HANE_IL && _ex(process.env.HANE_IL) ? JSON.parse(_rd(process.env.HANE_IL, 'utf8')) : {};
 const r = rng(SEED);
 const U = () => r();
 const norm = () => Math.sqrt(-2 * Math.log(U() || 1e-12)) * Math.cos(2 * Math.PI * U());
@@ -429,7 +432,7 @@ function yapisal(P) {
   s[AI.milliyetci] += KAL.otoriter * 1.4 * P.otoriter + (P.kadin ? -0.3 - KAL.mill_kadin : 0.25) + (P.yas < 35 ? 0.35 : 0) - 2.5 * (P.kurt ? 1 : 0) - 0.6 * (P.alevi ? 1 : 0) + 0.6 * BOLGE[P.bolge].multeci * (P.kurt ? 0 : 1);
   s[AI.kurt_sol] += (P.kurt ? KAL.kurt_sol * 3.2 - 1.6 * P.din : -3) + (P.yas < 35 ? 0.4 : 0) + (P.alevi && !P.kurt ? 0.2 : 0);
   s[AI.oy_yok] += 1.6 * (1 - P.ilgi) + (P.yas < 25 ? 0.6 : 0) + 0.12 * Object.values(P.ace).filter(Boolean).length - 0.6 * P.egit01 + (P.goc && P.goc.yil > YIL - 3 ? 0.6 : 0);
-  return s.map((v, j) => v + P.etki[j]);
+  return s.map((v, j) => v + P.etki[j] + (ILK[P.il]?.[j] ?? 0));
 }
 for (const P of [...kisiler, ...eskiler]) {
   P.tat = ALTS.map(() => 0.55 * norm());

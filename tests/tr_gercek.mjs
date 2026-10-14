@@ -47,7 +47,7 @@ console.log('3) Sentetikte öğren → gerçek 2018 seçmenini tahmin et (ortak 
   console.log(`  B yarısı n=${te.length}; yalnız kuram (veri yok) ${z.isabet_yuzde}% (ll ${z.log_kayip})`);
   const run = (ad, tr) => { const mS = fit(hs, tr, { haric: STD, kuramGuveni: 3 }), mB = fit(spec, tr); const sC = sc(hs, calib(hs, mS, te), te), bC = sc(spec, calib(spec, mB, te), te);
     console.log(`  ${ad.padEnd(38)} + gerçek toplama kalibre: standart ${sC.isabet_yuzde}% (ll ${sC.log_kayip}) / bütünleşik ${bC.isabet_yuzde}% (ll ${bC.log_kayip})`); };
-  for (const k of ['hane', 'hane_kal']) { try { run(`sentetik ${k} (2018 oyu, n=${sentetikTR('d2018', k).rows.length})`, keep(sentetikTR('d2018', k).rows)); } catch (e) { console.log('  ' + k + ': ' + e.message); } }
+  for (const k of ['hane', 'hane_kal', 'hane_kal_il']) { try { run(`sentetik ${k} (2018 oyu, n=${sentetikTR('d2018', k).rows.length})`, keep(sentetikTR('d2018', k).rows)); } catch (e) { console.log('  ' + k + ': ' + e.message); } }
   run(`gerçek A yarısında öğrenilmiş (n=${trA.length}, üst sınır)`, trA);
   delete DECISION_DOMAINS.__ham;
 }
