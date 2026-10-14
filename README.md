@@ -210,7 +210,7 @@ koşturur (maruziyet, tutum, Hall okuma konumu terimleri); seçenek `iletisim` a
 |---|---|---|---|
 | ANES 2016 tam / yapısal (partizan medya var) | 70,7 = 70,7 / 65,0 → 64,9 | 63,3 → **63,8** / 57,3 → **57,5** | tam 2016→2020: 80,1 → **80,5**; yapısal 69,3 → **69,6** |
 | ANES 2020 tam / yapısal (partizan medya var) | 81,6 = 81,6 / 73,7 → 73,8 | 73,9 → 73,8 / 68,8 → 68,7 | 2020→2016: ±0,1 |
-| Sentetik hane (kanal × saat, ilgi, ağ) | 85,6 → 85,5 | 75,8 → 75,1 (log-kayıp 0,713 → 0,710) | 2018→2023: 76,3 → 75,9 |
+| Sentetik hane (kanal × saat, ilgi, ağ) | 85,6 → 85,4 | 75,8 → 75,1 (log-kayıp 0,713 → 0,710) | 2018→2023: 76,3 → 76,4 |
 | Sentetik TR | 82,4 → **82,6** | — | — |
 
 Mercek tahmin gücünü belirgin artırmıyor (±0,5 puan): bol veride kişi değişkenlerinin sabitleri farkı
@@ -378,10 +378,10 @@ zamanlı etkileşim); karar modelinin denklemi kullanılmaz. Kalibrasyon ve kayn
 
 | Sentetik hane, 5 katlı CV (2.880 kişi) | Çoğunluk | Kuramsız standart | Bütünleşik |
 |---|---|---|---|
-| Sıradan anket + iletişim ekolojisi (aile/ağ/önceki oy ve hayat olayları yok) | 42,3 | 65,8 | **66,6** |
-| + aile (eşin, babanın oyu), ağ, mahalle, hayat olayları | 42,3 | 75,9 | **81,9** (log-kayıp 0,514 / 0,634) |
-| + önceki oy (2018) | 42,3 | 83,2 | **85,5** (log-kayıp 0,406 / 0,485) |
-| Öğrenme eğrisi, tam: 50 / 200 / 800 kişi | 42 / 42 / 43 | 37,6 / 76,5 / 81,8 | **81,5 / 83,8 / 84,8** |
+| Sıradan anket + iletişim ekolojisi (aile/ağ/önceki oy ve hayat olayları yok) | 42,3 | 65,8 | **66,8** |
+| + aile (eşin, babanın oyu), ağ, mahalle, hayat olayları | 42,3 | 75,9 | **82,0** (log-kayıp 0,515 / 0,634) |
+| + önceki oy (2018) | 42,3 | 83,2 | **85,4** (log-kayıp 0,407 / 0,485) |
+| Öğrenme eğrisi, tam: 50 / 200 / 800 kişi | 42 / 42 / 43 | 37,6 / 76,5 / 81,8 | **81,0 / 84,0 / 85,1** |
 | Hiç bireysel veri yok (yalnız kuram) | 42,3 | — | **67,8** |
 
 Hanede aynı oy %61 (rastgele çift %29); eşle aynı oy (algılanan) %67, tartışma ağının çoğunluğuyla
@@ -396,8 +396,8 @@ Bir seçimde öğrenip ötekini tahmin etmek (eş/ağ/mahalle ve önceki oy hari
 |---|---|---|---|---|
 | 2018'de öğren → 2023 | **71,8** (ll 0,759) | 71,3 (ll 0,766) | 71,3 | **73,4** / 72,9 |
 | 2023'te öğren → 2018 | 72,5 (ll 0,724) | **72,6** (ll 0,730) | 73,0 | **73,5** / 73,1 |
-| Hane verisi: 2018 → 2023 | **76,1** (ll 0,667) | 75,9 (ll **0,660**) | 76,3 | 78,0 / **78,1** |
-| Hane verisi: 2023 → 2018 | **73,5** (ll 0,727) | 72,8 (ll 0,750) | 72,9 | **74,8** / 73,8 |
+| Hane verisi: 2018 → 2023 | 76,1 (ll 0,667) | **76,4** (ll **0,657**) | 76,2 | **78,0** / 77,8 |
+| Hane verisi: 2023 → 2018 | **73,5** (ll 0,727) | 72,8 (ll 0,748) | 72,9 | **74,8** / 73,8 |
 
 Düzeltilmiş kıyasta sentetik panelde seçimler arası aktarımda kuram avantajı **yok**: önceki sürümün
 "71,7 / 70,1 ve 72,4 / 67,6" farkı, kuramsız modele tahmin anında öğrenilmemiş iletişim terimlerinin
@@ -406,6 +406,7 @@ yaşayanlarda aktarımı 68,5 → 70,7 iyileştiriyor" sonucu düzeltildi: üç 
 `yabancilasma`, `afet_cezasi`) çıkarılınca deprem kaybı yaşayan seçmenlerde 2018→2023 isabeti 71,7 → 70,7
 (92 kişi) ama hane verisinde ters yönde 66,7 → 67,5 (123 kişi): etki tutarsız, kanıt sayılmaz.
 Gerçek ANES'te yapısal aktarım avantajı (aşağıda) düzeltmeden sonra da sürüyor.
+Hane satırları, mercek terimlerinin öncülünü yanlışlıkla sıfırlayan ikinci bir hata düzeltildikten sonra yeniden ölçüldü (fark ±0,5).
 Not: üretim zinciri ekonomik oy, afet cezası gibi mekanizmaları içerir; model denklemi kullanılmasa da
 bu bir "dünya böyle işliyorsa model yakalar mı" sınamasıdır, gerçek panelde tekrarlanmalı.
 
@@ -466,6 +467,12 @@ Groq gpt-oss-20b, anket betiminden): dil modeli tek başına 71,9 (log-kayıp 1,
 altında; A yarısında öğrenilmiş bütünleşik model 78,1 (0,688); A + kalibre sentetik aileler **81,3** (0,641). Kalibrasyonun öğrettikleri: Türkiye'de sol-sağ öz-konumlaması büyük ölçüde bir parti
 kimliği etiketi; eğitimin etkisi üreticinin varsaydığından ~3 kat güçlü, dinin etkisi daha zayıf; Alevi kimliği
 daha belirleyici; Kürt kimliğinin iktidar oyuna "cezası" sanılandan küçük (2018'de Kürt seçmenin ~%49'u iktidara).
+
+**Sentetik coğrafya gerçekçi değil.** Sentetik ailelerin il düzeyi oy payları gerçek 2023 il sonuçlarıyla
+(YSK, `tests/data/fetch_tr_il.py`; örneklemde yeterli kişisi olan 43 il) karşılaştırıldı: Kürt hareketi payı orta
+düzeyde tutuyor (r ≈ 0,65), milliyetçi ~0,5, ama iktidar payında ilişki zayıf (r = 0,18; kalibre veride 0,07) ve
+iktidar / ana muhalefet payında ortalama mutlak hata 10–12 puan. Kalibrasyon kişi düzeyindeki ilişkileri
+düzeltti, il düzeyindeki dağılımı düzeltmedi; il hedefli kalibrasyon yapılmadı.
 
 **İletişim mekanizmalarının gücü — ANES 2016 + 2020 havuzu (10.553 kişi).** Tek seçimde belirsiz kalan mercek
 katsayıları havuzda daralıyor: medya etkisinin dikkat × ELM ikna edilebilirliği × Hall okuma konumuyla
@@ -533,7 +540,7 @@ küçük (48–120), farklar bu nedenle temkinle okunmalı. Hayat öyküsü metn
 37,5–40,5'ten 56–63'e çıkardı (20b ve 120b): dil modeli öyküden gerçek bilgi okuyor, ama aynı bilgiyi
 yapılandırılmış sütun olarak alan bütünleşik model yine önde (72,9–75,0). Hane verisinin ayrıntılı aile
 öyküleriyle de aynı tablo: dil modeli 37,5 → 58,3; bütünleşik model aynı 48 kişide 95,8 (bu verinin 5 katlı
-CV'si 85,5 — küçük örneklem şanslı düştü). Ayrıntılı persona dil modelinin isabetini belirgin artırıyor, ama
+CV'si 85,4 — küçük örneklem şanslı düştü). Ayrıntılı persona dil modelinin isabetini belirgin artırıyor, ama
 en büyük kazanç aynı bilgiyi kuram terimlerine yapılandırılmış olarak vermekten geliyor. Ücretsiz Groq kotası günde 200 bin token.
 
 ### CSV biçimi
