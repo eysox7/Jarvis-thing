@@ -553,7 +553,7 @@ küçük (48–120), farklar bu nedenle temkinle okunmalı. Hayat öyküsü metn
 yapılandırılmış sütun olarak alan bütünleşik model yine önde (72,9–75,0). Hane verisinin ayrıntılı aile
 öyküleriyle de aynı tablo: dil modeli 37,5 → 58,3 (20b) ve 46,9 → 62,5 (120b, 96 kişi); bütünleşik model 96 kişide 83,3, 48 kişide 95,8 (bu verinin 5 katlı
 CV'si 85,4 — küçük örneklem şanslı düştü). Ayrıntılı persona dil modelinin isabetini belirgin artırıyor, ama
-en büyük kazanç aynı bilgiyi kuram terimlerine yapılandırılmış olarak vermekten geliyor. Ücretsiz Groq kotası günde 200 bin token.
+en büyük kazanç aynı bilgiyi kuram terimlerine yapılandırılmış olarak vermekten geliyor. Ücretsiz Groq kotası günde 200 bin token. Vekil sunucu (proxy) arkasında Node'un `fetch`'i vekili kendiliğinden kullanmaz: `NODE_USE_ENV_PROXY=1` ile çalıştırın.
 
 ### CSV biçimi
 
