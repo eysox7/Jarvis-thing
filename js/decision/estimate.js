@@ -36,7 +36,8 @@ export function fitChoiceModel(spec, rows, o = {}) {
   if (data.length < 10) throw new Error('öğrenme için en az 10 geçerli gözlem gerekli');
   const J = resolved.alts.length;
   // haric: kıyas (ablasyon) için dışarıda bırakılan terimler; kampanya terimi yalnızca kampanya varsa
-  const terms = resolved.terms.filter((t) => t.id !== 'iletisim' && !(o.haric || []).includes(t.id));
+  const disari = (t) => (o.haric || []).includes(t.id) || (t.mercekOf && (o.haric || []).includes(t.mercekOf));   // taban terim çıkarılınca merceği de çıkar
+  const terms = resolved.terms.filter((t) => t.id !== 'iletisim' && !disari(t));
   const K = terms.length;
   const tIdx = terms.map((t) => resolved.terms.indexOf(t));
   const prior = coefficients(resolved, { ...(o.baslangic || {}), theta: o.baslangic?.theta || {} });   // öncül = kuramın tam büyüklüğü
@@ -138,6 +139,8 @@ export function fitChoiceModel(spec, rows, o = {}) {
     kuramlar.push({ terim: t.id, ad: t.ad, kuram: t.kuram, onsel: t.onsel, ogrenilen: r3(x[k]), std_hata: r3(se),
       veri_payi_yuzde: Math.round(dataShare * 100), destek: x[k] / se > 2 ? 'veri kuramı destekliyor' : x[k] / se < -2 ? 'veri TERS yönde' : 'belirsiz' });
   });
+  // Dışarıda bırakılan (haric) terimler tahminde de yoktur: katsayı 0 (yoksa tahmin anında kuram öncülüyle geri girerdi)
+  for (const t of resolved.terms) if (t.id !== 'iletisim' && disari(t)) theta[t.id] = 0;
   const asc = Object.fromEntries(resolved.alts.map((a, j) => [a.id, r3(ascOf(j))]));
   let demo = null;
   if (D) {

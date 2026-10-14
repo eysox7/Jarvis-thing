@@ -171,20 +171,55 @@ Rastgele fayda kuramı (McFadden): kişi i seçenek j'den `U_ij = ASC_j + Σ θ_
 Nüfus tahmininin yanında **tek kişi** tahmini de yapılır (`decision_person`): betimlenen kişinin
 seçim olasılıkları, kararını en çok hangi kuramların belirlediği ve hangi bilgilerin eksik olduğu.
 
-### İletişim kuramları modelin içinde
+### İletişim kuramları: modelin ana ayağı (iletişim merceği)
 
-Kitle motorunun 20 iletişim kuramı ayrı bir rapor değil, karar faydasının parçasıdır. Her seçeneğin
-kamusal iletişimi (parti mesajı, marka reklamı, kurum önerisi; gündelik kararlarda sosyal çevrenin
-ağızdan ağıza anlatımı) **kararı verecek aynı personalar** üzerinde kuramlarla koşturulur ve kişi ×
-seçenek düzeyinde üç terim olarak faydaya girer; ağırlıkları veriden öğrenilir:
+Seçmen partileri, ekonomiyi ve tehdidi doğrudan görmez; onları iletişim ekolojisi üzerinden görür:
+izlediği kanallar, konuştuğu insanlar, ait olduğu kurumlar ve kendi dolaysız deneyimi (Lippmann'ın
+"kafamızdaki resimler"i). Bu yüzden iletişim kuramları yanda koşan bir araç değil, **her kuram teriminin
+geçtiği mercektir** (`js/decision/lens.js`):
 
-- **maruziyet ve gündem** — Lasswell, gündem belirleme, propaganda modeli, dijital uçurum, iki aşamalı akış
-- **iletişimin ürettiği tutum** — ELM, çerçeveleme, kaynak güvenilirliği, seçici maruziyet, ekme, tepkisellik, hegemonya
-- **okuma konumu** — Hall'un egemen / müzakereci / karşıt okuması
+```
+ kişinin iletişim ekolojisi ─► mercek ─┬─► GİRDİ:   gündem → eksen ağırlıkları (yakınlık, yönsel oy)
+ (kanal × saat, ilgi, ağ,              │            medya diyeti → maruziyet (kanal yanlılığı × azalan getirili saat)
+  kurumlar, deneyim)                   └─► AĞIRLIK: z'_k = z_k + (g_k − 1)·z_k   (mekanizma başına öğrenilen θ')
+```
 
-Suskunluk sarmalı ayrıca anket birleştirmede çekingen seçmen düzeltmesi olarak uygulanır. Seçenek
-`iletisim` alanıyla kendi mesajını (kurum, kanal, çerçeve, duruş, tekrar, metin) tanımlayabilir;
-verilmezse seçenek özelliklerinden türetilir.
+| Mekanizma | Kuram | Neyi değiştirir |
+|---|---|---|
+| Gündem belirleme + konu sahipliği | McCombs & Shaw; Petrocik; Vavreck (açıklayıcı/isyancı kampanya) | iktidar medyası ekonomi iyiyken ekonomiyi, kötüyken kültür/güvenliği öne çıkarır; muhalif medya tersini |
+| Yönelim ihtiyacı | Weaver | gündem etkisi ilgisi yüksek, bağlılığı zayıf kişide güçlü |
+| Dolaysız konular | Zucker | iş kaybı, borç, terör, zorunlu göç medya olmadan da gündemi belirler |
+| Öncelikleme | Iyengar & Kinder | öne çıkan eksen iktidarı değerlendirme ölçütü olur (ekonomik oy, otoriter dinamik, kimlik terimleri) |
+| ELM | Petty & Cacioppo | ayrıntılandırma olasılığı düşük kişi çevresel ipuçlarına (yanlı medya, araç, çoğunluk) açık |
+| Pekiştirme / çapraz baskı | Klapper; Stroud; Mutz | kendi partisinin medyası parti kimliğini güçlendirir, karşıt medya zayıflatır |
+| Kodlama / kodaçımlama + hegemonya | Hall; Gramsci | egemen koddaki medyayı marjinal ve egemen ideolojiden uzak izleyici karşıt okur → bumerang |
+| Ekme | Gerbner | ağır TV izleyicisinde güvenlik gündemi ve otoriter tepki |
+| İki aşamalı akış | Lazarsfeld; Katz | ilgisiz seçmen siyaseti çevresinden alır → tartışma ağının ağırlığı artar |
+| Suskunluk sarmalı | Noelle-Neumann | topluluğa gömülü, yalıtılmaktan korkan kişi iklime uyar; ayrıca anket düzeltmesi |
+| Sorumluluk atfı | Iyengar | afet sonrası iktidarı cezalandırma bilgi ister |
+
+Her mekanizmanın kişiler arası farkı ayrı bir terimdir (`mercek_<terim>`); öncülü kuramın öngördüğü
+tam etkidir, veri onu büyütür, küçültür ya da sıfırlar. Böylece model her iletişim mekanizmasının bu
+veride ne kadar işlediğini **ölçer** (`decision_learn` çıktısında katsayı ± hata). `baglam.mercek: 0`
+merceği kapatır. Kitle motorunun 20 kuramı ayrıca her seçeneğin kamusal mesajını aynı personalar üzerinde
+koşturur (maruziyet, tutum, Hall okuma konumu terimleri); seçenek `iletisim` alanıyla kendi mesajını tanımlayabilir.
+
+**Ne kadar katkı veriyor? (dürüst sonuç)** Mercek açık / kapalı:
+
+| Veri | 5 katlı CV | Hiç bireysel veri yok (yalnız kuram) | Seçimler arası aktarım |
+|---|---|---|---|
+| ANES 2016 tam / yapısal | 70,6 = 70,6 / 64,3 = 64,3 | 63,2 → **63,7** / 57,0 → **57,3** | — |
+| ANES 2020 tam / yapısal (partizan medya var) | 81,6 = 81,6 / 73,7 → 73,8 | 73,9 → 73,8 / 68,8 → 68,7 | — |
+| Sentetik hane (kanal × saat, ilgi, ağ) | 86,0 → 85,7 | 74,2 → 73,5 (log-kayıp 0,731 → 0,728) | 2018→2023: 74,2 → **74,7** |
+| Sentetik TR | 82,4 → **82,6** | — | — |
+
+Mercek tahmin gücünü belirgin artırmıyor (±0,5 puan): bol veride kişi değişkenlerinin sabitleri farkı
+zaten emiyor; veri yokken ANES 2016'da küçük kazanç, 2020'de küçük kayıp. Öğrenilen mekanizma
+katsayılarının çoğu belirsiz; sentetik hanede ekonomi gündemi/öncelikleme 0,69 ± 0,53, ANES 2020'de
+1,09 ± 0,79 ile öncül yönünde. Değeri yorumdadır: hangi mekanizmanın kimde işlediği ayrı ayrı görülür.
+**Reddedilen bir sınama:** ELM'yi "ilgili seçmen mesele yakınlığına, ilgisiz seçmen lider imajına bakar"
+diye kurmak ANES'te tahmini kötüleştirdi (veri yokken 2020'de 73,9 → 73,0); lider değerlendirmesi ilgili
+seçmende de güçlü bir özet yargıdır (Lau & Redlawsk). ELM bu yüzden yalnız ikna direnci olarak kaldı.
 
 ### Doğruluk nereden gelir
 
@@ -251,8 +286,8 @@ düzeyde taşır:
   (varsayılan 0,4); `baglam.sosyal_yayilim: false` kapatır.
 
 ANES 2016'da her seçmenin eyaletinin gerçek sonucu topluluk bağlamı olarak verildiğinde (yapısal
-model): 5 katlı CV 63,0 → **64,0** (kuramsız standart 63,9); hiç bireysel eğitim verisi yokken 43,1 →
-**50,6**; 100 kişiyle öğrenmede 58,8 → **62,0**, 800 kişide 60,3 → **63,8**.
+model): 5 katlı CV **64,3** (kuramsız standart 64,0); hiç bireysel eğitim verisi yokken 43,1 →
+**50,8**; 100 kişiyle öğrenmede **62,1** (standart 58,3), 800 kişide 63,8 (standart 63,5).
 
 **Gerçek ağ verisiyle sınama — ANES 2000** (`fetch_anes.py` → `ANES2000*`). 2000 anketinde her
 seçmene siyaseti konuştuğu en çok dört kişi, bu kişinin eşi/akrabası olup olmadığı ve seçimde kime oy
@@ -262,25 +297,26 @@ Standart model aynı bilgiyi düz kategorik sütun olarak görür (adil kıyas):
 
 | ANES 2000, 5 katlı CV | Standart | Bütünleşik | Log-kayıp (std / büt) |
 |---|---|---|---|
-| Yapısal, ağ bilgisi yok | 59,6 | 60,4 | 0,975 / 0,952 |
-| Yapısal + eşin ve ağın oyu | 65,4 | **67,3** | 0,898 / **0,833** |
-| Tam (parti kimliği + termometre), ağ yok | **71,7** | 71,3 | 0,746 / 0,707 |
-| Tam + eşin ve ağın oyu | 71,9 | **73,6** | 0,739 / **0,663** |
-| Öğrenme eğrisi, yapısal + ağ: 50 / 200 / 1.600 kişi | 56,6 / 62,2 / 66,3 | **61,6 / 64,5 / 68,8** | — |
+| Yapısal, ağ bilgisi yok | 61,7 | 61,7 | 0,933 / 0,929 |
+| Yapısal + eşin ve ağın oyu | **68,2** | 68,0 | 0,836 / **0,817** |
+| Tam (parti kimliği + termometre), ağ yok | 72,1 | **72,9** | 0,711 / **0,693** |
+| Tam + eşin ve ağın oyu | 73,9 | **74,8** | 0,674 / **0,649** |
+| Öğrenme eğrisi, yapısal + ağ: 50 / 200 / 800 kişi | 35,7 / 63,4 / **66,7** | **62,1 / 65,5** / 66,0 | — |
 
-- Aile ve çevre bilgisi bireysel özelliklerin ötesinde gerçek bilgi taşıyor: yapısal modelde +6,3, parti
-  kimliği varken bile +2,1 puan ve log-kayıpta belirgin düşüş. 1.600 kişide sosyal terimler çıkarılınca
-  68,8 → 66,6.
-- Gerçek veriden öğrenilen katsayılar literatür öncüllerine yakın: `aile` 1,67 ± 0,27 (öncül 1,5),
-  `ag` 1,30 ± 0,18 (öncül 1,5). Hiç eğitim verisi yokken (yalnız kuram + seçimin toplam sonucu) aile ve
-  ağ bilgisi isabeti 54,8'den **59,1**'e çıkarıyor.
-- Topluluk (eyalet sonucu) 2000'de katkı vermedi: CV'de 67,3 / 67,4 (bağlamsız), veri yokken 54,6 / 54,8.
-  2016'da aynı bağlam veri yokken +7,5 puandı. Olası açıklama: eyaletlerin partizan ayrışması 2000'den
-  sonra derinleşti; eyalet ayrıca kaba bir birim, mahalle düzeyi veri gerekir.
-- Sağlamlık (eş hariç, yalnız ağ; eyalet bağlamı olmadan): tüm ağ +3,7, yalnız akraba olmayanlar +1,7, yalnız "sık konuşulan"
-  kişiler +0,9 puan (352 kişi). Ağın katkısı kuramlı ve kuramsız modelde aynı; bütünleşik modelin farkı
-  esas olarak eş teriminden geliyor: kuramsız model eşin oyunu küçültülmüş sabitlerle
-  öğrenirken kuram öncülü büyük katsayıya (1,67) izin veriyor.
+- Aile ve çevre bilgisi bireysel özelliklerin ötesinde gerçek bilgi taşıyor: yapısal modelde +6,5, parti
+  kimliği varken bile +1,9 puan ve log-kayıpta belirgin düşüş. Bu bilgiyi kuramlı ve kuramsız model bol
+  veride eşit kullanıyor (68,0 / 68,2); kuramın farkı az veride (50 kişi: 62,1 / 35,7; 200 kişi: 65,5 / 63,4)
+  ve olasılık kalitesinde (log-kayıp).
+- Gerçek veriden öğrenilen katsayılar öncüllerle aynı yönde: `aile` 1,35 ± 0,30, `ag` 0,99 ± 0,22 (öncül
+  1,5; iletişim merceği açıkken, ağın bir kısmı iki aşamalı akış terimine geçer). Hiç eğitim verisi yokken
+  (yalnız kuram + seçimin toplam sonucu) aile ve ağ bilgisi isabeti 54,8'den **59,1**'e çıkarıyor.
+- Topluluk (eyalet sonucu) 2000'de katkı vermedi (veri yokken 54,6 / 54,8). 2016'da aynı bağlam veri
+  yokken +7,5 puandı. Olası açıklama: eyaletlerin partizan ayrışması 2000'den sonra derinleşti; eyalet
+  ayrıca kaba bir birim, mahalle düzeyi veri gerekir.
+- **Düzeltme (oturum 7):** önceki sürümde ablasyonda çıkarılan terimler tahmin anında kuram öncülüyle
+  geri giriyordu (`estimate.js`). Kuramsız modele öğrenilmemiş aile/ağ terimleri eklenmiş ve onu
+  bozmuştu; "yapısal + ağ: 65,4 / 67,3" ve "bütünleşik modelin farkı eş teriminden" sonuçları bu hatadan
+  geliyordu ve geri çekildi. Yukarıdaki sayılar düzeltilmiş kıyastır.
 - Sınır: kişinin "yakınım kime oy verdi" algısı kendi oyunu yansıtabilir (projeksiyon) ve bağların bir
   kısmı homofilidir; bu yüzden tahmin gücü nedensel etkinin üst sınırı sayılmalı.
 
@@ -303,14 +339,50 @@ modeline (silikon betimi) gider.
 
 | Sentetik TR, 5 katlı CV (3.000 kişi) | Çoğunluk | Kuramsız standart | Bütünleşik |
 |---|---|---|---|
-| Yalnız sıradan anket (demografi, değerler, algılar) | 43,2 | 68,5 | 68,6 |
-| + hayat öyküsü, aile, ağ, mahalle | 43,2 | 76,7 | **80,3** (log-kayıp 0,550 / standart 0,751) |
-| + önceki oy (2018 dalgası) | 43,2 | 81,7 | **82,4** (log-kayıp 0,499 / 0,663) |
-| Öğrenme eğrisi, öykülü: 50 / 200 / 800 kişi | 42 / 44 / 43 | 70,8 / 74,3 / 75,8 | **76,2 / 79,2 / 79,9** |
-| Hiç bireysel veri yok (yalnız kuram) | 43,2 | — | **63,2** |
+| Yalnız sıradan anket (demografi, değerler, algılar) | 43,2 | 68,8 | 68,8 |
+| + hayat öyküsü, aile, ağ, mahalle | 43,2 | 74,5 | **80,1** (log-kayıp 0,547 / standart 0,698) |
+| + önceki oy (2018 dalgası) | 43,2 | 80,3 | **82,6** (log-kayıp 0,497 / 0,564) |
+| Öğrenme eğrisi, + önceki oy: 50 / 200 / 800 kişi | 42 / 44 / 43 | 42,3 / 73,7 / 79,4 | **78,4 / 81,0 / 81,2** |
+| Hiç bireysel veri yok (yalnız kuram) | 43,2 | — | **68,8** |
 
-Hayat öyküsü bilgisi isabeti 12 puan artırıyor; bu bilgiyle kuramlar kuramsız modeli her veri
-miktarında 4–5 puan geçiyor (sosyal terimler çıkarılınca −4/−5, eleştirel terimler çıkarılınca −1/−2 puan).
+Hayat öyküsü bilgisi isabeti 6–11 puan artırıyor; bu bilgiyle kuramlar kuramsız modeli 2–6 puan, az
+veride çok daha fazla geçiyor. Sosyal terimler çıkarılınca her veri miktarında −2/−5 puan; eleştirel
+terimler çıkarılınca fark yok ya da hafif artış (düzeltilmiş kıyasta eleştirel terimlerin bu veride
+katkısı görülmüyor).
+
+### Aileleriyle sentetik seçmenler: hane temelli yaşam seyri (`tests/data/sentetik/hane/`)
+
+`node tests/data/hayat_uret.mjs` gerçek demografik oranlardan (TÜİK ADNKS, eğitim ve evlenme
+istatistikleri, TNSA doğurganlık ve akraba evliliği, TAYA, hayat tabloları, RTÜK) **1.300 hane ve
+~2.900 seçmen** üretir. Aile soyut bir sütun değildir: hanedeki eş, evde yaşayan yetişkin çocuk ve dul
+kalmış yaşlı ebeveyn ayrı seçmenlerdir; birbirlerinin oyunu gerçekten etkilerler. Her kişinin anne-babası
+(adları, kendi kuşaklarının eğitimi, meslekleri, babanın oyu o dönemin partileriyle), kardeşleri
+(annenin kuşağının doğurganlığı; Almanya'ya işçi giden abi, köyde kalan abla, bebekken ölen kardeşler),
+köyden kente göçü, okulu, askerliği, evliliği (görücü usulü, akraba evliliği), çocukları, iş hayatı,
+yaşadığı tarihsel olaylar (12 Eylül, 90'larda köy boşaltmaları, 1999 ve 2023 depremleri, 2001 krizi, Gezi,
+15 Temmuz, KHK, pandemi), konutu, sağlığı, gündelik rutini, kaygıları ve **iletişim ekolojisi** vardır:
+TV kanalı ve saati, sosyal medya kaynağı ve saati, aile WhatsApp grubu, cami/cemevi, kahvehane, adı
+konmuş tartışma ağı ve kanaat önderi. Öyküler ortalama ~1.700 karakterdir. Oy, 2015–2023 arası yıl yıl
+işleyen ajan tabanlı bir iletişim süreciyle oluşur (medya dozu, karşıt içerikte geri tepme, hanede eş
+zamanlı etkileşim); karar modelinin denklemi kullanılmaz. Kalibrasyon ve kaynaklar:
+[tests/data/sentetik/hane/README.md](tests/data/sentetik/hane/README.md).
+
+> *Örnek (kısaltılmış):* Mehmet Çelik, 1962'de Bursa'ya bağlı bir köyde doğdu; 8 çocuklu bir ailenin
+> çocuğu. Babası Ramazan işçi, annesi Hatice hiç okula gitmemişti; babası yıllarca Adalet Partisi'ne,
+> sonra Doğru Yol'a oy verdi. Üç kardeşi bebekken öldü. 1987'de köyden Bursa merkezine taşındı. 1986'da
+> halasının kızı Özlem ile evlendi. Günde 4,5 saat televizyon izliyor… Siyaseti en çok annesi, abileri
+> Recep ve İbrahim, evli kızı Sibel ve komşularıyla konuşuyor. Kirada oturuyor; kalp hastası…
+
+| Sentetik hane, 5 katlı CV (2.909 kişi) | Çoğunluk | Kuramsız standart | Bütünleşik |
+|---|---|---|---|
+| Sıradan anket + iletişim ekolojisi ve hayat sütunları (aile/ağ/önceki oy yok) | 42,4 | 65,6 | **66,7** |
+| + aile (eşin, babanın oyu), ağ, mahalle, olaylar | 42,4 | 76,2 | **81,0** (log-kayıp 0,525 / 0,639) |
+| + önceki oy (2018) | 42,4 | 83,7 | **85,7** (log-kayıp 0,414 / 0,476) |
+| Öğrenme eğrisi, tam: 50 / 200 / 800 kişi | 38 / 42 / 43 | 37,9 / 73,5 / 81,9 | **81,0 / 83,7 / 84,6** |
+| Hiç bireysel veri yok (yalnız kuram) | 42,4 | — | **66,8** |
+
+Hanede aynı oy %60 (rastgele çift %30); eşle aynı oy (algılanan) %65, tartışma ağının çoğunluğuyla
+%61 (ANES 2000: %76 / %59). Sosyal terimler çıkarılınca her veri miktarında −2/−5 puan.
 
 **Panel: aynı kişiler, iki seçim (`--secimler-tr`).** Aynı 3.000 kişi 2018 koşullarında da oy verir:
 ekonomik zarar daha az (döviz krizi seçimden sonra), 2023 depremi yok, 2015–17 sonrası güvenlik gündemi
@@ -319,13 +391,16 @@ Bir seçimde öğrenip ötekini tahmin etmek (eş/ağ/mahalle ve önceki oy hari
 
 | Aktarım | Standart | Bütünleşik | Eleştirel terimler çıkarılınca | Toplam paya kalibre (std / büt) |
 |---|---|---|---|---|
-| 2018'de öğren → 2023 | 70,1 (ll 0,876) | **71,7** (ll 0,762) | 69,6 | 70,1 / **73,2** |
-| 2023'te öğren → 2018 | 67,6 (ll 0,919) | **72,4** (ll 0,730) | 69,1 | 69,4 / **72,8** |
+| 2018'de öğren → 2023 | **71,8** (ll 0,759) | 71,3 (ll 0,766) | 71,3 | **73,4** / 72,9 |
+| 2023'te öğren → 2018 | 72,5 (ll 0,724) | **72,6** (ll 0,730) | 73,0 | **73,5** / 73,1 |
+| Hane verisi: 2018 → 2023 | **75,2** (ll 0,688) | 74,7 (ll 0,691) | 75,1 | **77,1** / 76,4 |
+| Hane verisi: 2023 → 2018 | 72,7 (ll 0,750) | 72,7 (ll 0,751) | 72,2 | **74,5** / 74,0 |
 
-Üç yeni terim (`kolektif_travma`, `yabancilasma`, `afet_cezasi`) aynı seçim içinde neredeyse hiç katkı
-vermez (her veri miktarında ±0,2): girdileri (zorunlu göç, travma, deprem) zaten düz sütun olarak modelde.
-Değerleri aktarımda görünür: 2018 verisinde 2023 depremi yoktur, ama kuram "kayıp yaşayan iktidarı
-cezalandırır" bilgisini taşır. Deprem kaybı yaşayan 92 seçmende 2018→2023 isabeti 68,5 → **70,7**.
+Düzeltilmiş kıyasta sentetik panelde seçimler arası aktarımda kuram avantajı **yok**: önceki sürümün
+"71,7 / 70,1 ve 72,4 / 67,6" farkı, kuramsız modele tahmin anında öğrenilmemiş iletişim terimlerinin
+eklenmesinden (yukarıdaki hata) geliyordu ve geri çekildi. Aynı nedenle "üç yeni terim deprem kaybı
+yaşayanlarda aktarımı 68,5 → 70,7 iyileştiriyor" sonucu da geri çekildi; yeniden ölçülmesi gerekiyor.
+Gerçek ANES'te yapısal aktarım avantajı (aşağıda) düzeltmeden sonra da sürüyor.
 Not: üretim zinciri ekonomik oy, afet cezası gibi mekanizmaları içerir; model denklemi kullanılmasa da
 bu bir "dünya böyle işliyorsa model yakalar mı" sınamasıdır, gerçek panelde tekrarlanmalı.
 
@@ -341,23 +416,26 @@ değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diye
 
 | Test | Çoğunluk | Standart | Bütünleşik | Eleştirel terimler çıkarılınca |
 |---|---|---|---|---|
-| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 59,6 | **70,2** | 70,0 |
-| Seçimler arası, yapısal: 2020 → 2016 (2016'da eyalet bağlamı) | 35,7 | 57,2 | **62,5** | 60,7 |
-| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | 79,8 | **79,9** | 78,6 |
+| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 57,5 | **70,0** | 71,3 |
+| Seçimler arası, yapısal: 2020 → 2016 (2016'da eyalet bağlamı) | 35,7 | 57,2 | **62,6** | 61,4 |
+| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | 78,1 | **80,5** | 80,0 |
+| Seçimler arası, tam: 2020 → 2016 | 35,7 | **71,0** | 70,1 | 70,1 |
 | Gerçek iş akışı: 2016'da öğren + 2020'nin toplam paylarına (anket) kalibre et → 2020, yapısal | 47,1 | 61,8 | **70,9** | — |
-| Aynı iş akışı, tam model (parti kimliği + termometre) | 47,1 | **81,2** | 80,8 | — |
-| Aynı seçim, 5 katlı CV, yapısal 2020 | 47,1 | 73,6 | 73,4 | — |
-| Az veri: 2016'dan 100 kişiyle öğren (`--egri`) | 33,7 | 56,5 | **62,0** | 60,1 |
-| Az veri: 50 kişi | 33,5 | 31,5 | **57,5** | 57,3 |
-| Hiç bireysel veri yok — yalnız kuram + seçimin toplam sonucu, 2020 yapısal (`--sifir`) | 47,1 | — | **68,8** | — |
+| Aynı iş akışı, tam model (parti kimliği + termometre) | 47,1 | **81,0** | 80,8 | — |
+| Aynı seçim, 5 katlı CV, yapısal 2020 | 47,1 | **74,1** | 73,8 | — |
+| Az veri: 2016'dan 100 kişiyle öğren (`--egri`) | 33,7 | 58,3 | **62,1** | 60,1 |
+| Az veri: 50 kişi | 33,5 | 33,1 | **57,8** | 56,9 |
+| Hiç bireysel veri yok — yalnız kuram + seçimin toplam sonucu, 2020 yapısal (`--sifir`) | 47,1 | — | **68,7** | — |
 
 - Otoriter dinamik terimi (Frankfurt Okulu) iki seçimde de anlamlı: katsayı 0,34 ± 0,14 (2016),
   0,30 ± 0,10 (2020).
 - Kuramın değeri **az veride**, **yeni bir seçime/bağlama taşımada** ve **veri yokken** ortaya çıkar
   (iktidar değişince kuram ekonomik oyu ve iktidar yorgunluğunu doğru tarafa taşır; kuramsız model
   çöker). Bol veriyle aynı seçimin içinde ise esnek kuramsız model ile başa baş gider.
-- Diğer siyasi veriler (5 katlı CV): Şili 1988 plebisiti 32,9 / 67,4 / **67,5**; İngiltere BEPS
-  47,2 / **67,1** / 66,9 (log-kayıpta bütünleşik daha iyi: 0,845 / 0,861 ve 0,771 / 0,779).
+- Diğer siyasi veriler (5 katlı CV): Şili 1988 plebisiti 32,9 / 67,4 / 67,4; İngiltere BEPS
+  47,2 / **67,1** / 66,8 (log-kayıpta bütünleşik daha iyi: 0,845 / 0,857 ve 0,772 / 0,779).
+- Bu tablo oturum 7'deki ablasyon hatası düzeltildikten sonra yeniden ölçüldü (kuramsız model artık
+  öğrenmediği terimleri tahminde kullanmıyor); yapısal aktarımda kuramın 12,5 puanlık üstünlüğü sürüyor.
 
 **Ticaret:** otomobil tercihi (4.654 kişi, 6 seçenek) çoğunluk 32,2 / standart 40,2 / bütünleşik 40,1;
 ısıtma sistemi (900 hane) her model çoğunlukta 63,7 — veride kişi bilgisi çok az, kuram ek katkı vermiyor.

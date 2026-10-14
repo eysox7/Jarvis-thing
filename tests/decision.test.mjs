@@ -380,7 +380,7 @@ console.log('\n[27] İletişim merceği: her kuram terimi kişinin iletişim ort
   const L = (p, r = R) => lensOf(r, features(p), p);
   ok(L(base, R0) === null, 'mercek: 0 → kapalı');
   const z0 = zMatrix(R0, features(base), { ...base }), z1 = zMatrix(R, features({ ...base, medya_kaynagi: 'yandas' }), { ...base, medya_kaynagi: 'yandas' });
-  ok(z0.length === z1.length && z0.every((row) => row.every(Number.isFinite)) && z1.every((row) => row.every(Number.isFinite)), 'mercekli ve merceksiz terim matrisi aynı boyutta ve sonlu');
+  ok(R.terms.filter((t) => t.mercekOf).length >= 8 && !R0.terms.some((t) => t.mercekOf) && z1.length === R.terms.length && z0.every((row) => row.every(Number.isFinite)) && z1.every((row) => row.every(Number.isFinite)), 'mercek açıkken mekanizma başına öğrenilebilir mercek terimi; kapalıyken yok');
   // Gündem (Vavreck): ekonomi iyiyken iktidar medyası ekonomiyi, muhalif medya kültürü öne çıkarır
   ok(L({ ...base, medya_kaynagi: 'yandas' }).s.ekonomi > L({ ...base, medya_kaynagi: 'muhalif' }).s.ekonomi, 'gündem belirleme: iyi ekonomide yandaş medya ekonomiyi öne çıkarır');
   ok(L({ ...base, is_kaybi: 1 }).s.ekonomi > L(base).s.ekonomi, 'dolaysız konu (Zucker): iş kaybı medyadan bağımsız ekonomiyi öne çıkarır');
@@ -393,6 +393,30 @@ console.log('\n[27] İletişim merceği: her kuram terimi kişinin iletişim ort
   const P = (p, ctx) => predictPerson(sp(ctx), p).olasiliklar;
   const yAg = { ...base, siyasi_ilgi: 0.1, ag_paylari: { I: 0.9, M: 0.1 } };
   ok(P(yAg).I - P(yAg, { mercek: 0 }).I > 0, 'mercek tahmine işler: ilgisiz seçmende ağ etkisi büyür');
+}
+
+console.log('\n[28] Hane temelli yaşam seyri verisi (tests/data/sentetik/hane)');
+{
+  const { readFileSync, existsSync } = await import('node:fs');
+  const F = new URL('./data/sentetik/hane/', import.meta.url);
+  if (!existsSync(new URL('TR_hane_secmen.csv', F))) ok(false, 'hane verisi yok (node tests/data/hayat_uret.mjs)');
+  else {
+    const raw = parseCSV(readFileSync(new URL('TR_hane_secmen.csv', F), 'utf8'));
+    const story = readFileSync(new URL('TR_hane_oyku.jsonl', F), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    const haneler = new Map(); for (const r of raw) (haneler.get(r.hane) || haneler.set(r.hane, []).get(r.hane)).push(r);
+    ok(raw.length > 2000 && haneler.size > 1000 && raw.length / haneler.size > 1.8, `${haneler.size} hane, ${raw.length} seçmen (hane başı ${(raw.length / haneler.size).toFixed(2)} seçmen)`);
+    const share = (id) => raw.filter((r) => r.secim === id).length / raw.length;
+    ok(Math.abs(share('iktidar') - 0.43) < 0.03 && Math.abs(share('ana_muhalefet') - 0.29) < 0.03, 'oy dağılımı kalibrasyon hedeflerinde');
+    const cok = [...haneler.values()].filter((h) => h.length > 1);
+    const ayni = cok.flatMap((h) => h.slice(1).map((x) => x.secim === h[0].secim)), ortak = ayni.filter(Boolean).length / ayni.length;
+    const rast = raw.slice(0, 2000).map((x, i) => x.secim === raw[(i * 7919 + 13) % raw.length].secim).filter(Boolean).length / 2000;
+    ok(ortak > rast + 0.15, `aile bağı gerçek: aynı hanede aynı oy %${(ortak * 100).toFixed(0)} (rastgele çift %${(rast * 100).toFixed(0)})`);
+    ok(story.length === raw.length && story.every((x) => x.oyku.length > 600 && /doğdu/.test(x.oyku)) && story.reduce((a, x) => a + x.oyku.length, 0) / story.length > 1200, 'her kişinin ayrıntılı hayat öyküsü var (ort. >1.200 karakter)');
+    const yetiskin = story.filter((x, i) => Number(raw[i].yas) >= 30);
+    ok(yetiskin.filter((x) => /(Babası|Annesi) .+;/.test(x.oyku) && /Siyaseti en çok/.test(x.oyku)).length / yetiskin.length > 0.9, 'öykü anne-baba ve adı konmuş tartışma ağını içerir');
+    ok(!story.some((x, i) => new RegExp(`kendisi ${raw[i].secim}`).test(x.oyku)), 'öykü kişinin kendi oyunu söylemez');
+    ok(raw.every((r) => r.siyasi_ilgi !== '' && r.tv_saat !== '' && r.tv_kanal_turu), 'iletişim ekolojisi sütunları (ilgi, TV saati, kanal türü) her kişide');
+  }
 }
 
 console.log('');

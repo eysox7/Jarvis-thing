@@ -11,7 +11,7 @@ import { DECISION_DOMAINS, ILETISIM, GECMIS, ILETISIM_TERIMLERI, isAbstain, SILI
 import { ensureComm } from './communication.js';
 import { rng } from '../audience/personas.js';
 import { socialStructure, diffuse } from './social.js';
-import { lensOf } from './lens.js';
+import { lensOf, MERCEK_MEKANIZMA } from './lens.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 /** Kişi alanı → demografik anahtar. Sürekli sayılar (algı, tehdit, borç…) 0.25'lik dilimlere ayrılır. */
@@ -32,7 +32,12 @@ export function resolveChoice(spec = {}) {
   // doğrusal katsayı (öncül 0, gevşek). spec.serbest = {özellik: ölçek} — bütünleşik model kuramsız modeli kapsar.
   const free = Object.entries(spec.serbest || {}).map(([k, sc]) => ({ id: 'serbest_' + k, ad: k + ' (serbest)', kuram: 'veriden öğrenilen doğrusal etki', onsel: 0, sigma: 2,
     z: (f, p, a) => (a[k] === undefined || a[k] === null ? 0 : (Number(a[k]) || 0) / (Number(sc) || 1)) }));
-  const terms = [...domain.terimler, ...free, ...ILETISIM_TERIMLERI, ...SOSYAL_TERIMLERI, ILETISIM, GECMIS, SILIKON];
+  const base = [...domain.terimler, ...free, ...ILETISIM_TERIMLERI, ...SOSYAL_TERIMLERI, ILETISIM, GECMIS, SILIKON];
+  // İletişim merceği terimleri (lens.js): mekanizma başına öğrenilebilir sapma; öncül = taban terimin öncülü
+  const lens = domain.id === 'siyaset' && ctx.mercek !== 0 && ctx.mercek !== '0'
+    ? base.filter((t) => MERCEK_MEKANIZMA[t.id]).map((t) => ({ id: 'mercek_' + t.id, ad: 'İletişim merceği: ' + t.ad, kuram: MERCEK_MEKANIZMA[t.id], onsel: t.onsel, sigma: 0.75, mercekOf: t.id, z: () => 0 }))
+    : [];
+  const terms = [...base, ...lens];
   return { domain, alts, ctx, terms };
 }
 
@@ -143,12 +148,17 @@ export function rowResolved(resolved, row) {
 }
 
 /** Kişi için z matrisi (terim × seçenek). Tahmin ve öğrenme ortak kullanır. */
-// Her terim iletişim merceğinden geçer (lens.js): kişinin iletişim ortamı terimin girdisini (gündem →
-// eksen ağırlıkları) ve ağırlığını (öncelikleme, ELM, pekiştirme, iki aşamalı akış, Hall) belirler.
+// Her terim iletişim merceğinden geçer (lens.js): kişinin iletişim ortamı terimin girdisini belirler
+// (gündem → eksen ağırlıkları, medya diyeti → maruziyet); ağırlığındaki kişiler arası fark (öncelikleme,
+// ELM, pekiştirme, iki aşamalı akış, Hall) ayrı mercek terimi olarak girer: z = (g_k − 1) · z_k.
 export function zMatrix(resolved, f, p, i = 0) {
   const L = p ? lensOf(resolved, f, p) : null;
   if (p) Object.defineProperty(p, '__mercek', { value: L, enumerable: false, configurable: true, writable: true });
-  return resolved.terms.map((t) => { const g = L?.g[t.id] ?? 1; return resolved.alts.map((a) => g * t.z(f, p, a, resolved.ctx, i)); });
+  const raw = {};
+  return resolved.terms.map((t) => {
+    if (t.mercekOf) { const zb = raw[t.mercekOf], g = L?.g[t.mercekOf]; return zb && g !== undefined ? zb.map((z) => (g - 1) * z) : resolved.alts.map(() => 0); }
+    return (raw[t.id] = resolved.alts.map((a) => t.z(f, p, a, resolved.ctx, i)));
+  });
 }
 
 /** Kitle motorundan kampanya etkisini kişi başı fayda katkısına çevirir (aynı nüfus sırası). */

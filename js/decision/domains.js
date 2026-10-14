@@ -87,7 +87,8 @@ export const SIYASET = {
     { id: 'muzakere', ad: 'Müzakereci akıl', kuram: 'Habermas (1981) iletişimsel eylem — içerik kişilikten ağır basar', onsel: 0.6,
       z: (f, p, a, ctx) => { if (isAbstain(a)) return 0; const v = politicalPosition(f, p), q = partyPos(a); return (0.6 * f.nfc + 0.4 * f.leader) * (-((v.ekonomi - q.ekonomi) ** 2 + (v.kultur - q.kultur) ** 2) - 0.5 * (num(a.lider, 0.5) - 0.5)); } },
     { id: 'medya_yanliligi', ad: 'Medya sahipliği ve yanlılığı', kuram: 'Herman & Chomsky (1988) propaganda modeli; Smythe; Hall okuma konumu ile ağırlıklı — DellaVigna & Kaplan (2007): ağır izleyicide ~0,1–0,3 logit', onsel: 0.3,
-      z: (f, p, a, ctx) => { const s = ctx?.medya_yanliligi?.[p?.medya_kaynagi ?? mainMedia(p)]?.[a.id]; return s === undefined ? 0 : num(s) * (0.4 + 0.6 * f.kurumsal_guven); } },
+      // İletişim merceği varsa kişinin tüm medya diyeti (kanal × saat), yoksa ana kaynak
+      z: (f, p, a, ctx) => { const d = p?.__mercek?.medya; const s = d ? d[a.id] : ctx?.medya_yanliligi?.[p?.medya_kaynagi ?? mainMedia(p)]?.[a.id]; return s === undefined ? 0 : num(s) * (0.4 + 0.6 * f.kurumsal_guven); } },
     { id: 'arac', ad: 'Araç mesajdır', kuram: 'McLuhan (1964); Innis — sosyal medya düzen karşıtlığını, TV yerleşik düzeni besler', onsel: 0.4,
       z: (f, p, a) => { const m = mainMedia(p) === 'sosyal' ? 1 : mainMedia(p) === 'tv' ? -0.5 : 0; return m * (a.iktidar ? -1 : a.duzen_karsiti ? 1 : 0); } },
     { id: 'kimlik_siyaseti', ad: 'Marjinal kimlik ve karşı-hegemonya', kuram: 'Crenshaw (1989) kesişimsellik; Gramsci karşı-hegemonya; Hall — marjinal gruplar kültürel liberal/çoğulcu partiye yönelir', onsel: 0.8,

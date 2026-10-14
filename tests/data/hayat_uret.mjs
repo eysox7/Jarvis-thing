@@ -124,7 +124,7 @@ function soyAnlat(blok, dogum, dindar) {
     ana_muhalefet: genc ? "Ecevit'e, DSP'ye, sonra CHP'ye" : "CHP'ye, Ecevit'in 'ak günlere' sloganına inanarak",
     milliyetci: "MHP'ye — Türkeş'in ülkücü hareketine",
     kurt_sol: genc ? "HADEP'ten bu yana Kürt siyasi hareketine" : "bölgedeki ağanın dediğine, seksenlerden sonra Kürt siyasi hareketine",
-    oy_yok: 'sandığa pek gitmezdi; "devlet işi" derdi',
+    oy_yok: null,
   }[blok];
 }
 
@@ -469,7 +469,7 @@ for (const P of kisiler) {
     for (let c = 0; c < 12; c++) { const x = pick(havuz); if (x === P || x.hane === P.hane) continue; const d = Math.abs(x.din - P.din) + Math.abs(x.egit01 - P.egit01) + (x.kim !== P.kim ? 1.2 : 0) + Math.abs(x.yas - P.yas) / 30; const s = -2 * d + gumbel(); if (s > bs) { bs = s; best = x; } }
     if (!best) continue;
     const rol = P.meslek === 'isci' || P.meslek === 'memur' || P.meslek === 'ozel_sektor_beyaz_yaka' ? pick(['iş arkadaşı', 'komşusu', 'arkadaşı']) : P.kahve ? pick(['kahvedeki arkadaşı', 'komşusu']) : P.gun ? pick(['gün arkadaşı', 'komşu kadın']) : pick(['arkadaşı', 'komşusu', 'kuzeni']);
-    ag.push({ kisiYerel: best.id, iliski: rol, ad: best.ad, siklik: 0.5 });
+    ag.push({ kisiYerel: best.id, iliski: best.kadin && /kahve/.test(rol) ? 'komşusu' : !best.kadin && /gün arkadaşı|komşu kadın/.test(rol) ? 'komşusu' : rol, ad: best.ad, siklik: 0.5 });
   }
   // Kanaat önderi (Katz & Lazarsfeld): bağlama göre adı konmuş biri
   const onder = P.cami ? { iliski: 'mahallenin imamı', blok: bern(0.8) ? 'iktidar' : 'milliyetci' } : P.cemevi ? { iliski: 'cemevindeki dede', blok: bern(0.75) ? 'ana_muhalefet' : 'kurt_sol' } : P.kahve ? { iliski: 'kahvede herkesin dinlediği emekli öğretmen', blok: pickW({ iktidar: 0.35, ana_muhalefet: 0.4, milliyetci: 0.2, kurt_sol: P.kurt ? 0.5 : 0.02 }) }
@@ -577,7 +577,7 @@ const rows = kisiler.map((P) => {
     ...Object.fromEntries(ALTS.map((a, j) => ['ag_' + a, n ? r2(say[j] / n) : ''])),
     ...Object.fromEntries(ALTS.map((a, j) => ['cevre_' + a, r2(0.6 * IL[P.il][j] + 0.4 * q[j])])),
     // Yeni (hane ve iletişim ekolojisi) — ankette sorulabilir
-    siyasi_ilgi: r2(clamp(P.ilgi + 0.1 * norm())), tv_saat: P.tvSaat, sosyal_saat: P.sosyalSaat,
+    siyasi_ilgi: r2(clamp(P.ilgi + 0.1 * norm())), tv_saat: P.tvSaat, sosyal_saat: P.sosyalSaat, tv_kanal_turu: P.tvTur, sosyal_kaynak_turu: P.sosTur,
     hane_buyuklugu: H.uyeler.length + (P.cocuklar || []).filter((c) => c.evdeYasar && YIL - c.dogum < 18).length, hane_tipi: H.tip, evde_cocuk: evdeCocuk,
     kardes_sayisi: (P.kardesler || []).filter((s) => !s.olu).length, akraba_evliligi: P.evlilik?.akraba ? 1 : 0, gorucu_usulu: P.evlilik?.gorucu ? 1 : 0,
     gurbetci_akraba: P.gurbet ? 1 : 0, askerlik_dogu: P.askerlik?.dogu ? 1 : 0, darbe_maruziyeti: P.darbe || 0, khk: P.khk || 0,
@@ -596,8 +596,8 @@ function oyku(P, row) {
   // Köken ve anne-baba
   s.push(`${P.ad} ${P.soyad}${P.kizlikSoyadi ? ` (kızlık soyadı ${P.kizlikSoyadi})` : ''}, ${yilda(P.dogum)} ${P.koyde ? yon(P.dogumIl) + ' bağlı bir köyde' : bul(P.dogumIl)} doğdu; ${kok} bir ailenin ${(P.kardesler || []).length ? (P.kardesler.length + 1) + ' çocuğundan biri' : 'tek çocuğu'}.`);
   if (P.rol !== 'cocuk') {
-    s.push(`Babası ${A.babaAd} ${MESLEK_AD[A.babaMeslek] ?? A.babaMeslek}${A.babaEgt <= 1 ? (A.babaEgt === 0 ? ', okuma yazması yoktu' : ', ilkokul mezunu') : A.babaEgt >= 4 ? ', üniversite mezunuydu' : ''}; annesi ${A.anneAd} ${A.anneMeslek}${A.anneEgt === 0 ? ', hiç okula gitmemişti' : ''}.`);
-    s.push(`Evde din ${A.din > 0.66 ? 'hayatın merkezindeydi' : A.din > 0.4 ? 'gelenek olarak yaşanırdı' : 'pek konuşulmazdı'}; babası yıllarca ${soyAnlat(A.babaBlok, A.babaDogum, A.din > 0.6)} oy verdi${A.anneBlok !== A.babaBlok ? `, annesi ise sandıkta ${PARTI_KISA[A.anneBlok] === 'siyasetten uzak' ? 'çoğu zaman oy kullanmazdı' : 'gizlice ' + PARTI_KISA[A.anneBlok] + ' çizgisine yakındı'}` : ''}.`);
+    s.push(`Babası ${A.babaAd} ${MESLEK_AD[A.babaMeslek] ?? A.babaMeslek}${A.babaEgt <= 1 ? (A.babaEgt === 0 ? ', okuma yazması yoktu' : ', ilkokul mezunu') : A.babaEgt >= 4 ? (A.babaHayatta ? ', üniversite mezunu' : ', üniversite mezunuydu') : ''}; annesi ${A.anneAd} ${A.anneMeslek}${A.anneEgt === 0 ? ', hiç okula gitmemişti' : ''}.`);
+    s.push(`Evde din ${A.din > 0.66 ? 'hayatın merkezindeydi' : A.din > 0.4 ? 'gelenek olarak yaşanırdı' : 'pek konuşulmazdı'}; babası ${A.babaBlok === 'oy_yok' ? 'sandığa pek gitmez, siyasete "devlet işi" derdi' : 'yıllarca ' + soyAnlat(A.babaBlok, A.babaDogum, A.din > 0.6) + ' oy verdi'}${A.anneBlok !== A.babaBlok ? `, annesi ise sandıkta ${PARTI_KISA[A.anneBlok] === 'siyasetten uzak' ? 'çoğu zaman oy kullanmazdı' : 'gizlice ' + PARTI_KISA[A.anneBlok] + ' çizgisine yakındı'}` : ''}.`);
     const olum = [];
     if (!A.babaHayatta) olum.push(`babasını ${yilda(A.babaOlum)} ${A.babaOlum - P.dogum < 16 ? 'henüz çocukken' : ''} kaybetti`.replace(/  /g, ' '));
     if (!A.anneHayatta) olum.push(`annesini ${yilda(A.anneOlum)} kaybetti`);
@@ -676,7 +676,43 @@ function oyku(P, row) {
   if (P.otoriter > 0.65) s.push('Çocukların her şeyden önce büyüklerine saygı ve itaat öğrenmesi gerektiğine inanıyor.');
   else if (P.otoriter < 0.25) s.push('Çocukların merak ve bağımsızlıkla yetişmesi gerektiğini savunuyor.');
   s.push(P.ilgi > 0.6 ? 'Siyaseti yakından takip eder; tartışmaktan çekinmez.' : P.ilgi < 0.3 ? 'Siyasete ilgisi az; "hepsi aynı" der.' : 'Siyaseti ara sıra takip eder.');
+  s.push(...gundelik(P, H));
   return s.join(' ');
+}
+// Gündelik hayat ayrıntıları — ayrı rastgele akış (oylar ve ölçülen sütunlar değişmez). Oranlar yaklaşık:
+// konut sahipliği ~%57 (TÜİK), 65+ kronik hastalık ~%50 (TÜİK Sağlık Araştırması), Kürtçe anadili Kürtlerin büyük çoğunluğu
+const r2nd = rng(SEED * 97 + 13), V2 = () => r2nd(), b2 = (p) => V2() < p, p2 = (a) => a[Math.floor(V2() * a.length)];
+function gundelik(P, H) {
+  const s = [];
+  const evSahibi = b2(clamp(0.25 + 0.012 * (P.yas - 20) + (P.gelir === 'yuksek' ? 0.2 : P.gelir === 'dusuk' ? -0.15 : 0) + (H.kirsal ? 0.25 : 0), 0.05, 0.92));
+  if (P.rol === 'cocuk' || P.rol === 'yasli_ebeveyn') s.push(`${P.rol === 'cocuk' ? 'Ailesinin' : P.kadin ? 'Oğlunun' : 'Oğlunun'} evinde${P.rol === 'yasli_ebeveyn' ? ' kalıyor; torunlarıyla vakit geçirmek en büyük teselli' : ' kendi odası var; kira fiyatları yüzünden ayrı eve çıkmayı erteliyor'}.`);
+  else s.push(evSahibi ? (H.kirsal ? 'Köydeki ev babadan kalma; bahçesinde sebze yetiştiriyor.' : `Ev sahibi${b2(0.4) ? '; evin kredisi daha bitmedi' : ''}.`) : `Kirada oturuyor${b2(0.6) ? '; son iki yılda kira iki katına çıktı, ev sahibi tahliye için baskı yaptı' : ''}.`);
+  if (P.yas > 25 && P.rol !== 'yasli_ebeveyn') s.push(P.gelir === 'yuksek' && b2(0.7) ? `${p2(['Kredili aldığı', 'Birkaç yaşında bir', 'İkinci el'])} arabası var.` : b2(0.35) ? 'Eski bir arabası var; benzin zamlarından sonra az kullanıyor.' : 'Arabası yok; toplu taşıma ve dolmuşla gidip geliyor.');
+  if (P.yas > 55 && b2(0.55)) s.push(`${p2(['Tansiyon', 'Şeker', 'Kalp', 'Romatizma', 'KOAH'])} hastası; ilaçlarını ${P.meslek === 'emekli' ? 'emekli sağlık güvencesiyle' : 'devlet hastanesinden'} alıyor, randevu bulmak her seferinde dert.`);
+  else if (P.yas > 35 && b2(0.15)) s.push(`${p2(['Bel fıtığı', 'Migren', 'Mide rahatsızlığı'])} yüzünden zaman zaman çalışamıyor.`);
+  if (P.kurt) s.push(b2(P.yas > 40 ? 0.9 : 0.6) ? `Evde ${b2(0.15) ? 'Zazaca' : 'Kürtçe'} konuşuluyor${P.yas < 30 ? '; kendisi Türkçeyi daha rahat konuşuyor' : ''}.` : 'Kürtçeyi anlıyor ama konuşamıyor; bundan hayıflanıyor.');
+  if (P.arap) s.push('Evde Arapça da konuşuluyor.');
+  if (P.goc && !P.goc.zorunlu && P.goc.il !== P.dogumIl) s.push(b2(0.55) ? `Yazları ${P.dogumIl}'${back(P.dogumIl) ? 'daki' : 'deki'} köye gidiyor; bayramları memlekette geçirmeye çalışıyor.`.replace("'daki' köye", "'daki köye") : 'Memleketle bağı zayıfladı; en son yıllar önce bir cenaze için gitti.');
+  if (P.din > 0.6) s.push(`${P.alevi ? 'Muharrem orucunu tutar' : P.kadin ? 'Beş vakit namazını kılar, başını örter' : 'Beş vakit namazını kılmaya çalışır'}; Ramazan'da oruç tutar.`);
+  else if (P.din < 0.3 && !P.alevi) s.push('Dini bayramları aile ziyaretiyle geçirir; ibadetle pek arası yok.');
+  const rutin = P.meslek === 'emekli' ? 'Sabahları pazara ya da camiye/parka gider, öğleden sonra torunlara bakar'
+    : P.meslek === 'ev_kadini' ? 'Günü yemek, temizlik ve çocukların okul işleriyle geçer; akşam dizisini kaçırmaz'
+    : P.meslek === 'ogrenci' ? 'Gününün çoğu okulda ve telefonda geçiyor; hafta sonları kafede çalışıyor'
+    : P.meslek === 'ciftci' ? 'Güneş doğmadan tarlaya iner; akşam köy kahvesinde günün fiyatları konuşulur'
+    : P.meslek === 'issiz' ? 'Gününü iş ilanlarına bakarak ve tanıdıklardan iş sorarak geçiriyor'
+    : `Sabah ${p2(['7', '7.30', '8'])}'de evden çıkıyor, ${p2(['servisle', 'metrobüsle', 'otobüsle', 'arabayla', 'yürüyerek'])} işe gidiyor; akşam yorgun dönüyor`;
+  s.push(rutin + '.');
+  const kaygi = [];
+  if (P.borc > 0.55 || P.ez > 0.5) kaygi.push('ay sonunu getirememek');
+  if ((P.cocuklar || []).some((c) => YIL - c.dogum < 30)) kaygi.push('çocuklarının iş bulup bulamayacağı');
+  if (P.il === 'İstanbul') kaygi.push('beklenen büyük İstanbul depremi');
+  if (P.deprem23) kaygi.push('yeniden bir depremde enkaz altında kalmak');
+  if (P.yas < 30 && P.egt >= 3) kaygi.push('yurt dışına gidip gitmemek');
+  if (P.yas > 60) kaygi.push('çocuklarına yük olmak');
+  if (kaygi.length) s.push(`En çok ${kaygi.slice(0, 3).join(', ')} konusunda kaygılanıyor.`);
+  const umut = P.yas < 30 ? p2(['kendi işini kurmak', 'iyi bir işe girip ayrı eve çıkmak', 'yüksek lisans yapmak', 'evlenip yuva kurmak']) : P.yas < 55 ? p2(['çocuklarını okutmak', 'borçlarını kapatmak', 'bir ev almak', 'emekli olup memlekete dönmek']) : p2(['torunlarını evlendirmek', 'hacca gitmek', 'sağlıklı kalmak', 'çocuklarının yakınında yaşamak']);
+  s.push(`Hayali ${umut.replace('hacca gitmek', P.alevi ? 'Hacı Bektaş\'a, dergâha gitmek' : 'hacca gitmek')}.`);
+  return s;
 }
 function evdeCocukMetni(P) { const n = (P.cocuklar || []).filter((c) => c.evdeYasar).length; return n ? 'çocukların ' : (byId.get(P.aile.evdekiEbeveyn) ? 'yaşlı kayınvalidesinin ' : ''); }
 

@@ -49,7 +49,7 @@ const NUMERIC = {
   khk: { al: ['khk', 'ihrac'], to: [0, 1], from: [0, 1] },
   sendika: { al: ['sendika', 'union_member'], to: [0, 1], from: [0, 1] },
 };
-const CAT_EXTRA = { medya_kaynagi: ['medya_kaynagi', 'medya_kanali', 'izlenen_kanal', 'kanal'], etnik_koken: ['etnik_koken', 'etnisite', 'ethnicity', 'anadil'], inanc: ['inanc', 'mezhep', 'din', 'religion'], meslek: ['meslek', 'occupation'], cami_cemevi: ['cami_cemevi', 'ibadethane'], hane_tipi: ['hane_tipi', 'household_type'] };
+const CAT_EXTRA = { medya_kaynagi: ['medya_kaynagi', 'medya_kanali', 'izlenen_kanal', 'kanal'], etnik_koken: ['etnik_koken', 'etnisite', 'ethnicity', 'anadil'], inanc: ['inanc', 'mezhep', 'din', 'religion'], meslek: ['meslek', 'occupation'], cami_cemevi: ['cami_cemevi', 'ibadethane'], tv_kanal_turu: ['tv_kanal_turu', 'tv_kanali'], sosyal_kaynak_turu: ['sosyal_kaynak_turu', 'sosyal_medya_kaynagi'], hane_tipi: ['hane_tipi', 'household_type'] };
 const SCALES = [[0, 1], [-1, 1], [1, 5], [1, 7], [0, 10], [1, 10], [0, 100], [-3, 3], [-5, 5]];
 function numericColumn(raw, col, to, from) {
   const vals = raw.map((r) => String(r[col] ?? '').trim()).filter((v) => v !== '').map((v) => Number(v.replace(',', '.'))).filter(Number.isFinite);

@@ -22,7 +22,8 @@
 //   Ekme (Gerbner & Gross 1976): ağır televizyon izleyicisinde tehdit algısı ve otoriter tepki artar.
 //   Suskunluk sarmalı (Noelle-Neumann 1974): yalıtılma korkusu yüksek, topluluğa gömülü kişi
 //     çevresinin iklimine uyar → topluluk etkisi güçlenir; anket düzeltmesi communication.js'de.
-// Kişi alanları (varsa kullanılır, yoksa vekil): siyasi_ilgi 0..1, medya, medya_kaynagi, tv_saat,
+// Kişi alanları (varsa kullanılır, yoksa vekil): siyasi_ilgi 0..1, medya, medya_kaynagi, tv_kanal_turu, tv_saat,
+// sosyal_kaynak_turu, sosyal_saat,
 // parti_kimligi, is_kaybi, borc_yuku, hane_algisi, teror_maruziyeti, sehit_yakini, zorunlu_goc, tehdit_algisi.
 // Bağlam: mercek 0..1 (0 = kapalı, varsayılan 1), medya_yanliligi, ekonomi_algisi, egemen_ideoloji.
 
@@ -40,13 +41,22 @@ export function attention(f, p) {
   return has(p, 'siyasi_ilgi') ? clamp(+p.siyasi_ilgi, 0, 1) : clamp(0.25 + 0.4 * f.nfc + 0.25 * f.leader + 0.1 * f.egitim, 0, 1);
 }
 
-/** Kişinin medya diyetinin iktidara eğilimi −1..1 (bağlamdaki medya yanlılığı tablosundan). */
-function mediaSlant(p, ctx, inc) {
+/**
+ * Medya diyeti (Lasswell: kim, hangi kanalla, ne kadar): kişinin her kanalının yanlılığı, o kanala ayırdığı
+ * saatin azalan getirili dozuyla tartılır. Kanal alanları: tv_kanal_turu + tv_saat, sosyal_kaynak_turu +
+ * sosyal_saat; yoksa yalnız ana kaynak (medya_kaynagi) tam ağırlıkla. Döner {seçenek: maruziyet} ya da null.
+ */
+export function mediaDiet(p, ctx, alts) {
   const tab = ctx?.medya_yanliligi;
-  if (!tab || !inc) return 0;
-  const src = p?.medya_kaynagi ?? p?.medya;
-  const s = tab[src];
-  return s && s[inc.id] !== undefined ? clamp(num(s[inc.id]), -1, 1) : 0;
+  if (!tab || !p) return null;
+  const doz = (h) => (has(p, h) ? Math.log1p(clamp(+p[h], 0, 12)) / Math.log1p(4) : null);
+  const kanal = [];
+  if (p.tv_kanal_turu !== undefined || p.sosyal_kaynak_turu !== undefined) {
+    if (tab[p.tv_kanal_turu]) kanal.push([tab[p.tv_kanal_turu], doz('tv_saat') ?? 1]);
+    if (tab[p.sosyal_kaynak_turu]) kanal.push([tab[p.sosyal_kaynak_turu], doz('sosyal_saat') ?? 1]);
+  } else if (tab[p.medya_kaynagi ?? p.medya]) kanal.push([tab[p.medya_kaynagi ?? p.medya], 1]);
+  if (!kanal.length) return null;
+  return Object.fromEntries(alts.map((a) => [a.id, kanal.reduce((s, [t, w]) => s + (t[a.id] === undefined ? 0 : clamp(num(t[a.id]), -1, 1) * w), 0)]));
 }
 
 /**
@@ -60,7 +70,8 @@ export function lensOf(resolved, f, p) {
   const off = new Set(ctx.mercek_kapali || []);   // bileşen sınaması: gundem, elm, oncelik, pekistirme, hall, akis, sarmal
   const inc = resolved.alts.find((a) => a.iktidar);
   const A = attention(f, p);
-  const sigma = mediaSlant(p, ctx, inc);
+  const medya = mediaDiet(p, ctx, resolved.alts);
+  const sigma = medya && inc ? clamp(medya[inc.id], -1.5, 1.5) : 0;
   const e = num(ctx.ekonomi_algisi, -0.2);
   const pk = has(p, 'parti_kimligi') ? clamp(+p.parti_kimligi, -1, 1) : null;
 
@@ -84,7 +95,7 @@ export function lensOf(resolved, f, p) {
   const g = {};
   const elm = off.has('elm') ? 1 : 1.25 - 0.5 * c;   // çevresel yola açıklık (ortalama kişide ≈ 1)
   for (const k of CEVRESEL) g[k] = elm;
-  if (off.has('oncelik')) return fin({ g, s: off.has('gundem_eksen') ? null : s, A, c, sigma }, lam);
+  if (off.has('oncelik')) return fin({ g, s: off.has('gundem_eksen') ? null : s, A, c, sigma, medya: off.has('diyet') ? null : medya }, lam);
   // Öncelikleme: öne çıkan eksen iktidar değerlendirmesinin ölçütü
   g.ekonomik_oy = s.ekonomi;
   g.otoriter_dinamik = s.kultur * (1 + 0.2 * (tv - 0.5) * (has(p, 'tehdit_algisi') ? 0.3 : 1));   // ölçülmüş algı ekmeyi zaten taşır
@@ -93,10 +104,9 @@ export function lensOf(resolved, f, p) {
   g.afet_cezasi = 0.7 + 0.6 * c;                                            // sorumluluk atfı (Iyengar 1991) bilgi ister
 
   // --- Pekiştirme / çapraz baskı: medya kişinin partisine mi karşı mı?
-  if (pk !== null && ctx.medya_yanliligi && !off.has('pekistirme')) {
-    const src = ctx.medya_yanliligi[p?.medya_kaynagi ?? p?.medya];
+  if (pk !== null && medya && !off.has('pekistirme')) {
     let cong = 0;
-    if (src) for (const a of resolved.alts) if (a.kimlik && src[a.id] !== undefined) cong += num(src[a.id]) * (a.kimlik === 'sag' ? pk : a.kimlik === 'sol' ? -pk : 0);
+    if (medya) for (const a of resolved.alts) if (a.kimlik) cong += medya[a.id] * (a.kimlik === 'sag' ? pk : a.kimlik === 'sol' ? -pk : 0);
     g.parti_kimligi = 1 + 0.35 * A * clamp(cong, -1, 1);
   }
   // --- Hall + hegemonya: egemen koddaki (iktidar yanlısı) medyayı karşıt okuma
@@ -108,13 +118,32 @@ export function lensOf(resolved, f, p) {
   // --- İki aşamalı akış + suskunluk sarmalı
   if (!off.has('akis')) g.ag = 1 + 0.5 * (0.5 - A) - 0.25 * f.leader;
   if (!off.has('sarmal')) g.topluluk = 1 + 0.3 * (1 - f.nfc) * (0.4 * (1 - f.yerlesim) + 0.3 * f.yas + 0.3 * f.dindarlik) - 0.1;
-  return fin({ g, s: off.has('gundem_eksen') ? null : s, A, c, sigma }, lam);
+  return fin({ g, s: off.has('gundem_eksen') ? null : s, A, c, sigma, medya: off.has('diyet') ? null : medya }, lam);
 }
 
 function fin(L, lam) {
   if (lam < 1) { for (const k in L.g) L.g[k] = 1 + lam * (L.g[k] - 1); if (L.s) for (const k in L.s) L.s[k] = 1 + lam * (L.s[k] - 1); }
   return L;
 }
+
+/**
+ * Mercek terimleri: her mekanizmanın kişiler arası farkı ayrı, öğrenilebilir bir terimdir.
+ * Fayda katkısı θ_k·z_k + θ'_k·(g_k − 1)·z_k; öncül θ'_k = θ_k (kuramın öngördüğü tam mercek).
+ * Veri θ'_k'yı büyütür, küçültür ya da sıfırlar → model her iletişim mekanizmasının gücünü ölçer.
+ */
+export const MERCEK_MEKANIZMA = {
+  ag: 'İki aşamalı akış (Lazarsfeld; Katz) — ilgisiz seçmen siyaseti çevresinden alır',
+  topluluk: 'Suskunluk sarmalı / iklim (Noelle-Neumann) — yalıtılma korkusu, topluluğa uyum',
+  parti_kimligi: 'Pekiştirme ve çapraz baskı (Klapper; Stroud; Mutz)',
+  medya_yanliligi: 'Maruziyet × ELM ikna edilebilirliği × Hall okuma konumu',
+  ekonomik_oy: 'Gündem belirleme + öncelikleme: ekonomi (McCombs & Shaw; Iyengar & Kinder; Zucker)',
+  otoriter_dinamik: 'Gündem + öncelikleme: güvenlik/kültür; ekme (Gerbner)',
+  kimlik_siyaseti: 'Dolaysız deneyim: kimlik gündemi (Zucker)',
+  kolektif_travma: 'Dolaysız deneyim: kimlik gündemi (Zucker)',
+  afet_cezasi: 'Sorumluluk atfı bilgi ister (Iyengar 1991)',
+  stratejik: 'ELM çevresel yol: çoğunluk ipucu',
+  arac: 'ELM çevresel yol: araç',
+};
 
 /** Kişiye özgü eksen ağırlıkları (gündem): yakınlık ve yönsel oy terimleri için. */
 export const lensWeights = (p) => p?.__mercek?.s || null;

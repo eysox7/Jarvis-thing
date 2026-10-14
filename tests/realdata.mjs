@@ -144,7 +144,7 @@ export function sentetikTR(surum = 'tam', kaynak = 'tek') {
   const il = Object.fromEntries(parseCSV(readFileSync(new URL(F.il, S), 'utf8')).map((r) => [r.il, Object.fromEntries(ALT.map((a) => [a, num(r[a])]))]));
   const hk = { iktidar: 1, ana_muhalefet: -1, kurt_sol: -1, milliyetci: -0.3 }, mh = { iktidar: -1, ana_muhalefet: 1, kurt_sol: 0.3, milliyetci: 0.3 };
   const spec = { alan: 'siyaset', baglam: { ...MERCEK, bolge_paylari: il, iktidar_suresi_yil: 21, ekonomi_algisi: -0.4, tehdit: 0.3,
-    medya_yanliligi: { hukumete_yakin_kanal: hk, hukumete_yakin_hesaplar: hk, muhalif_kanal: mh, muhalif_hesaplar: mh, kurt_medyasi: { iktidar: -1, kurt_sol: 1, milliyetci: -1 } } }, secenekler: [
+    medya_yanliligi: { hukumete_yakin_kanal: hk, hukumete_yakin_hesaplar: hk, muhalif_kanal: mh, muhalif_hesaplar: mh, kurt_medyasi: { iktidar: -1, kurt_sol: 1, milliyetci: -1 }, ana_akim_kanal: { iktidar: 0.3 } } }, secenekler: [
     { id: 'iktidar', ekonomi: 0.3, kultur: 0.8, kimlik: 'sag', iktidar: true, guclu_lider: 0.9 },
     { id: 'ana_muhalefet', ekonomi: -0.3, kultur: -0.5, kimlik: 'sol' },
     { id: 'milliyetci', ekonomi: 0.2, kultur: 0.6, kimlik: 'sag', guclu_lider: 0.6 },
