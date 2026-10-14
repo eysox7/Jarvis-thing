@@ -36,8 +36,20 @@ const NUMERIC = {
   zorunlu_goc: { al: ['zorunlu_goc', 'koy_bosaltma', 'displacement'], to: [0, 1], from: [0, 1] },
   teror_maruziyeti: { al: ['teror_maruziyeti', 'catisma_maruziyeti', 'violence_exposure'], to: [0, 1], from: [0, 1] },
   deprem_maruziyeti: { al: ['deprem_maruziyeti', 'afet_maruziyeti', 'disaster'], to: [0, 1], from: [0, 2] },
+  // İletişim ekolojisi (iletişim merceğinin girdileri): siyasete ilgi/dikkat, günlük TV ve sosyal medya saati
+  siyasi_ilgi: { al: ['siyasi_ilgi', 'siyasete_ilgi', 'political_interest'], to: [0, 1] },
+  tv_saat: { al: ['tv_saat', 'tv_suresi', 'tv_hours'], to: [0, 10], from: [0, 10] },
+  sosyal_saat: { al: ['sosyal_saat', 'sosyal_medya_saat', 'social_media_hours'], to: [0, 10], from: [0, 10] },
+  // Aile ve hayat seyri (hane mikrosimülasyonu; ankette sorulabilir)
+  kardes_sayisi: { al: ['kardes_sayisi', 'siblings'], to: [0, 1], from: [0, 12] },
+  akraba_evliligi: { al: ['akraba_evliligi', 'consanguineous'], to: [0, 1], from: [0, 1] },
+  gurbetci_akraba: { al: ['gurbetci_akraba', 'diaspora_tie'], to: [0, 1], from: [0, 1] },
+  askerlik_dogu: { al: ['askerlik_dogu'], to: [0, 1], from: [0, 1] },
+  darbe_maruziyeti: { al: ['darbe_maruziyeti'], to: [0, 1], from: [0, 1] },
+  khk: { al: ['khk', 'ihrac'], to: [0, 1], from: [0, 1] },
+  sendika: { al: ['sendika', 'union_member'], to: [0, 1], from: [0, 1] },
 };
-const CAT_EXTRA = { medya_kaynagi: ['medya_kaynagi', 'medya_kanali', 'izlenen_kanal', 'kanal'], etnik_koken: ['etnik_koken', 'etnisite', 'ethnicity', 'anadil'], inanc: ['inanc', 'mezhep', 'din', 'religion'], meslek: ['meslek', 'occupation'] };
+const CAT_EXTRA = { medya_kaynagi: ['medya_kaynagi', 'medya_kanali', 'izlenen_kanal', 'kanal'], etnik_koken: ['etnik_koken', 'etnisite', 'ethnicity', 'anadil'], inanc: ['inanc', 'mezhep', 'din', 'religion'], meslek: ['meslek', 'occupation'], cami_cemevi: ['cami_cemevi', 'ibadethane'], hane_tipi: ['hane_tipi', 'household_type'] };
 const SCALES = [[0, 1], [-1, 1], [1, 5], [1, 7], [0, 10], [1, 10], [0, 100], [-3, 3], [-5, 5]];
 function numericColumn(raw, col, to, from) {
   const vals = raw.map((r) => String(r[col] ?? '').trim()).filter((v) => v !== '').map((v) => Number(v.replace(',', '.'))).filter(Number.isFinite);

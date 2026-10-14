@@ -10,6 +10,7 @@
 //   a   seçenek {id, ad, tur?, ...özellikler}      ctx  seçim bağlamı (+ türetilmiş alanlar)
 
 import { comm } from './communication.js';
+import { lensWeights } from './lens.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const num = (v, d = 0) => (Number.isFinite(+v) ? +v : d);
@@ -39,10 +40,10 @@ const mainMedia = (p) => p?.medya || null;
 const partyPos = (a) => ({ ekonomi: num(a.ekonomi ?? a.konum?.ekonomi), kultur: num(a.kultur ?? a.konum?.kultur) });
 const isAbstain = (a) => a.tur === 'cekimser' || a.id === 'oy_kullanmama';
 // Konu önemi (issue salience): kriz döneminde ekonomi ekseni ağır basar. Ortalama 1'e normalize.
-function issueWeights(ctx) {
-  const k = ctx?.konu_onemi;
-  if (!k) return { ekonomi: 1, kultur: 1 };
-  const e = Math.max(0, num(k.ekonomi, 1)), c = Math.max(0, num(k.kultur, 1)), m = (e + c) / 2 || 1;
+// Kişinin iletişim ortamının gündemi (lens.js, gündem belirleme) bağlamın konu önemiyle çarpılır.
+function issueWeights(ctx, p) {
+  const k = ctx?.konu_onemi, L = lensWeights(p);
+  const e = Math.max(0, num(k?.ekonomi, 1)) * (L ? L.ekonomi : 1), c = Math.max(0, num(k?.kultur, 1)) * (L ? L.kultur : 1), m = (e + c) / 2 || 1;
   return { ekonomi: e / m, kultur: c / m };
 }
 
@@ -60,9 +61,9 @@ export const SIYASET = {
   baglam: { bolge_paylari: '{bölge: {seçenek_id: %}} bölge/il/ilçe sonuçları — kişinin p.bolge alanıyla topluluk bağlamı', ekonomi_algisi: '-1 (kötü) .. 1 (iyi) genel ekonomik algı (varsayılan -0.2)', konu_onemi: '{ekonomi: ağırlık, kultur: ağırlık} hangi eksen daha belirleyici (ör. kriz: {ekonomi: 2, kultur: 0.6})', iktidar_suresi_yil: 'görevdeki partinin iktidar süresi (yorgunluk etkisi)', onceki_paylar: '{seçenek_id|etiket: yüzde} önceki seçim sonucu — personalara geçmiş oy atanır', tehdit: '0..2 normatif/güvenlik tehdidi algısı (terör, göç, kriz)', medya_yanliligi: '{medya türü veya kişinin medya_kaynagi etiketi: {seçenek_id: -1..1}} medya sahipliği/yanlılığı', sosyal_yayilim: 'false → kampanya/değişiklik etkisinin hane ve tartışma ağı üzerinden yayılmasını kapatır (varsayılan açık)', sosyal_nedensellik: '0..1 kesitsel aile/ağ katsayısının nedensel payı (varsayılan 0.4; gerisi homofili)' },
   terimler: [
     { id: 'yakinlik', ad: 'Mekânsal yakınlık', kuram: 'Downs (1957) — mekânsal oy modeli', onsel: 1.6,
-      z: (f, p, a, ctx) => { if (isAbstain(a)) return 0; const v = politicalPosition(f, p), q = partyPos(a), w = issueWeights(ctx); return -(w.ekonomi * (v.ekonomi - q.ekonomi) ** 2 + w.kultur * (v.kultur - q.kultur) ** 2); } },
+      z: (f, p, a, ctx) => { if (isAbstain(a)) return 0; const v = politicalPosition(f, p), q = partyPos(a), w = issueWeights(ctx, p); return -(w.ekonomi * (v.ekonomi - q.ekonomi) ** 2 + w.kultur * (v.kultur - q.kultur) ** 2); } },
     { id: 'yon', ad: 'Yönsel oy', kuram: 'Rabinowitz & Macdonald (1989)', onsel: 0.7,
-      z: (f, p, a, ctx) => { if (isAbstain(a)) return 0; const v = politicalPosition(f, p), q = partyPos(a), w = issueWeights(ctx); return w.ekonomi * v.ekonomi * q.ekonomi + w.kultur * v.kultur * q.kultur; } },
+      z: (f, p, a, ctx) => { if (isAbstain(a)) return 0; const v = politicalPosition(f, p), q = partyPos(a), w = issueWeights(ctx, p); return w.ekonomi * v.ekonomi * q.ekonomi + w.kultur * v.kultur * q.kultur; } },
     { id: 'parti_kimligi', ad: 'Parti kimliği', kuram: 'Campbell vd. (1960) — Michigan modeli', onsel: 1.3,
       // Ölçülmüş parti kimliği varsa (p.parti_kimligi: -1 güçlü sol/demokrat .. 1 güçlü sağ/cumhuriyetçi) o kullanılır
       z: (f, p, a) => {

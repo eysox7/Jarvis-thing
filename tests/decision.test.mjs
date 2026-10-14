@@ -5,6 +5,9 @@ import { fitChoiceModel, crossValidate, scoreProbs, calibrateShares, learn, rake
 import { buildEnsemble, stackWeights, siliconProbs, mixShares, siliconSecondOpinion } from '../js/decision/ensemble.js';
 import { aggregatePolls } from '../js/decision/polls.js';
 import { expressionRates } from '../js/decision/communication.js';
+import { lensOf } from '../js/decision/lens.js';
+import { zMatrix } from '../js/decision/model.js';
+import { features } from '../js/audience/personas.js';
 import { samplePopulation } from '../js/audience/personas.js';
 import { describePersona } from '../js/audience/survey.js';
 
@@ -365,6 +368,31 @@ console.log('\n[26] Zengin sentetik Türkiye verisi (tests/data/sentetik)');
     ok(Math.abs(s18('iktidar') - 0.46) < 0.04 && Math.abs(s18('kurt_sol') - 0.1) < 0.03 && ayni > 0.7 && ayni < 0.88, `2018 dalgası: iktidar %${(s18('iktidar') * 100).toFixed(1)}, iki seçimde aynı oy %${(ayni * 100).toFixed(0)}`);
     ok(raw.every((r) => r.ekonomi_algisi_2018 !== '' && r.deprem_maruziyeti_2018 !== undefined) && raw.every((r) => !(Number(r.deprem_maruziyeti_2018) > 1)), '2018 ölçümleri var; 2023 deprem kaybı 2018 sütununda yok');
   }
+}
+
+console.log('\n[27] İletişim merceği: her kuram terimi kişinin iletişim ortamından geçer');
+{
+  const hk = { I: 1, M: -1 }, mh = { I: -1, M: 1 };
+  const sp = (ctx = {}) => ({ alan: 'siyaset', baglam: { ekonomi_algisi: 0.5, medya_yanliligi: { yandas: hk, muhalif: mh }, ...ctx }, secenekler: [
+    { id: 'I', iktidar: true, ekonomi: 0.3, kultur: 0.7, kimlik: 'sag', lider: 0.6 }, { id: 'M', ekonomi: -0.3, kultur: -0.5, kimlik: 'sol', lider: 0.5 }, { id: 'Y', tur: 'cekimser' }] });
+  const base = { yas: '35-44', egitim: 'lise', ideoloji: 'merkez', dindarlik: 'orta', siyasi_ilgi: 0.8 };
+  const R = resolveChoice(sp()), R0 = resolveChoice(sp({ mercek: 0 }));
+  const L = (p, r = R) => lensOf(r, features(p), p);
+  ok(L(base, R0) === null, 'mercek: 0 → kapalı');
+  const z0 = zMatrix(R0, features(base), { ...base }), z1 = zMatrix(R, features({ ...base, medya_kaynagi: 'yandas' }), { ...base, medya_kaynagi: 'yandas' });
+  ok(z0.length === z1.length && z0.every((row) => row.every(Number.isFinite)) && z1.every((row) => row.every(Number.isFinite)), 'mercekli ve merceksiz terim matrisi aynı boyutta ve sonlu');
+  // Gündem (Vavreck): ekonomi iyiyken iktidar medyası ekonomiyi, muhalif medya kültürü öne çıkarır
+  ok(L({ ...base, medya_kaynagi: 'yandas' }).s.ekonomi > L({ ...base, medya_kaynagi: 'muhalif' }).s.ekonomi, 'gündem belirleme: iyi ekonomide yandaş medya ekonomiyi öne çıkarır');
+  ok(L({ ...base, is_kaybi: 1 }).s.ekonomi > L(base).s.ekonomi, 'dolaysız konu (Zucker): iş kaybı medyadan bağımsız ekonomiyi öne çıkarır');
+  // Hall: egemen koddaki medyayı marjinal kişi karşıt okur → yanlı medyanın etkisi tersine döner
+  ok(L({ ...base, medya_kaynagi: 'yandas', azinlik_kimlik: 'evet', ideoloji: 'sol' }).g.medya_yanliligi < 0 && L({ ...base, medya_kaynagi: 'yandas' }).g.medya_yanliligi > 0, 'Hall: marjinal ve egemen ideolojiden uzak izleyicide bumerang');
+  // Pekiştirme / çapraz baskı (Klapper, Mutz)
+  ok(L({ ...base, parti_kimligi: 0.8, medya_kaynagi: 'yandas' }).g.parti_kimligi > 1 && L({ ...base, parti_kimligi: 0.8, medya_kaynagi: 'muhalif' }).g.parti_kimligi < 1, 'pekiştirme: kendi partisinin medyası kimliği güçlendirir, karşıt medya zayıflatır');
+  // İki aşamalı akış: siyasete ilgisiz kişide tartışma ağının ağırlığı daha yüksek
+  ok(L({ ...base, siyasi_ilgi: 0.1 }).g.ag > L({ ...base, siyasi_ilgi: 0.9 }).g.ag, 'iki aşamalı akış: ilgisiz seçmen siyaseti çevresinden alır');
+  const P = (p, ctx) => predictPerson(sp(ctx), p).olasiliklar;
+  const yAg = { ...base, siyasi_ilgi: 0.1, ag_paylari: { I: 0.9, M: 0.1 } };
+  ok(P(yAg).I - P(yAg, { mercek: 0 }).I > 0, 'mercek tahmine işler: ilgisiz seçmende ağ etkisi büyür');
 }
 
 console.log('');

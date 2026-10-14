@@ -29,6 +29,8 @@ const tertile = (vals) => { const s = vals.filter(Number.isFinite).sort((x, y) =
 // Panel: aynı kişinin bir önceki seçimi (durum bağımlılığı)
 function withPast(rows) { const last = {}; for (const r of rows) { if (last[r.kisi] !== undefined) r.p.onceki = last[r.kisi]; last[r.kisi] = r.secim; } return rows; }
 
+// İletişim merceği deneyleri: MERCEK=0 kapalı, 1 açık (varsayılan)
+const MERCEK = { ...(process.env.MERCEK !== undefined ? { mercek: Number(process.env.MERCEK) } : {}), ...(process.env.MERCEK_KAPALI ? { mercek_kapali: process.env.MERCEK_KAPALI.split(',') } : {}) };
 const DATASETS = {
   BEPS() {
     const raw = load('BEPS');
@@ -68,6 +70,10 @@ const DATASETS = {
   SENTETIK_TR() { return sentetikTR('tam'); },
   SENTETIK_TR_onceki_yok() { return sentetikTR('onceki_yok'); },
   SENTETIK_TR_oykusuz() { return sentetikTR('oykusuz'); },
+  // Hane temelli yaşam seyri mikrosimülasyonu (tests/data/hayat_uret.mjs): eş, çocuk, yaşlı ebeveyn aynı veride
+  SENTETIK_HANE() { return sentetikTR('tam', 'hane'); },
+  SENTETIK_HANE_onceki_yok() { return sentetikTR('onceki_yok', 'hane'); },
+  SENTETIK_HANE_oykusuz() { return sentetikTR('oykusuz', 'hane'); },
   ANES2016() { return anes(2016, true); },
   ANES2016_yapisal() { return anes(2016, false); },
   ANES2020() { return anes(2020, true); },
@@ -130,19 +136,21 @@ const DATASETS = {
 // Sürüm: tam = tüm sütunlar; onceki_yok = önceki oy hariç; oykusuz = yalnız sıradan anket (demografi,
 // değerler, algılar) — öykü (travma, tehdit, göç, deprem, iş kaybı, borç), aile/ağ/mahalle ve önceki oy yok
 const OYKU_SUTUN = ['tehdit_algisi', 'travma_skoru', 'cocuklukta_sert_ceza', 'zorunlu_goc', 'teror_maruziyeti', 'sehit_yakini', 'deprem_maruziyeti', 'is_kaybi', 'borc_yuku', 'ic_goc'];
-export function sentetikTR(surum = 'tam') {
-  const S = new URL('./data/sentetik/', import.meta.url);
+// kaynak: 'tek' = bireysel üretim (TR_secmen.csv), 'hane' = hane temelli yaşam seyri mikrosimülasyonu (hane/TR_hane_secmen.csv)
+export function sentetikTR(surum = 'tam', kaynak = 'tek') {
+  const S = new URL(kaynak === 'hane' ? './data/sentetik/hane/' : './data/sentetik/', import.meta.url);
+  const F = kaynak === 'hane' ? { secmen: 'TR_hane_secmen.csv', il: 'TR_hane_il.csv' } : { secmen: 'TR_secmen.csv', il: 'TR_il_sonuclari.csv' };
   const ALT = ['iktidar', 'ana_muhalefet', 'milliyetci', 'kurt_sol', 'oy_yok'];
-  const il = Object.fromEntries(parseCSV(readFileSync(new URL('TR_il_sonuclari.csv', S), 'utf8')).map((r) => [r.il, Object.fromEntries(ALT.map((a) => [a, num(r[a])]))]));
+  const il = Object.fromEntries(parseCSV(readFileSync(new URL(F.il, S), 'utf8')).map((r) => [r.il, Object.fromEntries(ALT.map((a) => [a, num(r[a])]))]));
   const hk = { iktidar: 1, ana_muhalefet: -1, kurt_sol: -1, milliyetci: -0.3 }, mh = { iktidar: -1, ana_muhalefet: 1, kurt_sol: 0.3, milliyetci: 0.3 };
-  const spec = { alan: 'siyaset', baglam: { bolge_paylari: il, iktidar_suresi_yil: 21, ekonomi_algisi: -0.4, tehdit: 0.3,
-    medya_yanliligi: { hukumete_yakin_kanal: hk, hukumete_yakin_hesaplar: hk, muhalif_kanal: mh, muhalif_hesaplar: mh } }, secenekler: [
+  const spec = { alan: 'siyaset', baglam: { ...MERCEK, bolge_paylari: il, iktidar_suresi_yil: 21, ekonomi_algisi: -0.4, tehdit: 0.3,
+    medya_yanliligi: { hukumete_yakin_kanal: hk, hukumete_yakin_hesaplar: hk, muhalif_kanal: mh, muhalif_hesaplar: mh, kurt_medyasi: { iktidar: -1, kurt_sol: 1, milliyetci: -1 } } }, secenekler: [
     { id: 'iktidar', ekonomi: 0.3, kultur: 0.8, kimlik: 'sag', iktidar: true, guclu_lider: 0.9 },
     { id: 'ana_muhalefet', ekonomi: -0.3, kultur: -0.5, kimlik: 'sol' },
     { id: 'milliyetci', ekonomi: 0.2, kultur: 0.6, kimlik: 'sag', guclu_lider: 0.6 },
     { id: 'kurt_sol', ekonomi: -0.6, kultur: -0.6, kimlik: 'sol', azinlik_temsili: true, duzen_karsiti: true },
     { id: 'oy_yok', tur: 'cekimser' }] };
-  let raw = parseCSV(readFileSync(new URL('TR_secmen.csv', S), 'utf8'));
+  let raw = parseCSV(readFileSync(new URL(F.secmen, S), 'utf8')).map(({ hane, ...r }) => r);   // hane kimliği model girdisi değil
   // Panel dalgaları (seçimler arası aktarım testi): d2018 = 2018 oyu (onceki sütunu) ve 2018 ölçümleri,
   // d2023 = 2023. İkisinde de önceki oy ve 2023'te ölçülen eş/ağ/mahalle sütunları yok; il sonucu bağlamı yok.
   const DONEM = ['ekonomi_algisi', 'hane_algisi', 'tehdit_algisi', 'is_kaybi', 'borc_yuku', 'deprem_maruziyeti'];
@@ -165,7 +173,7 @@ export function anes(year, full, ag = true) {
   // Topluluk bağlamı: eyaletin gerçek seçim sonucu (kamuya açık; 2000 ve 2016 kamu dosyalarında eyalet var)
   const EY = 'eyalet_' + (Y0 ? 2000 : 2016);   // 2020 kamu dosyasında eyalet gizli
   const bolge = D && existsSync(new URL(EY + '.csv', DIR)) ? Object.fromEntries(load(EY).map((r) => [r.eyalet, { dem: num(r.dem), rep: num(r.rep), ucuncu: num(r.ucuncu) }])) : null;
-  const spec = { alan: 'siyaset', baglam: { ...(bolge && process.env.TOPLULUK !== '0' ? { bolge_paylari: bolge } : {}), ekonomi_algisi: Y0 ? 0.3 : D ? -0.1 : -0.3, iktidar_suresi_yil: D ? 8 : 4, medya_yanliligi: { sag_medya: { rep: 1, dem: -1 }, sol_medya: { dem: 1, rep: -1 } } }, secenekler: [
+  const spec = { alan: 'siyaset', baglam: { ...MERCEK, ...(bolge && process.env.TOPLULUK !== '0' ? { bolge_paylari: bolge } : {}), ekonomi_algisi: Y0 ? 0.3 : D ? -0.1 : -0.3, iktidar_suresi_yil: D ? 8 : 4, medya_yanliligi: { sag_medya: { rep: 1, dem: -1 }, sol_medya: { dem: 1, rep: -1 } } }, secenekler: [
     { id: 'dem', ad: Y0 ? 'Gore (D)' : D ? 'Clinton (D)' : 'Biden (D)', iktidar: D, ekonomi: -0.4, kultur: -0.45, kimlik: 'sol' },
     Y0 ? { id: 'rep', ad: 'Bush (R)', iktidar: false, ekonomi: 0.35, kultur: 0.6, kimlik: 'sag', guclu_lider: 0.4 }
       : { id: 'rep', ad: 'Trump (R)', iktidar: R, ekonomi: 0.35, kultur: 0.8, kimlik: 'sag', guclu_lider: 0.8, duzen_karsiti: D },
@@ -182,6 +190,8 @@ export function anes(year, full, ag = true) {
       otoriterlik: Number.isFinite(au) ? Math.round(au * 8) / 8 : undefined,
       // Siyasete dikkat → bilişsel ihtiyaç (ELM merkezî yol; Habermas'ın akılcı-eleştirel kamusu)
       bilissel_ihtiyac: num(r.ilgi5) >= 1 && num(r.ilgi5) <= 2 ? 'yuksek' : num(r.ilgi5) >= 3 ? 'dusuk' : undefined,
+      // Siyasete dikkat 0..1 — iletişim merceğinde dikkat/maruziyet (kullanımlar-doyumlar, yönelim ihtiyacı)
+      siyasi_ilgi: num(r.ilgi5) >= 1 && num(r.ilgi5) <= 5 ? (5 - num(r.ilgi5)) / 4 : undefined,
       bolge: r.eyalet || undefined,
     };
     // Herman & Chomsky: kişinin izlediği partizan medya (yanlılık bağlamda tanımlı)
@@ -292,7 +302,7 @@ if (args[0] === '--secimler') {
 if (args[0] === '--secimler-tr') {
   const ids = ['iktidar', 'ana_muhalefet', 'milliyetci', 'kurt_sol', 'oy_yok'];
   for (const [ya, yb] of [['d2018', 'd2023'], ['d2023', 'd2018']]) {
-    const A = sentetikTR(ya), B = sentetikTR(yb), tr = cleanRows(A.rows), te = cleanRows(B.rows);
+    const KY = process.env.KAYNAK || 'tek', A = sentetikTR(ya, KY), B = sentetikTR(yb, KY), tr = cleanRows(A.rows), te = cleanRows(B.rows);
     DECISION_DOMAINS.__ham = plainDomain(DECISION_DOMAINS.siyaset, [], tr);
     const sc = (sp, m) => scoreProbs(rowProbabilities(sp, m, te).map((x, i) => ({ P: x.P, y: ids.indexOf(te[i].secim), w: 1 })));
     const fit = (sp, o) => fitChoiceModel(sp, tr, { ...o, demoSigma: tuneDemoSigma(sp, tr, o), iters: 300 });

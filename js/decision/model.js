@@ -11,6 +11,7 @@ import { DECISION_DOMAINS, ILETISIM, GECMIS, ILETISIM_TERIMLERI, isAbstain, SILI
 import { ensureComm } from './communication.js';
 import { rng } from '../audience/personas.js';
 import { socialStructure, diffuse } from './social.js';
+import { lensOf } from './lens.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 /** Kişi alanı → demografik anahtar. Sürekli sayılar (algı, tehdit, borç…) 0.25'lik dilimlere ayrılır. */
@@ -110,12 +111,13 @@ export function demoUtility(demo, altId, p) {
 
 /** Tek kişi için seçenek faydaları ve olasılıklar. zs: terim × seçenek özellik matrisi (yeniden kullanım için). */
 export function personProbs(resolved, coef, f, p, i = 0, zs = null) {
-  const { alts, terms, ctx } = resolved;
+  const { alts, terms } = resolved;
+  if (!zs) zs = zMatrix(resolved, f, p, i);
   const V = new Array(alts.length);
   for (let j = 0; j < alts.length; j++) {
     let v = (coef.asc[alts[j].id] || 0) + (coef.demo ? demoUtility(coef.demo, alts[j].id, p) : 0);
     for (let k = 0; k < terms.length; k++) {
-      const z = zs ? zs[k][j] : terms[k].z(f, p, alts[j], ctx, i);
+      const z = zs[k][j];
       v += (coef.etk ? thetaFor(coef, terms[k].id, p) : coef.theta[terms[k].id] || 0) * z;
     }
     V[j] = v;
@@ -141,8 +143,12 @@ export function rowResolved(resolved, row) {
 }
 
 /** Kişi için z matrisi (terim × seçenek). Tahmin ve öğrenme ortak kullanır. */
+// Her terim iletişim merceğinden geçer (lens.js): kişinin iletişim ortamı terimin girdisini (gündem →
+// eksen ağırlıkları) ve ağırlığını (öncelikleme, ELM, pekiştirme, iki aşamalı akış, Hall) belirler.
 export function zMatrix(resolved, f, p, i = 0) {
-  return resolved.terms.map((t) => resolved.alts.map((a) => t.z(f, p, a, resolved.ctx, i)));
+  const L = p ? lensOf(resolved, f, p) : null;
+  if (p) Object.defineProperty(p, '__mercek', { value: L, enumerable: false, configurable: true, writable: true });
+  return resolved.terms.map((t) => { const g = L?.g[t.id] ?? 1; return resolved.alts.map((a) => g * t.z(f, p, a, resolved.ctx, i)); });
 }
 
 /** Kitle motorundan kampanya etkisini kişi başı fayda katkısına çevirir (aynı nüfus sırası). */
