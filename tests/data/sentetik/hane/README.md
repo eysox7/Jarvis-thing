@@ -82,3 +82,18 @@ olasılıkla yanlış algılanır; tartışma ağındaki azınlık görüşü %1
 | İki seçimde aynı oy | %75–80 | %81 |
 | Alevi seçmende ana muhalefet | çok yüksek | %84 |
 | Kürt seçmende Kürt hareketi / iktidar | ~%40–55 / ~%25–35 | %35 / %28 (Kürt hareketi düşük taraf) |
+
+Not: ana muhalefet hedefi (%29) ana muhalefet *bloğudur* (CHP ve küçük muhalefet partileri); YSK 2023 milletvekili
+sonuçlarında CHP'nin kayıtlı seçmen payı ~%22'dir. Bu fark il düzeyi kıyaslarda ~9 puanlık düzey hatası olarak görünür.
+
+## Gerçek veriye kalibre sürümler
+
+| Klasör | Ne değişti | Üreten |
+|---|---|---|
+| `../hane_kal/` | Kişi düzeyi çarpanlar CSES Türkiye 2018 A yarısının çapraz tablolarına göre (`kalibrasyon.json`) | `node tests/data/hane_kalibre.mjs` |
+| `../hane_kal_B/` | Aynı, B yarısına göre (ters bölünme; aynı çarpanlar seçildi) | `HEDEF_YARI=B node tests/data/hane_kalibre.mjs` |
+| `../hane_kal_il/` | + il başına 5 bloğun fayda kayması, gerçek 2023 YSK il paylarına göre (`il_sabitleri.json`) | `node tests/data/hane_il_kalibre.mjs` |
+| `../hane_kal_B_il/` | Ters bölünmenin çarpanlarıyla aynısı | `KAYNAK=hane_kal_B node tests/data/hane_il_kalibre.mjs` |
+
+İl kalibrasyonunun sınaması (hedefe dokunmadan): iktidar payının il düzeyi korelasyonu sentetik 2018 ↔ gerçek 2018'de
+0,09 → 0,92, başka tohumla üretilmiş yeni kişilerde 0,21 → 0,67. Varsayılan üretim (bu klasör) kalibrasyonsuzdur.
