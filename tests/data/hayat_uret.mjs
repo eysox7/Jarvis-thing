@@ -22,6 +22,11 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { rng } from '../../js/audience/personas.js';
 
 const NH = Number(process.argv[2] || 1300), SEED = Number(process.argv[3] || 2024), YIL = 2023;
+// Kalibrasyon çarpanları (tests/data/hane_kalibre.mjs gerçek CSES çapraz tablolarından ayarlar; dosya yoksa hepsi 1/0 →
+// varsayılan üretim birebir aynı). Rastgele çekiliş sayısını değiştirmez.
+import { existsSync as _ex, readFileSync as _rd } from 'node:fs';
+const KAL_F = process.env.HANE_KAL;   // yalnız açıkça verilirse (varsayılan veri kalibrasyonsuz)
+const KAL = { din: 1, kurt_ikt: 1, kurt_sol: 1, alevi: 1, egit: 1, otoriter: 1, ideo: 0, mill_kadin: 0, ...(KAL_F && _ex(KAL_F) ? JSON.parse(_rd(KAL_F, 'utf8')) : {}) };
 const r = rng(SEED);
 const U = () => r();
 const norm = () => Math.sqrt(-2 * Math.log(U() || 1e-12)) * Math.cos(2 * Math.PI * U());
@@ -419,10 +424,10 @@ function yapisal(P) {
   const s = new Array(5).fill(0), a = P.aile;
   const bb = a.babaBlok ?? (P.aile.ebeveynKisi ? null : null), ab = a.anneBlok;
   if (bb) s[AI[bb]] += 1.3; if (ab) s[AI[ab]] += 0.6;
-  s[AI.iktidar] += 1.9 * P.din + 1.0 * P.otoriter - 1.6 * (P.alevi ? 1 : 0) - 1.4 * (P.kurt ? 1 : 0) * (1 - 0.6 * P.din) + 0.5 * (P.koyKalan ? 1 : 0) + 0.012 * (P.yas - 40) - 0.4 * P.egit01 + (P.meslek === 'esnaf' ? 0.3 : 0);
-  s[AI.ana_muhalefet] += 1.8 * (P.alevi ? 1 : 0) + 1.4 * (1 - P.din) + 0.6 * P.egit01 + (P.bolge === 'ege' ? 0.6 : P.bolge === 'istanbul' ? 0.25 : 0) - 0.9 * (P.kurt ? 1 : 0) + (P.sendika ? 0.3 : 0);
-  s[AI.milliyetci] += 1.4 * P.otoriter + (P.kadin ? -0.3 : 0.25) + (P.yas < 35 ? 0.35 : 0) - 2.5 * (P.kurt ? 1 : 0) - 0.6 * (P.alevi ? 1 : 0) + 0.6 * BOLGE[P.bolge].multeci * (P.kurt ? 0 : 1);
-  s[AI.kurt_sol] += (P.kurt ? 3.2 - 1.6 * P.din : -3) + (P.yas < 35 ? 0.4 : 0) + (P.alevi && !P.kurt ? 0.2 : 0);
+  s[AI.iktidar] += KAL.din * 1.9 * P.din + KAL.otoriter * 1.0 * P.otoriter - KAL.alevi * 1.6 * (P.alevi ? 1 : 0) - KAL.kurt_ikt * 1.4 * (P.kurt ? 1 : 0) * (1 - 0.6 * P.din) + 0.5 * (P.koyKalan ? 1 : 0) + 0.012 * (P.yas - 40) - KAL.egit * 0.4 * P.egit01 + (P.meslek === 'esnaf' ? 0.3 : 0);
+  s[AI.ana_muhalefet] += KAL.alevi * 1.8 * (P.alevi ? 1 : 0) + KAL.din * 1.4 * (1 - P.din) + KAL.egit * 0.6 * P.egit01 + (P.bolge === 'ege' ? 0.6 : P.bolge === 'istanbul' ? 0.25 : 0) - 0.9 * (P.kurt ? 1 : 0) + (P.sendika ? 0.3 : 0);
+  s[AI.milliyetci] += KAL.otoriter * 1.4 * P.otoriter + (P.kadin ? -0.3 - KAL.mill_kadin : 0.25) + (P.yas < 35 ? 0.35 : 0) - 2.5 * (P.kurt ? 1 : 0) - 0.6 * (P.alevi ? 1 : 0) + 0.6 * BOLGE[P.bolge].multeci * (P.kurt ? 0 : 1);
+  s[AI.kurt_sol] += (P.kurt ? KAL.kurt_sol * 3.2 - 1.6 * P.din : -3) + (P.yas < 35 ? 0.4 : 0) + (P.alevi && !P.kurt ? 0.2 : 0);
   s[AI.oy_yok] += 1.6 * (1 - P.ilgi) + (P.yas < 25 ? 0.6 : 0) + 0.12 * Object.values(P.ace).filter(Boolean).length - 0.6 * P.egit01 + (P.goc && P.goc.yil > YIL - 3 ? 0.6 : 0);
   return s.map((v, j) => v + P.etki[j]);
 }
@@ -550,7 +555,7 @@ const rows = kisiler.map((P) => {
   const q = pref(P), H = haneler[P.hane - 1];
   const progov = P.tvTur === 'hukumete_yakin_kanal' || P.sosTur === 'hukumete_yakin_hesaplar';
   const muhalif = P.tvTur === 'muhalif_kanal' || P.sosTur === 'muhalif_hesaplar' || P.tvTur === 'kurt_medyasi';
-  const ideo = clamp(0.5 + 0.35 * (P.din - 0.5) + 0.3 * (P.otoriter - 0.4) + (P.alevi ? -0.2 : 0) + (P.kurt ? -0.15 : 0) + 0.15 * norm());
+  const ideo = clamp(0.5 + 0.35 * (P.din - 0.5) + 0.3 * (P.otoriter - 0.4) + (P.alevi ? -0.2 : 0) + (P.kurt ? -0.15 : 0) + KAL.ideo * (q[AI.iktidar] + q[AI.milliyetci] - q[AI.ana_muhalefet] - q[AI.kurt_sol]) + 0.15 * norm());   // KAL.ideo: öz-konumlamaya parti kimliği karışır
   const tehdit = clamp(0.2 + 0.3 * (P.teror || 0) + 0.25 * (P.sehit || 0) + 0.25 * BOLGE[P.bolge].multeci * (P.kurt ? 0.3 : 1) + 0.25 * P.otoriter + 0.04 * P.tvSaat * (progov ? 1 : 0.4) + (P.deprem23 === 2 ? 0.1 : 0) + 0.1 * norm());
   const guven = clamp(0.35 + (progov ? 0.3 : muhalif ? -0.15 : 0) + 0.25 * (q[AI.iktidar] - 0.4) - 0.03 * Object.values(P.ace).filter(Boolean).length - (P.alevi || P.kurt ? 0.1 : 0) + (P.khk ? -0.3 : 0) + 0.12 * norm());
   // Algılanan eş oyu ve ağ payları (algı hatası: suskunluk sarmalı — azınlıktaki kişi sesini kısar, çoğunluğa sayılır)
@@ -729,7 +734,7 @@ function gundelik(P, H) {
 function evdeCocukMetni(P) { const n = (P.cocuklar || []).filter((c) => c.evdeYasar).length; return n ? 'çocukların ' : (byId.get(P.aile.evdekiEbeveyn) ? 'yaşlı kayınvalidesinin ' : ''); }
 
 /* ============================ YAZ ============================ */
-const OUT = new URL('./sentetik/hane/', import.meta.url);
+const OUT = process.env.HANE_OUT ? new URL('file://' + process.env.HANE_OUT.replace(/\/?$/, '/')) : new URL('./sentetik/hane/', import.meta.url);
 mkdirSync(OUT, { recursive: true });
 const cols = Object.keys(rows[0]);
 const esc = (v) => (String(v).includes(';') ? `"${v}"` : String(v));

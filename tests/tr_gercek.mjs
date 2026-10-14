@@ -33,18 +33,21 @@ for (const tam of [false, true]) for (const [ya, yb] of [[2015, 2018], [2018, 20
   console.log(`  ${tam ? 'tam    ' : 'yapısal'} ${ya}→${yb}: standart ${s.isabet_yuzde}% (ll ${s.log_kayip}) | bütünleşik ${b.isabet_yuzde}% (ll ${b.log_kayip}) | kalibre: ${sC.isabet_yuzde}% / ${bC.isabet_yuzde}%`);
   delete DECISION_DOMAINS.__ham;
 }
-console.log('3) Sentetik hane nüfusunda öğren → gerçek 2018 seçmenini tahmin et (ortak sütunlar)');
+console.log('3) Sentetikte öğren → gerçek 2018 seçmenini tahmin et (ortak sütunlar; sınama = CSES 2018 B yarısı)');
 {
   const ORTAK = ['yas', 'cinsiyet', 'egitim', 'gelir', 'dindarlik', 'ideoloji', 'yerlesim', 'etnik_koken', 'azinlik_kimlik', 'ekonomi_algisi', 'kurumsal_guven', 'siyasi_ilgi'];
-  const B = trGercek(2018, false), S = sentetikTR('oykusuz', 'hane');
+  const yarim = (k) => Number(String(k).split('-')[1]) % 2 === 0 ? 'A' : 'B';
+  const B = trGercek(2018, false);
   const keep = (rows) => rows.map((r) => ({ ...r, p: Object.fromEntries(Object.entries(r.p).filter(([k]) => ORTAK.includes(k))) }));
-  const tr = keep(S.rows), te = keep(B.rows);
+  const teAll = keep(B.rows), te = teAll.filter((r) => yarim(r.kisi) === 'B'), trA = teAll.filter((r) => yarim(r.kisi) === 'A');
   const spec = { ...B.spec, baglam: { ...B.spec.baglam } }; delete spec.baglam.bolge_paylari;   // sentetikte NUTS bölgesi yok
   DECISION_DOMAINS.__ham = ham(spec);
   const hs = { ...spec, alan: '__ham' };
-  const mS = fit(hs, tr, { haric: STD, kuramGuveni: 3 }), mB = fit(spec, tr);
   const z = sc(spec, calib(spec, { asc: {}, kuram_olcegi: KURAM_OLCEGI }, te), te);
-  const sC = sc(hs, calib(hs, mS, te), te), bC = sc(spec, calib(spec, mB, te), te);
-  console.log(`  yalnız kuram (veri yok) ${z.isabet_yuzde}% (ll ${z.log_kayip}) | sentetikte öğrenilmiş + gerçek toplama kalibre: standart ${sC.isabet_yuzde}% (ll ${sC.log_kayip}) / bütünleşik ${bC.isabet_yuzde}% (ll ${bC.log_kayip})`);
+  console.log(`  B yarısı n=${te.length}; yalnız kuram (veri yok) ${z.isabet_yuzde}% (ll ${z.log_kayip})`);
+  const run = (ad, tr) => { const mS = fit(hs, tr, { haric: STD, kuramGuveni: 3 }), mB = fit(spec, tr); const sC = sc(hs, calib(hs, mS, te), te), bC = sc(spec, calib(spec, mB, te), te);
+    console.log(`  ${ad.padEnd(38)} + gerçek toplama kalibre: standart ${sC.isabet_yuzde}% (ll ${sC.log_kayip}) / bütünleşik ${bC.isabet_yuzde}% (ll ${bC.log_kayip})`); };
+  for (const k of ['hane', 'hane_kal']) { try { run(`sentetik ${k} (2018 oyu, n=${sentetikTR('d2018', k).rows.length})`, keep(sentetikTR('d2018', k).rows)); } catch (e) { console.log('  ' + k + ': ' + e.message); } }
+  run(`gerçek A yarısında öğrenilmiş (n=${trA.length}, üst sınır)`, trA);
   delete DECISION_DOMAINS.__ham;
 }

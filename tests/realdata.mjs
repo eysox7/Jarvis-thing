@@ -165,8 +165,9 @@ export function trGercek(yil, tam = true) {
 
 // kaynak: 'tek' = bireysel üretim (TR_secmen.csv), 'hane' = hane temelli yaşam seyri mikrosimülasyonu (hane/TR_hane_secmen.csv)
 export function sentetikTR(surum = 'tam', kaynak = 'tek') {
-  const S = new URL(kaynak === 'hane' ? './data/sentetik/hane/' : './data/sentetik/', import.meta.url);
-  const F = kaynak === 'hane' ? { secmen: 'TR_hane_secmen.csv', il: 'TR_hane_il.csv' } : { secmen: 'TR_secmen.csv', il: 'TR_il_sonuclari.csv' };
+  // 'hane_kal': gerçek CSES 2018 (A yarısı) çapraz tablolarına kalibre edilmiş hane üretimi (tests/data/hane_kalibre.mjs)
+  const S = new URL(kaynak === 'hane' ? './data/sentetik/hane/' : kaynak === 'hane_kal' ? './data/sentetik/hane_kal/' : './data/sentetik/', import.meta.url);
+  const F = kaynak.startsWith('hane') ? { secmen: 'TR_hane_secmen.csv', il: 'TR_hane_il.csv' } : { secmen: 'TR_secmen.csv', il: 'TR_il_sonuclari.csv' };
   const ALT = ['iktidar', 'ana_muhalefet', 'milliyetci', 'kurt_sol', 'oy_yok'];
   const il = Object.fromEntries(parseCSV(readFileSync(new URL(F.il, S), 'utf8')).map((r) => [r.il, Object.fromEntries(ALT.map((a) => [a, num(r[a])]))]));
   const hk = { iktidar: 1, ana_muhalefet: -1, kurt_sol: -1, milliyetci: -0.3 }, mh = { iktidar: -1, ana_muhalefet: 1, kurt_sol: 0.3, milliyetci: 0.3 };
