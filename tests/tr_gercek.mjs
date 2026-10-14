@@ -51,3 +51,29 @@ console.log('3) Sentetikte öğren → gerçek 2018 seçmenini tahmin et (ortak 
   run(`gerçek A yarısında öğrenilmiş (n=${trA.length}, üst sınır)`, trA);
   delete DECISION_DOMAINS.__ham;
 }
+console.log('4) Az gerçek veri + kalibre sentetik aileler (sınama = CSES 2018 B yarısı; A yarısından n kişi, 3 tekrar)');
+{
+  const { rng } = await import('../js/audience/personas.js');
+  const ORTAK = ['yas', 'cinsiyet', 'egitim', 'gelir', 'dindarlik', 'ideoloji', 'yerlesim', 'etnik_koken', 'azinlik_kimlik', 'ekonomi_algisi', 'kurumsal_guven', 'siyasi_ilgi'];
+  const yarim = (k) => Number(String(k).split('-')[1]) % 2 === 0 ? 'A' : 'B';
+  const B = trGercek(2018, false);
+  const keep = (rows) => rows.map((r) => ({ ...r, p: Object.fromEntries(Object.entries(r.p).filter(([k]) => ORTAK.includes(k))) }));
+  const all = keep(B.rows), te = all.filter((r) => yarim(r.kisi) === 'B'), A = all.filter((r) => yarim(r.kisi) === 'A');
+  const spec = { ...B.spec, baglam: { ...B.spec.baglam } }; delete spec.baglam.bolge_paylari;
+  const syn = keep(sentetikTR('d2018', 'hane_kal').rows);
+  const fitN = (tr) => fitChoiceModel(spec, tr, { demoSigma: tuneDemoSigma(spec, tr, {}), iters: 300 });
+  for (const n of [50, 100, 200]) {
+    const acc = { g: [], s: [] };
+    for (let rep = 0; rep < 3; rep++) {
+      const r = rng(500 + rep * 13 + n), idx = A.map((_, i) => i);
+      for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+      const real = idx.slice(0, n).map((i) => A[i]);
+      acc.g.push(sc(spec, calib(spec, fitN(real), te), te).isabet_yuzde);
+      // sentetik satırlar düşük ağırlıkla (toplam ağırlığı gerçek verinin ~2 katı) + gerçek satırlar tam ağırlık
+      const w = Math.min(1, 2 * n / syn.length);
+      acc.s.push(sc(spec, calib(spec, fitN([...syn.map((x) => ({ ...x, w })), ...real]), te), te).isabet_yuzde);
+    }
+    const m = (a) => (a.reduce((x, y) => x + y, 0) / a.length).toFixed(1);
+    console.log(`  n=${n}: yalnız gerçek ${m(acc.g)}% | gerçek + kalibre sentetik ${m(acc.s)}%`);
+  }
+}

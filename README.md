@@ -449,7 +449,16 @@ cinsiyet) göre ayarlandı; B yarısına dokunulmadı:
 | Gerçek A yarısında (467 kişi) öğrenilmiş — üst sınır | 76,4 | 0,705 |
 
 Hiçbir gerçek bireysel kayıt eğitime girmeden, sentetik ailelerde eğitilen model gerçek veriyle eğitilenin
-0,6 puan yakınına geldi. Kalibrasyonun öğrettikleri: Türkiye'de sol-sağ öz-konumlaması büyük ölçüde bir parti
+0,6 puan yakınına geldi. Kurumun elinde az sayıda gerçek kayıt da varsa ikisi birlikte en iyisi:
+
+| B yarısını tahmin, A yarısından n gerçek kişi (3 tekrar) | Yalnız gerçek | Gerçek + kalibre sentetik aileler |
+|---|---|---|
+| 50 kişi | 72,1 | **77,1** |
+| 100 kişi | 73,7 | **77,5** |
+| 200 kişi | 73,2 | **77,7** |
+
+Not: kalibrasyon A yarısının tamamının *toplam* çapraz tablolarını kullandı; senaryonun doğru adı "yayımlanmış
+çapraz tablolar (ör. anket şirketlerinin oy × demografi raporları) + az sayıda bireysel kayıt"tır. Kalibrasyonun öğrettikleri: Türkiye'de sol-sağ öz-konumlaması büyük ölçüde bir parti
 kimliği etiketi; eğitimin etkisi üreticinin varsaydığından ~3 kat güçlü, dinin etkisi daha zayıf; Alevi kimliği
 daha belirleyici; Kürt kimliğinin iktidar oyuna "cezası" sanılandan küçük (2018'de Kürt seçmenin ~%49'u iktidara).
 
