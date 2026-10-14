@@ -482,7 +482,7 @@ büyüklüğüyle büzülmüş log-oran adımı). Hedefe dokunmayan iki sınama:
 
 Coğrafya yeni kişilere de taşınıyor; katılmamanın il dağılımı zayıf kalıyor. İl kalibreli ailelerde öğrenilen
 model gerçek seçmeni iki bölünmede de gerçek veride öğrenilmiş model kadar isabetle tahmin ediyor (yukarıdaki
-tablo; olasılık kalitesinde gerçek veri hâlâ önde). Ana muhalefet payında ~9 puanlık ortalama hata düzey farkı:
+tablo; olasılık kalitesinde gerçek veri hâlâ önde). Az sayıda gerçek kayıt da varsa il kalibrasyonu ek katkı vermiyor (n = 50 / 100 / 200: 76,9 / 77,5 / 77,6 ↔ 77,1 / 77,5 / 77,7). Ana muhalefet payında ~9 puanlık ortalama hata düzey farkı:
 üretici ulusal toplamı kendi hedefinde (%29) tutuyor, YSK eşlemesinde bu blok il ortalamasında %19.
 
 **İletişim mekanizmalarının gücü — ANES 2016 + 2020 havuzu (10.553 kişi).** Tek seçimde belirsiz kalan mercek
