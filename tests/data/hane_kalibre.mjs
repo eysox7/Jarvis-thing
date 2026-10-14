@@ -13,7 +13,9 @@ const TMP = '/tmp/hane_kal_' + process.pid; mkdirSync(TMP, { recursive: true });
 const ALT = ['iktidar', 'ana_muhalefet', 'milliyetci', 'kurt_sol', 'oy_yok'];
 const COLS = ['dindarlik', 'etnik_koken', 'egitim', 'ideoloji', 'yerlesim', 'cinsiyet'];
 export const yarim = (kisi) => Number(String(kisi).split('-')[1]) % 2 === 0 ? 'A' : 'B';
-const real = parseCSV(readFileSync(new URL('./cache/TR_CSES2018.csv', import.meta.url), 'utf8')).filter((r) => yarim(r.kisi) === 'A');
+// HEDEF_YARI=B: sağlamlık için ters bölünme (B'ye kalibre, A'da sına); çıktı hane_kal_B/
+const HY = process.env.HEDEF_YARI || 'A';
+const real = parseCSV(readFileSync(new URL('./cache/TR_CSES2018.csv', import.meta.url), 'utf8')).filter((r) => yarim(r.kisi) === HY);
 
 function lifts(rows, voteCol) {
   const N = rows.length, marg = ALT.map((a) => rows.filter((r) => r[voteCol] === a).length / N), out = {};
@@ -40,7 +42,7 @@ for (let tur = 0; tur < 2; tur++) for (const [k, vals] of Object.entries(GRID)) 
   for (const v of vals) { if (v === best[k]) continue; const K = { ...best, [k]: v }, l = loss(K); if (l < bl) { bl = l; best = K; } }
   console.log(`tur ${tur + 1} ${k.padEnd(10)} → ${best[k]}  kayıp ${bl.toFixed(4)}`);
 }
-const OUT = new URL('./sentetik/hane_kal/', import.meta.url).pathname;
+const OUT = new URL(HY === 'A' ? './sentetik/hane_kal/' : './sentetik/hane_kal_B/', import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
 writeFileSync(OUT + 'kalibrasyon.json', JSON.stringify(best, null, 1) + '\n');
 execFileSync('node', [GEN], { env: { ...process.env, HANE_KAL: OUT + 'kalibrasyon.json', HANE_OUT: OUT }, stdio: 'inherit' });

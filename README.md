@@ -441,23 +441,24 @@ kötüydü — sentetik ailelerin oy örüntüsü gerçeğe uymuyordu. Hane üre
 **yalnız A yarısının** toplam çapraz tablolarına (oy | dindarlık, etnik köken, eğitim, ideoloji, yerleşim,
 cinsiyet) göre ayarlandı; B yarısına dokunulmadı:
 
-| CSES 2018 B yarısını tahmin (462 gerçek seçmen) | İsabet | Log-kayıp |
+| Gerçek 2018 seçmenini tahmin | A'ya kalibre → B'de sına (462) | B'ye kalibre → A'da sına (467) |
 |---|---|---|
-| Yalnız kuram (hiç veri yok) | 72,5 | 0,827 |
-| Kalibrasyonsuz sentetik ailelerde öğrenilmiş | 69,9 | 0,860 |
-| **Kalibre sentetik ailelerde öğrenilmiş** (`tests/data/sentetik/hane_kal/`) | **75,8** | **0,747** |
-| Gerçek A yarısında (467 kişi) öğrenilmiş — üst sınır | 76,4 | 0,705 |
+| Yalnız kuram (hiç veri yok) | 72,5 (ll 0,827) | 73,2 (ll 0,809) |
+| Kalibrasyonsuz sentetik ailelerde öğrenilmiş | 69,9 (ll 0,860) | 69,6 (ll 0,899) |
+| **Kalibre sentetik ailelerde öğrenilmiş** (`tests/data/sentetik/hane_kal/`) | **75,8** (ll **0,747**) | 73,2 (ll 0,800) |
+| Diğer gerçek yarıda öğrenilmiş — üst sınır | 76,4 (ll 0,705) | 73,9 (ll 0,714) |
 
-Hiçbir gerçek bireysel kayıt eğitime girmeden, sentetik ailelerde eğitilen model gerçek veriyle eğitilenin
-0,6 puan yakınına geldi. Kurumun elinde az sayıda gerçek kayıt da varsa ikisi birlikte en iyisi:
+Kalibrasyon iki bölünmede de aynı çarpanları seçti ve sentetik veriyi iki yönde de düzeltti (~70 → 73–76);
+gerçek bireysel kayıt kullanmadan yalnız kuramı geçmesi ise bölünmeye bağlı (+3,3 / ±0). Kurumun elinde az
+sayıda gerçek kayıt da varsa ikisi birlikte her iki bölünmede de en iyisi:
 
-| B yarısını tahmin, A yarısından n gerçek kişi (3 tekrar) | Yalnız gerçek | Gerçek + kalibre sentetik aileler |
+| Diğer yarıdan n gerçek kişi (3 tekrar) | Yalnız gerçek (A→B / B→A) | Gerçek + kalibre sentetik aileler |
 |---|---|---|
-| 50 kişi | 72,1 | **77,1** |
-| 100 kişi | 73,7 | **77,5** |
-| 200 kişi | 73,2 | **77,7** |
+| 50 kişi | 72,1 / 72,8 | **77,1 / 75,3** |
+| 100 kişi | 73,7 / 73,8 | **77,5 / 75,5** |
+| 200 kişi | 73,2 / 75,2 | **77,7 / 75,5** |
 
-Not: kalibrasyon A yarısının tamamının *toplam* çapraz tablolarını kullandı; senaryonun doğru adı "yayımlanmış
+Not: kalibrasyon bir yarının tamamının *toplam* çapraz tablolarını kullandı; senaryonun doğru adı "yayımlanmış
 çapraz tablolar (ör. anket şirketlerinin oy × demografi raporları) + az sayıda bireysel kayıt"tır.
 
 **Dil modeli gerçek Türk seçmenini canlandırabiliyor mu?** (`tests/llm_tr_gercek.mjs`, B yarısından 96 kişi,
