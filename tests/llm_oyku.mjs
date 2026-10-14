@@ -2,7 +2,7 @@
 // canlandırılır: (a) yalnız anket alanları, (b) anket alanları + hayat öyküsü. Bütünleşik model
 // (kalan kişilerde öğrenilmiş) aynı kişilerde kıyas için ölçülür; ayrıca öykülü dil modeli fayda terimi
 // olarak eklenince (hibrit) katsayı ve isabet raporlanır.
-// Çalıştır: NODE_USE_ENV_PROXY=1 node tests/llm_oyku.mjs [kişi=48] [model=openai/gpt-oss-20b]
+// Çalıştır: NODE_USE_ENV_PROXY=1 [KAYNAK=hane] node tests/llm_oyku.mjs [kişi=48] [model=openai/gpt-oss-20b]
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { attachSilicon } from '../js/decision/ensemble.js';
 import { fitChoiceModel, tuneDemoSigma, scoreProbs } from '../js/decision/estimate.js';
@@ -27,8 +27,10 @@ async function chat(system, user) {
 
 process.argv.splice(2, process.argv.length, '--yukle');
 const { sentetikTR } = await import('./realdata.mjs');
-const { spec, rows } = sentetikTR('onceki_yok');
-const oyku = Object.fromEntries(readFileSync(new URL('./data/sentetik/TR_secmen_oyku.jsonl', import.meta.url), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map((x) => [String(x.kisi), x.oyku]));
+// KAYNAK=hane → hane temelli yaşam seyri verisi (ayrıntılı aile öyküleri)
+const KAYNAK = process.env.KAYNAK || 'tek';
+const { spec, rows } = sentetikTR('onceki_yok', KAYNAK);
+const oyku = Object.fromEntries(readFileSync(new URL(KAYNAK === 'hane' ? './data/sentetik/hane/TR_hane_oyku.jsonl' : './data/sentetik/TR_secmen_oyku.jsonl', import.meta.url), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map((x) => [String(x.kisi), x.oyku]));
 const r = rng(31), idx = rows.map((_, i) => i);
 for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
 const panel = idx.slice(0, N).map((i) => rows[i]), train = idx.slice(N).map((i) => rows[i]);
@@ -42,7 +44,7 @@ let kota = false;   // günlük kota dolarsa: önbellekteki yanıtlarla (iki ko�
 const run = async (tag, betim) => {
   for (const x of panel) delete x.p.__silikon;   // önceki koşunun yanıtı yanıtsız kişide kalmasın
   for (let i = 0; i < panel.length; i += 12) {
-    const part = panel.slice(i, i + 12), key = (x) => `${MODEL}|tr_${tag}|${x.kisi}`;
+    const part = panel.slice(i, i + 12), key = (x) => `${MODEL}|tr${KAYNAK === 'hane' ? 'hane' : ''}_${tag}|${x.kisi}`;
     if (kota) { for (const x of part) if (cache[key(x)]) await attachSilicon(spec, [x], chat, { batch: 6, cache, anahtar: key, sistem: SYS, brief, betim }); continue; }
     try { await attachSilicon(spec, part, chat, { batch: 6, cache, anahtar: key, sistem: SYS, brief, betim }); save(); }
     catch (e) { if (!/kota/.test(e.message)) throw e; kota = true; console.error(e.message, '— önbellekle devam'); i -= 12; }
