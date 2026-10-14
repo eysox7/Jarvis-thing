@@ -465,7 +465,7 @@ Not: kalibrasyon bir yarının tamamının *toplam* çapraz tablolarını kullan
 
 **Dil modeli gerçek Türk seçmenini canlandırabiliyor mu?** (`tests/llm_tr_gercek.mjs`, B yarısından 96 kişi,
 Groq gpt-oss-20b, anket betiminden): dil modeli tek başına 71,9 (log-kayıp 1,008) — yalnız kuramın (75,0; 0,774)
-altında; A yarısında öğrenilmiş bütünleşik model 78,1 (0,688); A + kalibre sentetik aileler **81,3** (0,641). Kalibrasyonun öğrettikleri: Türkiye'de sol-sağ öz-konumlaması büyük ölçüde bir parti
+altında; A yarısında öğrenilmiş bütünleşik model 78,1 (0,688); A + kalibre sentetik aileler **81,3** (0,641); il kalibreli ailelerle 80,2 (**0,630**) — 96 kişide bir kişilik fark. Kalibrasyonun öğrettikleri: Türkiye'de sol-sağ öz-konumlaması büyük ölçüde bir parti
 kimliği etiketi; eğitimin etkisi üreticinin varsaydığından ~3 kat güçlü, dinin etkisi daha zayıf; Alevi kimliği
 daha belirleyici; Kürt kimliğinin iktidar oyuna "cezası" sanılandan küçük (2018'de Kürt seçmenin ~%49'u iktidara).
 

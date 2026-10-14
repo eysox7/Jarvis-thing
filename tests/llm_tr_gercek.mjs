@@ -50,5 +50,6 @@ const fit = (tr) => fitChoiceModel(spec, tr, { demoSigma: tuneDemoSigma(spec, tr
 const PL = panel.map((x) => (x.p.__silikon ? ids.map((id) => x.p.__silikon[id]) : null));
 const res = { model: MODEL, panel: N, yanit: okI.length, sure_sn: Math.round((Date.now() - t0) / 1000),
   dil_modeli: sc(PL), yalniz_kuram: sc(probs(calib({ asc: {}, kuram_olcegi: KURAM_OLCEGI }))),
-  butunlesik_A: sc(probs(calib(fit(A)))), butunlesik_A_artı_sentetik: sc(probs(calib(fit([...keep(sentetikTR('d2018', 'hane_kal').rows).map((x) => ({ ...x, w: 0.3 })), ...A])))) };
+  butunlesik_A: sc(probs(calib(fit(A)))), butunlesik_A_artı_sentetik: sc(probs(calib(fit([...keep(sentetikTR('d2018', 'hane_kal').rows).map((x) => ({ ...x, w: 0.3 })), ...A])))),
+  butunlesik_A_artı_il_kalibre_sentetik: sc(probs(calib(fit([...keep(sentetikTR('d2018', 'hane_kal_il').rows).map((x) => ({ ...x, w: 0.3 })), ...A])))) };
 console.log(JSON.stringify(res, null, 2));
