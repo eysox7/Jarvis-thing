@@ -543,6 +543,7 @@ veriden öğrenilir. Groq gpt-oss modelleri ANES seçmenlerini betimlerinden can
 | Sentetik TR, 48 seçmen, betime hayat öyküsü eklendi (20b, `tests/llm_oyku.mjs`) | 56,3 (öyküsüz 37,5) | 72,9 | — | — |
 | Aynı, 84 seçmen (120b; kota dolunca iki yanıtı da olanlar) | 63,1 (öyküsüz 40,5) | 75,0 | — | — |
 | Hane verisi, 48 seçmen, ayrıntılı aile öyküsü (~1.700 karakter; 20b, `KAYNAK=hane`) | 58,3 (öyküsüz 37,5) | 95,8 | — | — |
+| Hane verisi, 96 seçmen, aynı öyküler (120b, `KAYNAK=hane`) | 62,5 (öyküsüz 46,9; log-kayıp 1,157) | **83,3** (0,497) | — | — |
 
 Öğrenilen katsayı her koşuda sıfıra yakın: dil modeli, modelin zaten bildiği bireysel betimi okuyor ve
 bağımsız bilgi katmıyor. Topluluk bağlamını metin olarak vermek de dil modelinin isabetini artırmadı;
@@ -550,7 +551,7 @@ aynı bilgi modele yapılandırılmış terim (`topluluk`) olarak girince kazan�
 küçük (48–120), farklar bu nedenle temkinle okunmalı. Hayat öyküsü metni ise dil modelinin isabetini
 37,5–40,5'ten 56–63'e çıkardı (20b ve 120b): dil modeli öyküden gerçek bilgi okuyor, ama aynı bilgiyi
 yapılandırılmış sütun olarak alan bütünleşik model yine önde (72,9–75,0). Hane verisinin ayrıntılı aile
-öyküleriyle de aynı tablo: dil modeli 37,5 → 58,3; bütünleşik model aynı 48 kişide 95,8 (bu verinin 5 katlı
+öyküleriyle de aynı tablo: dil modeli 37,5 → 58,3 (20b) ve 46,9 → 62,5 (120b, 96 kişi); bütünleşik model 96 kişide 83,3, 48 kişide 95,8 (bu verinin 5 katlı
 CV'si 85,4 — küçük örneklem şanslı düştü). Ayrıntılı persona dil modelinin isabetini belirgin artırıyor, ama
 en büyük kazanç aynı bilgiyi kuram terimlerine yapılandırılmış olarak vermekten geliyor. Ücretsiz Groq kotası günde 200 bin token.
 
