@@ -409,6 +409,55 @@ Gerçek ANES'te yapısal aktarım avantajı (aşağıda) düzeltmeden sonra da s
 Not: üretim zinciri ekonomik oy, afet cezası gibi mekanizmaları içerir; model denklemi kullanılmasa da
 bu bir "dünya böyle işliyorsa model yakalar mı" sınamasıdır, gerçek panelde tekrarlanmalı.
 
+### Gerçek Türkiye seçmeni (CSES 2015 ve 2018)
+
+Model artık Türkiye'de gerçek seçmenlerle de sınanıyor: CSES (Comparative Study of Electoral Systems)
+Türkiye Kasım 2015 (942 kişi) ve 2018 (929 kişi) anketleri — oy ya da katılmama, yaş, cinsiyet, eğitim,
+gelir, ibadet sıklığı, sol-sağ, ekonomi algısı, demokrasiden memnuniyet, evde konuşulan dil (Kürtçe),
+yerleşim; 2018'de siyasete ilgi. Topluluk bağlamı NUTS-1 bölgesinin **gerçek** seçim sonucudur (YSK il
+sonuçları, `turkeyelections` paketi, MIT). Veri ücretsiz ama açık yeniden dağıtım izni olmadığı için repoya
+konmaz: `python3 tests/data/fetch_cses_tr.py` indirir, `python3 tests/data/fetch_tr_il.py` il sonuçlarını
+üretir, `node tests/tr_gercek.mjs` sınar. Seçenekler o seçimin bloklarıdır: 2015'te iktidar AK Parti ve MHP
+milliyetçi muhalefet; 2018'de iktidar Cumhur İttifakı, milliyetçi muhalefet İYİ Parti.
+
+| Gerçek Türkiye | Çoğunluk | Kuramsız standart | Bütünleşik |
+|---|---|---|---|
+| 2018, 5 katlı CV, parti yakınlığıyla | 57,4 | **85,5** | 83,7 (log-kayıp **0,496** / 0,516) |
+| 2018, 5 katlı CV, yapısal (parti yakınlığı yok) | 57,4 | 76,2 | **76,4** (log-kayıp **0,644** / 0,694) |
+| 2015, 5 katlı CV, yapısal | 40,8 | **71,0** | 70,7 (log-kayıp **0,823** / 0,853) |
+| Az veri, 2018 yapısal: 50 / 100 / 400 kişi | 57 | 57,4 / 69,9 / **76,0** | **75,0 / 74,3** / 75,6 |
+| Az veri, 2015 yapısal: 50 / 100 / 400 kişi | 35–41 | 35,1 / 64,4 / 70,0 | **65,0 / 68,2 / 70,1** |
+| Hiç bireysel veri yok (kuram + gerçek toplam sonuç), 2018 / 2015 yapısal | 57,4 / 40,8 | — | **73,3 / 60,1** |
+| Seçimler arası, yapısal: 2015'te öğren → 2018 | 57,4 | **76,7** (ll 0,746) | 75,9 (ll **0,703**) |
+| Seçimler arası, yapısal: 2018 → 2015 | 40,8 | 66,0 | **68,5** |
+| Seçimler arası, parti yakınlığıyla, toplam paya kalibre: 2018 → 2015 | 40,8 | 75,6 | **81,2** |
+
+ABD'deki tablo Türkiye'de de çıkıyor: bol veride isabet başa baş (olasılık kalitesinde kuram önde), az veride
+ve hiç veri yokken kuram belirgin önde. Medya değişkeni olmadığı için iletişim merceği burada etkisiz.
+
+**Sentetik aileleri gerçek seçmene kalibre etmek** (`node tests/data/hane_kalibre.mjs`). Kalibrasyonsuz sentetik
+hane nüfusunda öğrenip gerçek 2018 seçmenini tahmin etmek, hiç veri kullanmadan kuramla tahmin etmekten
+kötüydü — sentetik ailelerin oy örüntüsü gerçeğe uymuyordu. Hane üreticisinin birkaç çarpanı, CSES 2018'in
+**yalnız A yarısının** toplam çapraz tablolarına (oy | dindarlık, etnik köken, eğitim, ideoloji, yerleşim,
+cinsiyet) göre ayarlandı; B yarısına dokunulmadı:
+
+| CSES 2018 B yarısını tahmin (462 gerçek seçmen) | İsabet | Log-kayıp |
+|---|---|---|
+| Yalnız kuram (hiç veri yok) | 72,5 | 0,827 |
+| Kalibrasyonsuz sentetik ailelerde öğrenilmiş | 69,9 | 0,860 |
+| **Kalibre sentetik ailelerde öğrenilmiş** (`tests/data/sentetik/hane_kal/`) | **75,8** | **0,747** |
+| Gerçek A yarısında (467 kişi) öğrenilmiş — üst sınır | 76,4 | 0,705 |
+
+Hiçbir gerçek bireysel kayıt eğitime girmeden, sentetik ailelerde eğitilen model gerçek veriyle eğitilenin
+0,6 puan yakınına geldi. Kalibrasyonun öğrettikleri: Türkiye'de sol-sağ öz-konumlaması büyük ölçüde bir parti
+kimliği etiketi; eğitimin etkisi üreticinin varsaydığından ~3 kat güçlü, dinin etkisi daha zayıf; Alevi kimliği
+daha belirleyici; Kürt kimliğinin iktidar oyuna "cezası" sanılandan küçük (2018'de Kürt seçmenin ~%49'u iktidara).
+
+**İletişim mekanizmalarının gücü — ANES 2016 + 2020 havuzu (10.553 kişi).** Tek seçimde belirsiz kalan mercek
+katsayıları havuzda daralıyor: medya etkisinin dikkat × ELM ikna edilebilirliği × Hall okuma konumuyla
+değişmesi **0,22 ± 0,14** (yapısal) ve kimlik gündemi (dolaysız deneyim) **0,81 ± 0,40** destekleniyor;
+topluluk iklimine uyum (suskunluk sarmalı) ters yönde (−0,67 ± 0,65); gündem/öncelikleme ve pekiştirme belirsiz.
+
 ### Gerçek veride ölçülen başarım (`node tests/realdata.mjs`)
 
 Gerçek insanların gerçek kararları, görülmemiş veride. Kıyas: **standart** = kuramsız koşullu logit
