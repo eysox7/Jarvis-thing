@@ -646,16 +646,21 @@ def({
   },
 });
 
+// İletişim merceği ve hayat öyküsü alanları (tek kişi tahmininde olduğu gibi geçer)
+const ILETISIM_ALANLARI = ['siyasi_ilgi', 'tv_saat', 'sosyal_saat', 'medya_kaynagi', 'tv_kanal_turu', 'sosyal_kaynak_turu', 'parti_kimligi', 'ekonomi_algisi', 'hane_algisi', 'tehdit_algisi', 'otoriterlik', 'is_kaybi', 'borc_yuku', 'teror_maruziyeti', 'sehit_yakini', 'zorunlu_goc', 'deprem_maruziyeti', 'travma_skoru', 'aile_tercihi', 'ebeveyn_tercihi'];
+
 def({
   name: 'decision_person',
-  desc: 'Tek bir kişinin (betimlenen persona) bir karar durumunda ne seçeceğini olasılıklarla tahmin eder ve kararını hangi kuramların belirlediğini açıklar. Örn. "35 yaşında, büyükşehirde yaşayan, üniversite mezunu, orta gelirli bir kadın".',
-  params: { ...SCEN_PARAMS, kisi: `object (zorunlu) — persona alanları; bilinmeyenleri yazma. Boyutlar: ${Object.keys(DIMENSIONS).join(', ')} (yaş sayı olabilir); onceki: önceki seçim` },
+  desc: 'Tek bir kişinin (betimlenen persona) bir karar durumunda ne seçeceğini olasılıklarla tahmin eder, kararını hangi kuramların belirlediğini ve iletişim ortamının (dikkat, ELM ikna yolu, gündem, medya eğilimi, Hall okuma konumu, iki aşamalı akış) kararı nasıl çerçevelediğini açıklar. Örn. "35 yaşında, büyükşehirde yaşayan, üniversite mezunu, orta gelirli, akşam haberlerini muhalif kanaldan izleyen bir kadın".',
+  params: { ...SCEN_PARAMS, kisi: `object (zorunlu) — persona alanları; bilinmeyenleri yazma. Boyutlar: ${Object.keys(DIMENSIONS).join(', ')} (yaş sayı olabilir); onceki: önceki seçim; iletişim ve hayat: ${ILETISIM_ALANLARI.join(', ')} (sayılar 0..1, saatler gün başına; medya_kaynagi bağlamdaki medya_yanliligi anahtarlarından); ag_paylari: {seçenek: pay}` },
   run: (a) => {
     if (!a.kisi || typeof a.kisi !== 'object') throw new Error('kisi zorunlu');
     const { spec, model } = scenarioOf(a);
     const p = {};
     for (const [k, v] of Object.entries(a.kisi)) {
       if (k === 'onceki') { p.onceki = String(v); continue; }
+      if (k === 'ag_paylari' && v && typeof v === 'object') { p.ag_paylari = v; continue; }
+      if (ILETISIM_ALANLARI.includes(k)) { p[k] = typeof v === 'number' || (v !== '' && Number.isFinite(+v)) ? +v : String(v); continue; }
       const m = mapValue(k, v);
       if (m) p[k] = m;
     }

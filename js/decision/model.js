@@ -11,7 +11,7 @@ import { DECISION_DOMAINS, ILETISIM, GECMIS, ILETISIM_TERIMLERI, isAbstain, SILI
 import { ensureComm } from './communication.js';
 import { rng } from '../audience/personas.js';
 import { socialStructure, diffuse } from './social.js';
-import { lensOf, MERCEK_MEKANIZMA } from './lens.js';
+import { lensOf, MERCEK_MEKANIZMA, describeLens } from './lens.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 /** Kişi alanı → demografik anahtar. Sürekli sayılar (algı, tehdit, borç…) 0.25'lik dilimlere ayrılır. */
@@ -411,6 +411,7 @@ export function predictPerson(spec, persona, opts = {}) {
     olasiliklar: Object.fromEntries(resolved.alts.map((a, j) => [a.id, pct(P[j])])),
     en_olasi: resolved.alts[b].id, ikinci: resolved.alts[s].id,
     neden: nedenler,
+    iletisim_ortami: describeLens(p.__mercek),
     eksik_boyutlar: Object.keys(DIMENSIONS).filter((d) => p[d] === undefined),
     kaynak: opts.model?.kaynak || (opts.model?.theta || opts.model?.siniflar ? 'veriden öğrenilmiş model' : 'kuram öncülleri'),
   };
