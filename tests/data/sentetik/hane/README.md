@@ -44,7 +44,7 @@ oylarıdır.
 7. **Evlilik:** yıl, nasıl (görücü usulü, akraba evliliği, iş yerinde/üniversitede tanışma), eşin memleketi ve
    işi; boşanma ya da dul kalma; eşin aile soyuyla siyasi homogami (Alford vd. 2011) ve yıllar içinde
    karşılıklı uyum.
-8. **Çocuklar:** adları ve yaşları; evde yaşayan bekâr yetişkin çocuklar ayrı seçmen olarak kurulur.
+8. **Çocuklar:** adları ve yaşları; evde yaşayan bekâr yetişkin çocuklar ayrı seçmen olarak kurulur ve dindarlığı, eğitim düzeyi, ailenin sosyoekonomik durumu hanedeki gerçek anne-babadan aktarılır.
 9. **Tarihsel olaylar** ve **gündelik hayat:** ev sahibi/kiracı, araba, kronik hastalık, evde konuşulan dil,
    memleket bağı, ibadet, günlük rutin, kaygılar ve hayaller.
 10. **İletişim ekolojisi:** TV kanalı ve saati, sosyal medya kaynağı ve saati, aile WhatsApp grubu, cami/cemevi,
@@ -68,16 +68,17 @@ olasılıkla yanlış algılanır; tartışma ağındaki azınlık görüşü %1
 
 | Ölçüt | Gerçek düzey | Veride |
 |---|---|---|
-| Oy (iktidar / ana muh. / milliyetçi / Kürt / katılmama) | ~43 / 29 / 8 / 8 / 12 | 42,4 / 29,8 / 8,2 / 8,1 / 11,5 |
-| 2018 dağılımı | ~46 / 20 / 8,5 / 10 / 15,5 | 46,6 / 19,4 / 8,3 / 9,9 / 15,9 |
-| 18+ yaş yapısı (18–24 / 25–34 / 35–44 / 45–54 / 55–64 / 65+) | ADNKS: ~13,5 / 19,5 / 19,5 / 16,5 / 13,5 / 14 | 15,4 / 22,3 / 17,2 / 19,8 / 12,9 / 12,4 |
-| Hane tipi (tek / çift / çekirdek / tek ebeveyn / geniş) | ADNKS: 19,7 / 15 / 42 / 9 / 13 | 18,7 / 14,2 / 43,4 / 9,2 / 14,5 |
-| Akraba evliliği (evlenmiş olanlarda) | TNSA 2018: %23 (15–49 yaş kadın; gençlerde düşük) | %15 |
-| Görücü usulü | TAYA: yaşlı kuşaklarda çoğunluk, gençlerde azınlık | %48 |
-| Çalışan kadın (65 altı) | İşgücüne katılım %35,8 (işsizler dahil) | %29 |
-| Günlük TV | ~3,5 saat | 3,5 saat (sosyal medya 2,3) |
-| Eşle aynı oy (algılanan) | ANES 2000: %76 | %65 |
-| Tartışma ağının çoğunluğuyla aynı oy | ANES 2000: %59 | %61 |
-| İki seçimde aynı oy | %75–80 | %80 |
-| Alevi seçmende ana muhalefet | çok yüksek | %83 |
-| Kürt seçmende Kürt hareketi / iktidar | ~%40–55 / ~%25–35 | %35 / %29 (Kürt hareketi düşük taraf) |
+| Seçmen sayısı | — | 2.880 (1.300 hane; hane başı 2,2 seçmen, ort. hane 2,9 kişi) |
+| Oy (iktidar / ana muh. / milliyetçi / Kürt / katılmama) | ~43 / 29 / 8 / 8 / 12 | 42,3 / 29,4 / 8,2 / 8,0 / 12,2 |
+| 2018 dağılımı | ~46 / 20 / 8,5 / 10 / 15,5 | 46,7 / 20,0 / 8,0 / 9,7 / 15,6 |
+| 18+ yaş yapısı (18–24 / 25–34 / 35–44 / 45–54 / 55–64 / 65+) | ADNKS: ~13,5 / 19,5 / 19,5 / 16,5 / 13,5 / 14 | 14,9 / 22,1 / 16,0 / 19,5 / 14,6 / 12,8 |
+| Hane tipi (tek / çift / çekirdek / tek ebeveyn / geniş) | ADNKS: 19,7 / 15 / 42 / 9 / 13 | 18,9 / 17,0 / 41,5 / 7,2 / 15,3 |
+| Akraba evliliği (evlenmiş olanlarda) | TNSA 2018: %23 (15–49 yaş kadın; gençlerde düşük) | %16,7 |
+| Görücü usulü | TAYA: yaşlı kuşaklarda çoğunluk, gençlerde azınlık | %47 |
+| Çalışan kadın (65 altı) | İşgücüne katılım %35,8 (işsizler dahil) | %30 |
+| Günlük TV | ~3,5 saat | 3,6 saat (sosyal medya 2,3) |
+| Eşle aynı oy (algılanan) | ANES 2000: %76 | %67 |
+| Tartışma ağının çoğunluğuyla aynı oy | ANES 2000: %59 | %63 |
+| İki seçimde aynı oy | %75–80 | %81 |
+| Alevi seçmende ana muhalefet | çok yüksek | %84 |
+| Kürt seçmende Kürt hareketi / iktidar | ~%40–55 / ~%25–35 | %35 / %28 (Kürt hareketi düşük taraf) |

@@ -704,10 +704,10 @@ function gundelik(P, H) {
   else if (P.yas > 35 && b2(0.15)) s.push(`${p2(['Bel fıtığı', 'Migren', 'Mide rahatsızlığı'])} yüzünden zaman zaman çalışamıyor.`);
   if (P.kurt) s.push(b2(P.yas > 40 ? 0.9 : 0.6) ? `Evde ${b2(0.15) ? 'Zazaca' : 'Kürtçe'} konuşuluyor${P.yas < 30 ? '; kendisi Türkçeyi daha rahat konuşuyor' : ''}.` : 'Kürtçeyi anlıyor ama konuşamıyor; bundan hayıflanıyor.');
   if (P.arap) s.push('Evde Arapça da konuşuluyor.');
-  if (P.goc && !P.goc.zorunlu && P.goc.il !== P.dogumIl) s.push(b2(0.55) ? `Yazları ${P.dogumIl}'${back(P.dogumIl) ? 'daki' : 'deki'} köye gidiyor; bayramları memlekette geçirmeye çalışıyor.`.replace("'daki' köye", "'daki köye") : 'Memleketle bağı zayıfladı; en son yıllar önce bir cenaze için gitti.');
+  if (P.goc && !P.goc.zorunlu && P.goc.il !== P.dogumIl) s.push(b2(0.55) ? `Yazları ${P.koyde ? P.dogumIl + "'" + (back(P.dogumIl) ? 'daki' : 'deki') + ' köye' : 'memlekete, ' + yon(P.dogumIl)} gidiyor; bayramları memlekette geçirmeye çalışıyor.`.replace("'daki' köye", "'daki köye") : 'Memleketle bağı zayıfladı; en son yıllar önce bir cenaze için gitti.');
   if (P.din > 0.6) s.push(`${P.alevi ? 'Muharrem orucunu tutar' : P.kadin ? 'Beş vakit namazını kılar, başını örter' : 'Beş vakit namazını kılmaya çalışır'}; Ramazan'da oruç tutar.`);
   else if (P.din < 0.3 && !P.alevi) s.push('Dini bayramları aile ziyaretiyle geçirir; ibadetle pek arası yok.');
-  const rutin = P.meslek === 'emekli' ? 'Sabahları pazara ya da camiye/parka gider, öğleden sonra torunlara bakar'
+  const rutin = P.meslek === 'emekli' ? `Sabahları pazara ya da ${P.alevi ? 'cemevine' : P.din > 0.5 ? 'camiye' : 'parka'} gider${(P.cocuklar || []).length ? ', öğleden sonra torunlara bakar' : ''}`
     : P.meslek === 'ev_kadini' ? 'Günü yemek, temizlik ve çocukların okul işleriyle geçer; akşam dizisini kaçırmaz'
     : P.meslek === 'ogrenci' ? 'Gününün çoğu okulda ve telefonda geçiyor; hafta sonları kafede çalışıyor'
     : P.meslek === 'ciftci' ? 'Güneş doğmadan tarlaya iner; akşam köy kahvesinde günün fiyatları konuşulur'

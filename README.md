@@ -210,7 +210,7 @@ koşturur (maruziyet, tutum, Hall okuma konumu terimleri); seçenek `iletisim` a
 |---|---|---|---|
 | ANES 2016 tam / yapısal (partizan medya var) | 70,7 = 70,7 / 65,0 → 64,9 | 63,3 → **63,8** / 57,3 → **57,5** | tam 2016→2020: 80,1 → **80,5**; yapısal 69,3 → **69,6** |
 | ANES 2020 tam / yapısal (partizan medya var) | 81,6 = 81,6 / 73,7 → 73,8 | 73,9 → 73,8 / 68,8 → 68,7 | 2020→2016: ±0,1 |
-| Sentetik hane (kanal × saat, ilgi, ağ) | 86,0 → 85,7 | 74,2 → 73,5 (log-kayıp 0,731 → 0,728) | 2018→2023: 74,2 → **74,7** |
+| Sentetik hane (kanal × saat, ilgi, ağ) | 85,6 → 85,5 | 75,8 → 75,1 (log-kayıp 0,713 → 0,710) | 2018→2023: 76,3 → 75,9 |
 | Sentetik TR | 82,4 → **82,6** | — | — |
 
 Mercek tahmin gücünü belirgin artırmıyor (±0,5 puan): bol veride kişi değişkenlerinin sabitleri farkı
@@ -355,7 +355,7 @@ katkısı görülmüyor).
 
 `node tests/data/hayat_uret.mjs` gerçek demografik oranlardan (TÜİK ADNKS, eğitim ve evlenme
 istatistikleri, TNSA doğurganlık ve akraba evliliği, TAYA, hayat tabloları, RTÜK) **1.300 hane ve
-~2.900 seçmen** üretir. Aile soyut bir sütun değildir: hanedeki eş, evde yaşayan yetişkin çocuk ve dul
+2.880 seçmen** üretir. Aile soyut bir sütun değildir: hanedeki eş, evde yaşayan yetişkin çocuk ve dul
 kalmış yaşlı ebeveyn ayrı seçmenlerdir; birbirlerinin oyunu gerçekten etkilerler. Her kişinin anne-babası
 (adları, kendi kuşaklarının eğitimi, meslekleri, babanın oyu o dönemin partileriyle), kardeşleri
 (annenin kuşağının doğurganlığı; Almanya'ya işçi giden abi, köyde kalan abla, bebekken ölen kardeşler),
@@ -368,22 +368,24 @@ işleyen ajan tabanlı bir iletişim süreciyle oluşur (medya dozu, karşıt i�
 zamanlı etkileşim); karar modelinin denklemi kullanılmaz. Kalibrasyon ve kaynaklar:
 [tests/data/sentetik/hane/README.md](tests/data/sentetik/hane/README.md).
 
-> *Örnek (kısaltılmış):* Mehmet Çelik, 1962'de Bursa'ya bağlı bir köyde doğdu; 8 çocuklu bir ailenin
-> çocuğu. Babası Ramazan işçi, annesi Hatice hiç okula gitmemişti; babası yıllarca Adalet Partisi'ne,
-> sonra Doğru Yol'a oy verdi. Üç kardeşi bebekken öldü. 1987'de köyden Bursa merkezine taşındı. 1986'da
-> halasının kızı Özlem ile evlendi. Günde 4,5 saat televizyon izliyor… Siyaseti en çok annesi, abileri
-> Recep ve İbrahim, evli kızı Sibel ve komşularıyla konuşuyor. Kirada oturuyor; kalp hastası…
+> *Örnek (kısaltılmış):* İsmail Çetin, 1953'te Kayseri'de doğdu; Alevi bir ailenin 6 çocuğundan biri.
+> Babası Yaşar işçi, yıllarca CHP'ye, Ecevit'in "ak günlere" sloganına inanarak oy verdi; 1975'te öldü.
+> Abisi Recep 1966'da işçi olarak Viyana'ya gitti, orada kaldı; iki kardeşi bebekken öldü, köyde doktor
+> yoktu. 1969'da İstanbul'a göç etti, Sultanbeyli'ye yerleşti. 1974'te amcasının kızı Meryem ile evlendi.
+> Haberleri Halk TV'den izliyor; cemevindeki cemlere katılır, kahvehanede oturur; kafası karışınca cemevindeki
+> dede Kazım'a danışır. Kirada oturuyor, kira iki katına çıktı; KOAH hastası; en çok beklenen İstanbul
+> depreminden kaygılanıyor.
 
-| Sentetik hane, 5 katlı CV (2.909 kişi) | Çoğunluk | Kuramsız standart | Bütünleşik |
+| Sentetik hane, 5 katlı CV (2.880 kişi) | Çoğunluk | Kuramsız standart | Bütünleşik |
 |---|---|---|---|
-| Sıradan anket + iletişim ekolojisi ve hayat sütunları (aile/ağ/önceki oy yok) | 42,4 | 65,6 | **66,7** |
-| + aile (eşin, babanın oyu), ağ, mahalle, olaylar | 42,4 | 76,2 | **81,0** (log-kayıp 0,525 / 0,639) |
-| + önceki oy (2018) | 42,4 | 83,7 | **85,7** (log-kayıp 0,414 / 0,476) |
-| Öğrenme eğrisi, tam: 50 / 200 / 800 kişi | 38 / 42 / 43 | 37,9 / 73,5 / 81,9 | **81,0 / 83,7 / 84,6** |
-| Hiç bireysel veri yok (yalnız kuram) | 42,4 | — | **66,8** |
+| Sıradan anket + iletişim ekolojisi (aile/ağ/önceki oy ve hayat olayları yok) | 42,3 | 65,8 | **66,6** |
+| + aile (eşin, babanın oyu), ağ, mahalle, hayat olayları | 42,3 | 75,9 | **81,9** (log-kayıp 0,514 / 0,634) |
+| + önceki oy (2018) | 42,3 | 83,2 | **85,5** (log-kayıp 0,406 / 0,485) |
+| Öğrenme eğrisi, tam: 50 / 200 / 800 kişi | 42 / 42 / 43 | 37,6 / 76,5 / 81,8 | **81,5 / 83,8 / 84,8** |
+| Hiç bireysel veri yok (yalnız kuram) | 42,3 | — | **67,8** |
 
-Hanede aynı oy %60 (rastgele çift %30); eşle aynı oy (algılanan) %65, tartışma ağının çoğunluğuyla
-%61 (ANES 2000: %76 / %59). Sosyal terimler çıkarılınca her veri miktarında −2/−5 puan.
+Hanede aynı oy %61 (rastgele çift %29); eşle aynı oy (algılanan) %67, tartışma ağının çoğunluğuyla
+%63 (ANES 2000: %76 / %59). Eleştirel terimler çıkarılınca bu veride fark yok ya da hafif artış. Sosyal terimler çıkarılınca her veri miktarında −2/−5 puan.
 
 **Panel: aynı kişiler, iki seçim (`--secimler-tr`).** Aynı 3.000 kişi 2018 koşullarında da oy verir:
 ekonomik zarar daha az (döviz krizi seçimden sonra), 2023 depremi yok, 2015–17 sonrası güvenlik gündemi
@@ -394,15 +396,15 @@ Bir seçimde öğrenip ötekini tahmin etmek (eş/ağ/mahalle ve önceki oy hari
 |---|---|---|---|---|
 | 2018'de öğren → 2023 | **71,8** (ll 0,759) | 71,3 (ll 0,766) | 71,3 | **73,4** / 72,9 |
 | 2023'te öğren → 2018 | 72,5 (ll 0,724) | **72,6** (ll 0,730) | 73,0 | **73,5** / 73,1 |
-| Hane verisi: 2018 → 2023 | **75,2** (ll 0,688) | 74,7 (ll 0,691) | 75,1 | **77,1** / 76,4 |
-| Hane verisi: 2023 → 2018 | 72,7 (ll 0,750) | 72,7 (ll 0,751) | 72,2 | **74,5** / 74,0 |
+| Hane verisi: 2018 → 2023 | **76,1** (ll 0,667) | 75,9 (ll **0,660**) | 76,3 | 78,0 / **78,1** |
+| Hane verisi: 2023 → 2018 | **73,5** (ll 0,727) | 72,8 (ll 0,750) | 72,9 | **74,8** / 73,8 |
 
 Düzeltilmiş kıyasta sentetik panelde seçimler arası aktarımda kuram avantajı **yok**: önceki sürümün
 "71,7 / 70,1 ve 72,4 / 67,6" farkı, kuramsız modele tahmin anında öğrenilmemiş iletişim terimlerinin
 eklenmesinden (yukarıdaki hata) geliyordu ve geri çekildi. Aynı nedenle "üç yeni terim deprem kaybı
 yaşayanlarda aktarımı 68,5 → 70,7 iyileştiriyor" sonucu düzeltildi: üç terim (`kolektif_travma`,
 `yabancilasma`, `afet_cezasi`) çıkarılınca deprem kaybı yaşayan seçmenlerde 2018→2023 isabeti 71,7 → 70,7
-(92 kişi; hane verisinde 115 kişi, 67,8 → 67,0) — küçük ama aynı yönde; tüm seçmende fark yok.
+(92 kişi) ama hane verisinde ters yönde 66,7 → 67,5 (123 kişi): etki tutarsız, kanıt sayılmaz.
 Gerçek ANES'te yapısal aktarım avantajı (aşağıda) düzeltmeden sonra da sürüyor.
 Not: üretim zinciri ekonomik oy, afet cezası gibi mekanizmaları içerir; model denklemi kullanılmasa da
 bu bir "dünya böyle işliyorsa model yakalar mı" sınamasıdır, gerçek panelde tekrarlanmalı.
