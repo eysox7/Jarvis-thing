@@ -360,6 +360,8 @@ for (let h = 0; h < NH; h++) {
         c.kisi = ck; H.uyeler.push(ck);
       }
     }
+    // Kardeş listesi çocukların hepsi belirlendikten sonra (evde yaşayan küçük kardeşler 'ev')
+    for (const c of cocuklar) if (c.kisi) c.kisi.kardesler = cocuklar.filter((x) => x !== c).map((x) => ({ ad: x.ad, kadin: x.kadin, dogum: x.dogum, buyuk: x.dogum < c.dogum, evli: x.evli, yer: x.evdeYasar ? 'ev' : 'il' }));
   }
   // Geniş aile: dul kalmış yaşlı ebeveyn (çoğunlukla erkeğin annesi) hanede
   if (tip === 'genis') {
@@ -613,7 +615,7 @@ function oyku(P, row) {
   const kt = ks.filter((k) => !k.olu).slice(0, 4).map((k) => {
     const rol = k.kadin ? (k.buyuk ? 'ablası' : 'kız kardeşi') : (k.buyuk ? 'abisi' : 'erkek kardeşi');
     if (k.yer === 'almanya') return `${rol} ${k.ad} ${yilda(k.gurbetYil)} işçi olarak ${yon(k.sehir)} gitti, orada kaldı`;
-    if (k.yer === 'ev') return `${rol} ${k.ad} da evde`;
+    if (k.yer === 'ev') return `${rol} ${k.ad} ${back(k.ad) ? 'da' : 'de'} evde`;
     return `${rol} ${k.ad} ${k.yer === 'koy' ? 'köyde' : k.yer === 'il' ? 'memlekette' : bul(k.yer)}${k.meslek ? ', ' + k.meslek : ''}${k.evli ? ', evli' : ''}`;
   });
   if (kt.length) s.push(Buyuk(kt.join('; ')) + '.');
@@ -631,18 +633,18 @@ function oyku(P, row) {
   // Eğitim, askerlik, iş
   s.push(`${Buyuk(EGT_AD[P.egt])}${P.universiteSehir ? ` (${bul(P.universiteSehir)} okudu)` : ''}.`);
   if (P.askerlik && !P.askerlik.dogu && P.askerlik.yil <= YIL) s.push(`Askerliğini ${P.askerlik.bedelli ? 'bedelli yaptı' : yilda(P.askerlik.yil) + ' ' + bul(P.askerlik.yer) + ' yaptı'}.`);
-  const isCumle = { ogrenci: 'Hâlâ öğrenci; harçlığını yarı zamanlı işlerden çıkarıyor.', emekli: `Emekli${P.kadin ? '' : `; yıllarca ${P.egt >= 4 ? 'memur olarak' : 'işçi olarak'} çalıştı`}. Maaşı kiraya ve faturalara zor yetiyor.`, ev_kadini: !P.evlilik && P.yas < 35 ? 'Okulu bıraktıktan sonra evde annesine yardım ediyor; ara sıra iş arıyor.' : `Evin ${evdeCocukMetni(P) ? 've ' + evdeCocukMetni(P) : ''}bakımını üstleniyor.`, issiz: P.khk ? 'Kamudan ihraç edildiğinden beri düzenli bir iş bulamadı.' : 'Şu an iş arıyor; iş ilanlarına bakmaktan yoruldu.', ciftci: `${Buyuk(P.sektor)} üretiyor; mazot, gübre ve tohum fiyatları her yıl derdi.`, isci: `${Buyuk(P.sektor)} işçi olarak çalışıyor${P.sendika ? ', sendika üyesi' : ''}.`, esnaf: `Mahallede küçük bir ${P.sektor} işletiyor.`, memur: `${Buyuk(P.sektor)} olarak devlette çalışıyor${P.sendika ? ', sendikalı' : ''}.`, ozel_sektor_beyaz_yaka: `Özel sektörde, ${P.sektor} çalışıyor.`, serbest_meslek: `Serbest ${P.sektor}.`, sofor_kurye: `${Buyuk(P.sektor)} olarak çalışıyor.` }[P.meslek];
+  const isCumle = { ogrenci: 'Hâlâ öğrenci; harçlığını yarı zamanlı işlerden çıkarıyor.', emekli: `Emekli${P.kadin ? '' : `; yıllarca ${P.egt >= 4 ? 'memur olarak' : 'işçi olarak'} çalıştı`}. Maaşı kiraya ve faturalara zor yetiyor.`, ev_kadini: !P.evlilik && P.yas < 35 ? 'Okulu bıraktıktan sonra evde annesine yardım ediyor; ara sıra iş arıyor.' : `Evin ${evdeCocukMetni(P) ? 've ' + evdeCocukMetni(P) : ''}bakımını üstleniyor.`, issiz: P.khk ? 'Kamudan ihraç edildiğinden beri düzenli bir iş bulamadı.' : 'Şu an iş arıyor; iş ilanlarına bakmaktan yoruldu.', ciftci: `${Buyuk(P.sektor)} üretiyor; mazot, gübre ve tohum fiyatları her yıl derdi.`, isci: `${Buyuk(P.sektor)} işçi olarak çalışıyor${P.sendika ? ', sendika üyesi' : ''}.`, esnaf: P.yas < 25 ? `Mahalledeki bir ${P.sektor} dükkânında tezgâhtar olarak çalışıyor.` : `Mahallede küçük bir ${P.sektor} işletiyor.`, memur: `${Buyuk(P.sektor)} olarak devlette çalışıyor${P.sendika ? ', sendikalı' : ''}.`, ozel_sektor_beyaz_yaka: `Özel sektörde, ${P.sektor} çalışıyor.`, serbest_meslek: `Serbest ${P.sektor}.`, sofor_kurye: `${Buyuk(P.sektor)} olarak çalışıyor.` }[P.meslek];
   if (isCumle) s.push(isCumle);
   // Hayat olayları (kronolojik)
   for (const o of [...P.olaylar].sort((a, b) => a.yil - b.yil)) s.push(Buyuk(o.metin) + '.');
-  if (P.isKaybi && !P.khk) s.push('Son iki yılda işini kaybetti.');
+  if (P.isKaybi && !P.khk) s.push(['issiz', 'emekli', 'ev_kadini', 'ogrenci'].includes(P.meslek) ? 'Son iki yılda işini kaybetti.' : 'Son iki yılda bir süre işsiz kaldı; yeniden iş bulana kadar birikimini tüketti.');
   if (P.borc > 0.6) s.push('Kredi kartı ve ihtiyaç kredisi borçları birikti; ay sonunu getirmek her ay daha zor.');
   else if (P.gelir === 'yuksek') s.push('Enflasyona rağmen geliri ailesini rahat geçindirmeye yetiyor.');
   // Evlilik ve çocuklar
   if (P.evlilik) {
     const E = P.evlilik, esK = byId.get(E.esId) ?? P.eskiEs;
     const esIs = esK ? (MESLEK_AD[esK.meslek] ?? esK.meslek) : '';
-    s.push(`${yilda(E.yil)} ${E.nasil} evlendi${E.akraba ? ' (akraba evliliği)' : ''}; eşi ${E.esAd} ${esK ? `${esK.dogumIl !== P.dogumIl ? cik(esK.dogumIl).replace(/'[dt][ae]n$/, (m) => m) + ' gelme, ' : ''}${esIs}` : ''}.`.replace(', .', '.'));
+    s.push(`${yilda(E.yil)} ${E.nasil} evlendi${E.akraba ? ' (akraba evliliği)' : ''}${esK ? `; eşi ${esK.dogumIl !== P.dogumIl && esK.dogumIl !== P.il ? cik(esK.dogumIl) + ' gelme, ' : ''}${esIs}` : ''}.`);
     if (E.bitis) s.push(E.bitis.tur === 'dul' ? `Eşini ${yilda(E.bitis.yil)} kaybetti; o günden beri ${H.uyeler.length === 1 ? 'yalnız yaşıyor' : 'çocuklarıyla yaşıyor'}.` : `${yilda(E.bitis.yil)} boşandı${P.kadin ? '; nafaka davası yıllarca sürdü' : ''}.`);
     else if (row.es_oyu) s.push(`Eşi ${row.es_oyu === 'oy_yok' ? 'siyasetle pek ilgilenmez, sandığa gitmeyi gereksiz bulur' : 'siyasette ' + PARTI_KISA[row.es_oyu] + ' yanlısı'}${row.es_oyu !== 'oy_yok' && P.ilgi > 0.5 ? '; akşam yemeklerinde ara sıra tartışırlar' : ''}.`);
   } else if (P.rol !== 'cocuk' && P.yas > 30) s.push('Hiç evlenmedi.');
@@ -670,7 +672,7 @@ function oyku(P, row) {
   });
   if (konusulan.length) s.push(`Siyaseti en çok şu kişilerle konuşuyor: ${konusulan.join(', ')}.`);
   const onder = P.ag.find((c) => c.onder);
-  if (onder) s.push(`Bir konuda kafası karışınca ${onder.iliski} ${onder.ad}'${back(onder.ad) ? 'a' : 'e'} danışır.`.replace(/'([ae])$/, "'$1"));
+  if (onder) s.push(`Bir konuda kafası karışınca ${onder.iliski} ${yon(onder.ad)} danışır.`);
   // Değerler, algılar (oyunu söylemez)
   if (row.tehdit_algisi > 0.65) s.push(`Ülkenin ${P.kurt ? 'huzurunun' : 'güvenliğinin ve sınırlarının'} tehlikede olduğunu düşünüyor${BOLGE[P.bolge].multeci > 0.5 && !P.kurt ? '; mahallesine gelen sığınmacılardan rahatsız' : ''}.`);
   if (P.otoriter > 0.65) s.push('Çocukların her şeyden önce büyüklerine saygı ve itaat öğrenmesi gerektiğine inanıyor.');
