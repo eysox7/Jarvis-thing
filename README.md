@@ -208,13 +208,14 @@ koşturur (maruziyet, tutum, Hall okuma konumu terimleri); seçenek `iletisim` a
 
 | Veri | 5 katlı CV | Hiç bireysel veri yok (yalnız kuram) | Seçimler arası aktarım |
 |---|---|---|---|
-| ANES 2016 tam / yapısal | 70,6 = 70,6 / 64,3 = 64,3 | 63,2 → **63,7** / 57,0 → **57,3** | — |
-| ANES 2020 tam / yapısal (partizan medya var) | 81,6 = 81,6 / 73,7 → 73,8 | 73,9 → 73,8 / 68,8 → 68,7 | — |
+| ANES 2016 tam / yapısal (partizan medya var) | 70,7 = 70,7 / 65,0 → 64,9 | 63,3 → **63,8** / 57,3 → **57,5** | tam 2016→2020: 80,1 → **80,5**; yapısal 69,3 → **69,6** |
+| ANES 2020 tam / yapısal (partizan medya var) | 81,6 = 81,6 / 73,7 → 73,8 | 73,9 → 73,8 / 68,8 → 68,7 | 2020→2016: ±0,1 |
 | Sentetik hane (kanal × saat, ilgi, ağ) | 86,0 → 85,7 | 74,2 → 73,5 (log-kayıp 0,731 → 0,728) | 2018→2023: 74,2 → **74,7** |
 | Sentetik TR | 82,4 → **82,6** | — | — |
 
 Mercek tahmin gücünü belirgin artırmıyor (±0,5 puan): bol veride kişi değişkenlerinin sabitleri farkı
-zaten emiyor; veri yokken ANES 2016'da küçük kazanç, 2020'de küçük kayıp. Öğrenilen mekanizma
+zaten emiyor; veri yokken ANES 2016'da küçük kazanç, 2020'de küçük kayıp; ANES'te 2016'dan 2020'ye
+aktarımda küçük ama tutarlı kazanç (+0,3 / +0,4). Öğrenilen mekanizma
 katsayılarının çoğu belirsiz; sentetik hanede ekonomi gündemi/öncelikleme 0,69 ± 0,53, ANES 2020'de
 1,09 ± 0,79 ile öncül yönünde. Değeri yorumdadır: hangi mekanizmanın kimde işlediği ayrı ayrı görülür.
 **Reddedilen bir sınama:** ELM'yi "ilgili seçmen mesele yakınlığına, ilgisiz seçmen lider imajına bakar"
@@ -286,8 +287,8 @@ düzeyde taşır:
   (varsayılan 0,4); `baglam.sosyal_yayilim: false` kapatır.
 
 ANES 2016'da her seçmenin eyaletinin gerçek sonucu topluluk bağlamı olarak verildiğinde (yapısal
-model): 5 katlı CV **64,3** (kuramsız standart 64,0); hiç bireysel eğitim verisi yokken 43,1 →
-**50,8**; 100 kişiyle öğrenmede **62,1** (standart 58,3), 800 kişide 63,8 (standart 63,5).
+model): 5 katlı CV 64,9 (kuramsız standart 65,2); hiç bireysel eğitim verisi yokken 43,1 →
+**50,8**; 100 kişiyle öğrenmede **62,3** (standart 58,9), 800 kişide 63,7 (standart 64,0).
 
 **Gerçek ağ verisiyle sınama — ANES 2000** (`fetch_anes.py` → `ANES2000*`). 2000 anketinde her
 seçmene siyaseti konuştuğu en çok dört kişi, bu kişinin eşi/akrabası olup olmadığı ve seçimde kime oy
@@ -399,7 +400,9 @@ Bir seçimde öğrenip ötekini tahmin etmek (eş/ağ/mahalle ve önceki oy hari
 Düzeltilmiş kıyasta sentetik panelde seçimler arası aktarımda kuram avantajı **yok**: önceki sürümün
 "71,7 / 70,1 ve 72,4 / 67,6" farkı, kuramsız modele tahmin anında öğrenilmemiş iletişim terimlerinin
 eklenmesinden (yukarıdaki hata) geliyordu ve geri çekildi. Aynı nedenle "üç yeni terim deprem kaybı
-yaşayanlarda aktarımı 68,5 → 70,7 iyileştiriyor" sonucu da geri çekildi; yeniden ölçülmesi gerekiyor.
+yaşayanlarda aktarımı 68,5 → 70,7 iyileştiriyor" sonucu düzeltildi: üç terim (`kolektif_travma`,
+`yabancilasma`, `afet_cezasi`) çıkarılınca deprem kaybı yaşayan seçmenlerde 2018→2023 isabeti 71,7 → 70,7
+(92 kişi; hane verisinde 115 kişi, 67,8 → 67,0) — küçük ama aynı yönde; tüm seçmende fark yok.
 Gerçek ANES'te yapısal aktarım avantajı (aşağıda) düzeltmeden sonra da sürüyor.
 Not: üretim zinciri ekonomik oy, afet cezası gibi mekanizmaları içerir; model denklemi kullanılmasa da
 bu bir "dünya böyle işliyorsa model yakalar mı" sınamasıdır, gerçek panelde tekrarlanmalı.
@@ -412,19 +415,19 @@ kişi değişkenleri. ANES için önce `python3 tests/data/fetch_anes.py` (ham v
 
 **Siyaset — ANES 2016/2020** (ABD; Demokrat / Cumhuriyetçi / üçüncü aday / oy kullanmama; 3.610 ve
 6.943 seçmen). "Yapısal" model parti kimliği ve aday termometresi kullanmaz; yalnızca toplumsal yapı,
-değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diyeti:
+değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diyeti (partizan program/site sayısı):
 
 | Test | Çoğunluk | Standart | Bütünleşik | Eleştirel terimler çıkarılınca |
 |---|---|---|---|---|
-| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 57,5 | **70,0** | 71,3 |
-| Seçimler arası, yapısal: 2020 → 2016 (2016'da eyalet bağlamı) | 35,7 | 57,2 | **62,6** | 61,4 |
-| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | 78,1 | **80,5** | 80,0 |
-| Seçimler arası, tam: 2020 → 2016 | 35,7 | **71,0** | 70,1 | 70,1 |
-| Gerçek iş akışı: 2016'da öğren + 2020'nin toplam paylarına (anket) kalibre et → 2020, yapısal | 47,1 | 61,8 | **70,9** | — |
-| Aynı iş akışı, tam model (parti kimliği + termometre) | 47,1 | **81,0** | 80,8 | — |
+| Seçimler arası, yapısal: 2016'da öğren → 2020'yi tahmin et (`--secimler`) | 47,1 | 55,0 | **69,6** | 70,7 |
+| Seçimler arası, yapısal: 2020 → 2016 (2016'da eyalet bağlamı) | 35,7 | 57,9 | **62,7** | 61,3 |
+| Seçimler arası, tam (parti kimliği + termometre): 2016 → 2020 | 47,1 | 77,4 | **80,5** | 80,2 |
+| Seçimler arası, tam: 2020 → 2016 | 35,7 | **70,7** | 70,1 | 70,0 |
+| Gerçek iş akışı: 2016'da öğren + 2020'nin toplam paylarına (anket) kalibre et → 2020, yapısal | 47,1 | 59,7 | **70,4** | — |
+| Aynı iş akışı, tam model (parti kimliği + termometre) | 47,1 | **81,2** | 80,8 | — |
 | Aynı seçim, 5 katlı CV, yapısal 2020 | 47,1 | **74,1** | 73,8 | — |
-| Az veri: 2016'dan 100 kişiyle öğren (`--egri`) | 33,7 | 58,3 | **62,1** | 60,1 |
-| Az veri: 50 kişi | 33,5 | 33,1 | **57,8** | 56,9 |
+| Az veri: 2016'dan 100 kişiyle öğren (`--egri`) | 33,7 | 58,9 | **62,3** | 60,0 |
+| Az veri: 50 kişi | 33,5 | 33,1 | **57,9** | 56,8 |
 | Hiç bireysel veri yok — yalnız kuram + seçimin toplam sonucu, 2020 yapısal (`--sifir`) | 47,1 | — | **68,7** | — |
 
 - Otoriter dinamik terimi (Frankfurt Okulu) iki seçimde de anlamlı: katsayı 0,34 ± 0,14 (2016),
@@ -435,7 +438,9 @@ değerler (otoriterlik, din, ideoloji), algılar (ekonomi, güven) ve medya diye
 - Diğer siyasi veriler (5 katlı CV): Şili 1988 plebisiti 32,9 / 67,4 / 67,4; İngiltere BEPS
   47,2 / **67,1** / 66,8 (log-kayıpta bütünleşik daha iyi: 0,845 / 0,857 ve 0,772 / 0,779).
 - Bu tablo oturum 7'deki ablasyon hatası düzeltildikten sonra yeniden ölçüldü (kuramsız model artık
-  öğrenmediği terimleri tahminde kullanmıyor); yapısal aktarımda kuramın 12,5 puanlık üstünlüğü sürüyor.
+  öğrenmediği terimleri tahminde kullanmıyor) ve 2016'ya partizan medya bataryası eklendikten sonra (Hannity,
+  O'Reilly, Limbaugh, foxnews.com / Maddow, Hardball, HuffPost…) yeniden ölçüldü; yapısal aktarımda kuramın
+  ~14 puanlık üstünlüğü sürüyor.
 
 **Ticaret:** otomobil tercihi (4.654 kişi, 6 seçenek) çoğunluk 32,2 / standart 40,2 / bütünleşik 40,1;
 ısıtma sistemi (900 hane) her model çoğunlukta 63,7 — veride kişi bilgisi çok az, kuram ek katkı vermiyor.
