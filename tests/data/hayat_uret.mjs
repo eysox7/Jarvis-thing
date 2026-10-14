@@ -169,28 +169,33 @@ function kisiKur(o) {
   P.ad = adCek(P.kadin, P.dogum, P.kim);
   P.koyde = bern(clamp(1 - BOLGE[P.dogumBolge].kent + (YIL - P.dogum) * 0.009, 0.02, 0.92));
   // --- Anne, baba ---------------------------------------------------------------
-  const babaDogum = P.dogum - Math.round(27 + 4 * norm() * 0.8 + (P.dogum < 1960 ? 2 : 0)), anneDogum = babaDogum + Math.round(4 + 2 * norm() * 0.7);
-  const ses = clamp(0.32 + 0.22 * norm() + (P.koyde ? -0.12 : 0.08) + (P.dogum - 1960) * 0.003 + (DOGU(P.dogumBolge) ? -0.08 : 0));
-  const din = clamp(BOLGE[P.dogumBolge].din + 0.18 * norm() + (P.koyde ? 0.12 : -0.05) + (P.alevi ? -0.25 : 0) - (P.dogum - 1960) * 0.002);
-  const babaEgt = egitimCek(babaDogum, false, 2.2 * (ses - 0.35) - (P.koyde ? 0.6 : 0));
-  const anneEgt = egitimCek(anneDogum, true, 2.2 * (ses - 0.35) - (P.koyde ? 0.8 : 0) + 0.5 * (babaEgt - 1));
+  // Hanedeki gerçek anne-baba verildiyse (evde yaşayan yetişkin çocuk) aile özellikleri onlardan aktarılır
+  const EB = o.ebeveynler;
+  const babaDogum = EB ? EB[0].dogum : P.dogum - Math.round(27 + 4 * norm() * 0.8 + (P.dogum < 1960 ? 2 : 0)), anneDogum = EB ? EB[1].dogum : babaDogum + Math.round(4 + 2 * norm() * 0.7);
+  const GEL = { dusuk: 0, orta: 0.12, yuksek: 0.28 };
+  const ses = EB ? clamp(0.2 + 0.3 * (EB[0].egit01 + EB[1].egit01) / 2 + Math.max(GEL[EB[0].gelir], GEL[EB[1].gelir]) + 0.08 * norm())
+    : clamp(0.32 + 0.22 * norm() + (P.koyde ? -0.12 : 0.08) + (P.dogum - 1960) * 0.003 + (DOGU(P.dogumBolge) ? -0.08 : 0));
+  const din = EB ? clamp(0.5 * (EB[0].din + EB[1].din) + 0.05 + 0.12 * norm())
+    : clamp(BOLGE[P.dogumBolge].din + 0.18 * norm() + (P.koyde ? 0.12 : -0.05) + (P.alevi ? -0.25 : 0) - (P.dogum - 1960) * 0.002);
+  const babaEgt = EB ? EB[0].egt : egitimCek(babaDogum, false, 2.2 * (ses - 0.35) - (P.koyde ? 0.6 : 0));
+  const anneEgt = EB ? EB[1].egt : egitimCek(anneDogum, true, 2.2 * (ses - 0.35) - (P.koyde ? 0.8 : 0) + 0.5 * (babaEgt - 1));
   const babaBlok = e && bern(0.6) ? e.aile.babaBlok : babaBlokCek(din, kim, P.dogumBolge);   // eş seçiminde siyasi homogami (Alford vd. 2011)
   const anneBlok = bern(0.72) ? babaBlok : babaBlokCek(din, kim, P.dogumBolge);
   const babaMeslek = babaEgt >= 4 ? pickW({ ogretmen: 0.45, memur: 0.25, doktor: 0.05, muhendis: 0.12, avukat: 0.05, imam: 0.08 * din }) : P.koyde ? pickW({ ciftci: 0.7, coban: 0.08, imam: 0.03 * din, muhtar: 0.04, isci: 0.15 }) : babaEgt >= 4 ? pickW({ ogretmen: 0.4, memur: 0.3, doktor: 0.05, muhendis: 0.1, avukat: 0.05 }) : pickW({ isci: 0.4, esnaf: 0.25, sofor: 0.12, memur: 0.1, insaat_ustasi: 0.13 });
   const anneMeslek = anneEgt >= 4 ? pickW({ ogretmen: 0.5, hemsire: 0.3, memur: 0.2 }) : P.koyde ? 'tarla ve ev' : bern(0.12) ? 'terzi' : 'ev hanımı';
   P.aile = { babaAd: adCek(false, babaDogum, P.kim), anneAd: adCek(true, anneDogum, P.kim), babaDogum, anneDogum, babaEgt, anneEgt, babaMeslek, anneMeslek, babaBlok, anneBlok, ses, din,
-    babaHayatta: hayatta(YIL - babaDogum, false), anneHayatta: hayatta(YIL - anneDogum, true) };
+    babaHayatta: EB ? true : hayatta(YIL - babaDogum, false), anneHayatta: EB ? true : hayatta(YIL - anneDogum, true) };
   if (!P.aile.babaHayatta) P.aile.babaOlum = clamp(Math.round(babaDogum + 55 + 18 * U() + 6 * norm()), P.dogum + 1, YIL);
   if (!P.aile.anneHayatta) P.aile.anneOlum = clamp(Math.round(anneDogum + 60 + 18 * U() + 6 * norm()), P.dogum + 1, YIL);
   // --- Kardeşler (annenin kuşağının doğurganlığı × bölge × anne eğitimi) ----------------
   const tfr = lerpT(DOGURGANLIK, anneDogum) * BOLGE[P.dogumBolge].dogur ** (anneDogum < 1960 ? 0.6 : 1) * (anneEgt >= 4 ? 0.72 : anneEgt === 0 ? 1.3 : 1) * (P.koyde ? 1.15 : 0.95);
-  let nCocuk = 1; for (let k = 0; k < 14; k++) if (U() < (tfr - 1) / 13) nCocuk++;
+  let nCocuk = 1; if (!EB) for (let k = 0; k < 14; k++) if (U() < (tfr - 1) / 13) nCocuk++;   // hanedeki çocukların kardeşleri çağıran tarafından yazılır
   const sira = Math.floor(U() * nCocuk);
   P.kardesler = [];
   for (let k = 0; k < nCocuk; k++) {
     if (k === sira) continue;
     const kd = P.dogum + (k - sira) * Math.round(2 + 1.4 * U());
-    if (kd > YIL - 1) continue;
+    if (kd > YIL - 1 || kd - anneDogum < 16 || kd - anneDogum > 44) continue;   // annenin doğurganlık yaşları içinde
     const kk = bern(0.49), olu = bern(lerpT(COCUK_OLUM, kd));
     let kad = adCek(kk, kd, P.kim);
     for (let t = 0; t < 6 && (kad === P.ad || P.kardesler.some((x) => x.ad === kad)); t++) kad = adCek(kk, kd, P.kim);
@@ -207,7 +212,7 @@ function kisiKur(o) {
     }
     P.kardesler.push(s);
   }
-  P.gurbet = P.kardesler.some((s) => s.yer === 'almanya') || bern(0.06 * BOLGE[P.dogumBolge].gurbet);
+  P.gurbet = EB ? !!(EB[0].gurbet || EB[1].gurbet) : P.kardesler.some((s) => s.yer === 'almanya') || bern(0.06 * BOLGE[P.dogumBolge].gurbet);
   // --- Çocukluk: ACE, terbiye --------------------------------------------------
   const yoksul = 1 - ses;
   P.ace = {
@@ -268,7 +273,7 @@ function kisiKur(o) {
   if (DEPREM99.has(burada(1999)) && yasIn(1999) >= 4) { P.deprem99 = 1; ola(1999, `17 Ağustos 1999 depremini ${bul(burada(1999))} yaşadı${bern(0.15) ? '; bir yakınını enkazda kaybetti' : ''}`, {}); }
   if (yasIn(2001) >= 20 && ['isci', 'ozel_sektor_beyaz_yaka', 'esnaf', 'sofor_kurye'].includes(P.meslek) && bern(0.14)) { P.kriz01 = 1; ola(2001, `2001 krizinde ${P.meslek === 'esnaf' ? 'dükkânını kapatmanın eşiğine geldi' : 'işten çıkarıldı'}; o yıl ailece borçla yaşadılar`, { iktidar: 0.25, ana_muhalefet: -0.15 }); }
   if (yasIn(2013) >= 16 && yasIn(2013) <= 35 && P.din < 0.4 && !P.koyKalan && bern(0.12 + 0.1 * P.egit01)) { P.gezi = 1; ola(2013, 'Gezi eylemlerinde sokaktaydı; biber gazını ilk kez orada soludu', { ana_muhalefet: 0.6, iktidar: -0.6 }); }
-  if (YIL - 2016 + P.yas - YIL + 2016 >= 0 && yasIn(2016) >= 16 && P.din > 0.6 && !P.alevi && !P.kurt && bern(0.14)) { P.temmuz15 = 1; ola(2016, '15 Temmuz gecesi sela okununca sokağa çıktı, sabaha kadar köprü başında bekledi', { iktidar: 0.6 }); }
+  if (yasIn(2016) >= 16 && P.din > 0.6 && !P.alevi && !P.kurt && bern(0.14)) { P.temmuz15 = 1; ola(2016, '15 Temmuz gecesi sela okununca sokağa çıktı, sabaha kadar köprü başında bekledi', { iktidar: 0.6 }); }
   if (P.meslek === 'memur' && yasIn(2016) >= 24 && bern(0.035)) { P.khk = 1; P.meslek = bern(0.5) ? 'issiz' : 'sofor_kurye'; ola(2016, "2016'da KHK ile kamudan ihraç edildi; pasaportu iptal edildi, yıllarca iş bulamadı", { iktidar: -1.4 }); }
   if (yasIn(2020) >= 18 && bern(0.06)) { P.covidKayip = 1; ola(2020, `pandemide ${pick(['babasını', 'annesini', 'dayısını', 'teyzesini', 'amcasını'])} kaybetti`, {}); }
   P.deprem23 = DEPREM23.has(o.il) && bern(0.75) ? (bern(0.25) ? 2 : 1) : 0;
@@ -331,17 +336,20 @@ for (let h = 0; h < NH; h++) {
   H.uyeler.push(ref); ref.rol = 'referans';
   const soyad = ref.soyad;
   let es = null;
-  if (['cift', 'cekirdek', 'genis'].includes(tip) || (tip === 'tek_ebeveyn' && bern(0.3)) || (tip === 'tek' && bern(0.15))) {
+  if (['cift', 'cekirdek', 'genis'].includes(tip) || tip === 'tek_ebeveyn' || (tip === 'tek' && refYas >= 30 && bern(0.15))) {
     const esYas = refYas + (refKadin ? 1 : -1) * Math.round(3.2 + 2.5 * norm() * 0.8);
     es = kisiKur({ dogum: YIL - clamp(esYas, 18, 95), kadin: !refKadin, bolge, il, kirsal, esine: ref, soyad: refKadin ? pick(SOYAD) : soyad });
     if (refKadin) ref.kizlikSoyadi = ref.soyad, ref.soyad = es.soyad;
     const kadinK = refKadin ? ref : es, erkekK = refKadin ? es : ref;
     const ey = evlilikKur(ref, es, kadinK);
     const cocuklar = cocuklarKur(kadinK, erkekK, ey);
+    // Çocuksuz çift hanesi: genç çift henüz çocuk sahibi değil, yaşlı çiftin çocukları evden ayrılmış
+    if (tip === 'cift') { if (refYas < 40) cocuklar.length = 0; else for (const c of cocuklar) c.ayrildi = true; }
     if (tip === 'tek_ebeveyn' || tip === 'tek') {
       // eş öldü ya da boşandı: kişi kaydı anlatı içindir, seçmen değil
       const dul = es.yas > 60 || bern(0.35);
-      ref.evlilik.bitis = dul ? { tur: 'dul', yil: clamp(Math.round(YIL - 1 - 15 * U()), ey + 2, YIL - 1) } : { tur: 'bosanma', yil: clamp(Math.round(ey + 4 + 12 * U()), ey + 1, YIL - 1) };
+      const lo = Math.min(ey + 1, YIL - 1);
+      ref.evlilik.bitis = dul ? { tur: 'dul', yil: clamp(Math.round(YIL - 1 - 15 * U()), lo, YIL - 1) } : { tur: 'bosanma', yil: clamp(Math.round(ey + 4 + 12 * U()), lo, YIL - 1) };
       ref.eskiEs = es; eskiler.push(es); es = null;
     } else { H.uyeler.push(es); es.rol = 'es'; }
     ref.cocuklar = cocuklar; if (es) es.cocuklar = cocuklar;
@@ -350,9 +358,9 @@ for (let h = 0; h < NH; h++) {
       const cy = YIL - c.dogum;
       c.evli = cy >= 22 && bern(clamp((cy - 21) / 9, 0, 0.9));
       if (tip === 'tek') { c.evdeYasar = false; continue; }
-      c.evdeYasar = !c.evli && (cy < 18 || bern(cy < 30 ? 0.85 : 0.5));
+      c.evdeYasar = !c.ayrildi && !c.evli && (cy < 18 || bern(cy < 30 ? 0.85 : 0.5));
       if (c.evdeYasar && cy >= 18) {
-        const ck = kisiKur({ dogum: c.dogum, kadin: c.kadin, bolge, il, kirsal, kokenBolge: bolge, kim: { kurt: kadinK.kurt, alevi: kadinK.alevi, arap: kadinK.arap }, soyad: erkekK.soyad });
+        const ck = kisiKur({ dogum: c.dogum, kadin: c.kadin, bolge, il, kirsal, kokenBolge: bolge, kim: { kurt: kadinK.kurt, alevi: kadinK.alevi, arap: kadinK.arap }, soyad: erkekK.soyad, ebeveynler: [erkekK, kadinK] });
         ck.ad = c.ad; ck.rol = 'cocuk'; ck.aile = { ...ck.aile, babaAd: erkekK.ad, anneAd: kadinK.ad, babaDogum: erkekK.dogum, anneDogum: kadinK.dogum, babaEgt: erkekK.egt, anneEgt: kadinK.egt,
           babaMeslek: erkekK.meslek, anneMeslek: kadinK.meslek, babaHayatta: !(ref.evlilik.bitis?.tur === 'dul' && ref.eskiEs === erkekK), anneHayatta: true, babaBlok: null, anneBlok: null, ebeveynKisi: [erkekK.id, kadinK.id] };
         ck.koyde = kirsal; ck.goc = null; ck.dogumIl = il; ck.dogumBolge = bolge;
@@ -366,8 +374,10 @@ for (let h = 0; h < NH; h++) {
   // Geniş aile: dul kalmış yaşlı ebeveyn (çoğunlukla erkeğin annesi) hanede
   if (tip === 'genis') {
     const erkek = ref.kadin ? es : ref;
-    const anneK = erkek && bern(0.75);
-    const yas = erkek ? clamp(erkek.yas + 25 + Math.round(4 * norm() * 0.6), 60, 96) : 70;
+    // Yaşayan ebeveyn tercih edilir; yaşı oğlunun kaydındaki doğum yılıdır
+    const anneK = erkek ? (erkek.aile.anneHayatta ? true : erkek.aile.babaHayatta ? false : bern(0.75)) : bern(0.75);
+    const yas = erkek ? YIL - (anneK ? erkek.aile.anneDogum : erkek.aile.babaDogum) : 70;
+    if (erkek) { delete erkek.aile[anneK ? 'anneOlum' : 'babaOlum']; const ol = erkek.aile[anneK ? 'babaOlum' : 'anneOlum']; erkek.ace.ebeveynKaybi = !!(ol && ol - erkek.dogum < 16); }
     const yasli = kisiKur({ dogum: YIL - yas, kadin: anneK, bolge, il, kirsal, kokenBolge: erkek?.dogumBolge, kim: erkek ? { kurt: erkek.kurt, alevi: erkek.alevi, arap: erkek.arap } : undefined, soyad: erkek?.soyad });
     yasli.rol = 'yasli_ebeveyn'; yasli.dul = true;
     if (erkek) { yasli.ad = anneK ? erkek.aile.anneAd : erkek.aile.babaAd; yasli.cocukKisi = erkek.id; erkek.aile[anneK ? 'anneHayatta' : 'babaHayatta'] = true; erkek.aile.evdekiEbeveyn = yasli.id; yasli.blokEbeveyn = anneK ? erkek.aile.anneBlok : erkek.aile.babaBlok; }

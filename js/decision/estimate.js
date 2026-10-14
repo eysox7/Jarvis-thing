@@ -300,7 +300,7 @@ export function fitLatentClass(spec, rows, o = {}) {
   // Okunur etiket: sınıfın öncülden en çok ayrıştığı terim
   const res = resolveChoice(spec);
   siniflar.forEach((cl) => {
-    const dev = res.terms.filter((t) => cl.theta[t.id] !== undefined).map((t) => [t, cl.theta[t.id] - t.onsel]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
+    const dev = res.terms.filter((t) => cl.theta[t.id] !== undefined && !(o.haric || []).includes(t.id) && !(o.haric || []).includes(t.mercekOf)).map((t) => [t, cl.theta[t.id] - t.onsel]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
     cl.etiket = dev ? `${dev[1] > 0 ? 'güçlü' : 'zayıf'} ${dev[0].ad.toLocaleLowerCase('tr')}` : '';
   });
   return { alan: res.domain.id, kaynak: `veriden öğrenilmiş gizli sınıf modeli (${C} sınıf, ${N} gözlem)`, siniflar, n: N, log_olabilirlik: r3(ll), kuramlar: classes.reduce((a, b, c) => (pay[c] > pay[classes.indexOf(a)] ? b : a)).kuramlar };

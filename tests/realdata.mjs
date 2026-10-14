@@ -135,7 +135,8 @@ const DATASETS = {
 // (eleştirel kuramların asıl sınandığı model — "kim olduğun ve neye inandığın oyunu ne kadar belirler?")
 // Sürüm: tam = tüm sütunlar; onceki_yok = önceki oy hariç; oykusuz = yalnız sıradan anket (demografi,
 // değerler, algılar) — öykü (travma, tehdit, göç, deprem, iş kaybı, borç), aile/ağ/mahalle ve önceki oy yok
-const OYKU_SUTUN = ['tehdit_algisi', 'travma_skoru', 'cocuklukta_sert_ceza', 'zorunlu_goc', 'teror_maruziyeti', 'sehit_yakini', 'deprem_maruziyeti', 'is_kaybi', 'borc_yuku', 'ic_goc'];
+const OYKU_SUTUN = ['tehdit_algisi', 'travma_skoru', 'cocuklukta_sert_ceza', 'zorunlu_goc', 'teror_maruziyeti', 'sehit_yakini', 'deprem_maruziyeti', 'is_kaybi', 'borc_yuku', 'ic_goc',
+  'khk', 'darbe_maruziyeti', 'askerlik_dogu', 'gurbetci_akraba', 'akraba_evliligi', 'gorucu_usulu', 'kardes_sayisi'];   // hane verisinin hayat öyküsü sütunları
 // kaynak: 'tek' = bireysel üretim (TR_secmen.csv), 'hane' = hane temelli yaşam seyri mikrosimülasyonu (hane/TR_hane_secmen.csv)
 export function sentetikTR(surum = 'tam', kaynak = 'tek') {
   const S = new URL(kaynak === 'hane' ? './data/sentetik/hane/' : './data/sentetik/', import.meta.url);

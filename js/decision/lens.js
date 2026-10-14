@@ -152,7 +152,7 @@ export function describeLens(L) {
   const okuma = L.g.medya_yanliligi === undefined ? null : L.g.medya_yanliligi < 0 ? 'karşıt (Hall): yanlı medya ters teper' : L.g.medya_yanliligi < 0.6 ? 'müzakereci (Hall)' : 'egemen (Hall)';
   return {
     dikkat: r(L.A), ikna_yolu: L.c > 0.6 ? 'merkezi (ELM): ipuçlarına dirençli' : L.c < 0.35 ? 'çevresel (ELM): ipuçlarına açık' : 'karma (ELM)',
-    gundem: { ekonomi: r(L.s.ekonomi), kultur_guvenlik: r(L.s.kultur), kimlik: r(L.s.kimlik) },
+    gundem: L.s ? { ekonomi: r(L.s.ekonomi), kultur_guvenlik: r(L.s.kultur), kimlik: r(L.s.kimlik) } : null,
     iktidara_medya_egilimi: r(L.sigma), okuma_konumu: okuma,
     ag_agirligi: L.g.ag === undefined ? null : r(L.g.ag) + (L.g.ag > 1.1 ? ' (iki aşamalı akış: siyaseti çevresinden alıyor)' : ''),
     parti_kimligi: L.g.parti_kimligi === undefined ? null : L.g.parti_kimligi > 1.05 ? 'medya pekiştiriyor' : L.g.parti_kimligi < 0.95 ? 'çapraz baskı zayıflatıyor' : 'nötr',
