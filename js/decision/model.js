@@ -52,8 +52,10 @@ export function coefficients(resolved, model = {}, overrides = {}) {
   const k = model.theta ? 1 : Number.isFinite(+resolved.ctx?.kuram_olcegi) ? +resolved.ctx.kuram_olcegi : Number.isFinite(+model.kuram_olcegi) ? +model.kuram_olcegi : 1;
   for (const t of resolved.terms) theta[t.id] = t.onsel * k;
   Object.assign(theta, model.theta || {}, overrides.theta || {});
-  // Mercek terimleri olmadan öğrenilmiş (eski) modelde mercek katsayısı 0 — öncülle sessizce geri girmesin
-  if (model.theta) for (const t of resolved.terms) if (t.mercekOf && model.theta[t.id] === undefined && overrides.theta?.[t.id] === undefined) theta[t.id] = 0;
+  // Mercek terimleri olmadan öğrenilmiş (eski) modelde mercek katsayısı 0 — öncülle sessizce geri girmesin.
+  // Yalnız dolu ve hiç mercek anahtarı olmayan öğrenilmiş modelde; öğrenmenin başlangıç öncülü ({}) etkilenmez.
+  const eski = model.theta && Object.keys(model.theta).length && !Object.keys(model.theta).some((k) => k.startsWith('mercek_'));
+  if (eski) for (const t of resolved.terms) if (t.mercekOf && overrides.theta?.[t.id] === undefined) theta[t.id] = 0;
   const asc = {};
   for (const a of resolved.alts) asc[a.id] = Number.isFinite(+a.asc) ? +a.asc : 0;
   Object.assign(asc, model.asc || {}, overrides.asc || {});

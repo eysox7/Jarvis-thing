@@ -393,6 +393,9 @@ console.log('\n[27] İletişim merceği: her kuram terimi kişinin iletişim ort
   const P = (p, ctx) => predictPerson(sp(ctx), p).olasiliklar;
   const yAg = { ...base, siyasi_ilgi: 0.1, ag_paylari: { I: 0.9, M: 0.1 } };
   ok(P(yAg).I - P(yAg, { mercek: 0 }).I > 0, 'mercek tahmine işler: ilgisiz seçmende ağ etkisi büyür');
+  { const { coefficients } = await import('../js/decision/model.js'); const Rr = resolveChoice(sp());
+    ok(coefficients(Rr, { theta: {} }).theta.mercek_ag === Rr.terms.find((t) => t.id === 'ag').onsel && coefficients(Rr, { theta: { lider: 1 } }).theta.mercek_ag === 0,
+      'mercek öncülü: öğrenme başlangıcında kuramın değeri; mercek terimi olmadan öğrenilmiş eski modelde 0'); }
   const io = predictPerson(sp(), { ...base, medya_kaynagi: 'yandas', azinlik_kimlik: 'evet', ideoloji: 'sol' }).iletisim_ortami;
   ok(io && /karşıt/.test(io.okuma_konumu) && io.gundem.ekonomi > 0 && io.ikna_yolu, 'tek kişi tahmini iletişim ortamını açıklar (gündem, ikna yolu, okuma konumu)');
 }

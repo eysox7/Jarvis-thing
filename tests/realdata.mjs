@@ -71,6 +71,11 @@ const DATASETS = {
   SENTETIK_TR_onceki_yok() { return sentetikTR('onceki_yok'); },
   SENTETIK_TR_oykusuz() { return sentetikTR('oykusuz'); },
   // Hane temelli yaşam seyri mikrosimülasyonu (tests/data/hayat_uret.mjs): eş, çocuk, yaşlı ebeveyn aynı veride
+  // GERÇEK Türkiye seçmenleri: CSES Türkiye Kasım 2015 ve 2018 (python3 tests/data/fetch_cses_tr.py)
+  TR_GERCEK_2018() { return trGercek(2018, true); },
+  TR_GERCEK_2018_yapisal() { return trGercek(2018, false); },
+  TR_GERCEK_2015() { return trGercek(2015, true); },
+  TR_GERCEK_2015_yapisal() { return trGercek(2015, false); },
   SENTETIK_HANE() { return sentetikTR('tam', 'hane'); },
   SENTETIK_HANE_onceki_yok() { return sentetikTR('onceki_yok', 'hane'); },
   SENTETIK_HANE_oykusuz() { return sentetikTR('oykusuz', 'hane'); },
@@ -137,6 +142,27 @@ const DATASETS = {
 // değerler, algılar) — öykü (travma, tehdit, göç, deprem, iş kaybı, borç), aile/ağ/mahalle ve önceki oy yok
 const OYKU_SUTUN = ['tehdit_algisi', 'travma_skoru', 'cocuklukta_sert_ceza', 'zorunlu_goc', 'teror_maruziyeti', 'sehit_yakini', 'deprem_maruziyeti', 'is_kaybi', 'borc_yuku', 'ic_goc',
   'khk', 'darbe_maruziyeti', 'askerlik_dogu', 'gurbetci_akraba', 'akraba_evliligi', 'gorucu_usulu', 'kardes_sayisi'];   // hane verisinin hayat öyküsü sütunları
+// GERÇEK Türkiye: CSES Türkiye. Seçenekler o seçimin bloklarıdır: 2015'te iktidar AK Parti, MHP milliyetçi
+// muhalefet; 2018'de iktidar Cumhur İttifakı (AK Parti + MHP), milliyetçi muhalefet İYİ Parti. Topluluk bağlamı:
+// NUTS-1 bölgesinin gerçek seçim sonucu. tam: parti yakınlığı (+2015'te Haziran 2015 oyu); yapisal: yalnız
+// toplumsal yapı, değerler ve algılar.
+export function trGercek(yil, tam = true) {
+  const f = new URL(`./data/cache/TR_CSES${yil}.csv`, import.meta.url);
+  if (!existsSync(f)) throw new Error('önce: python3 tests/data/fetch_cses_tr.py');
+  const ALT = ['iktidar', 'ana_muhalefet', 'milliyetci', 'kurt_sol', 'oy_yok'];
+  const bolge = Object.fromEntries(parseCSV(readFileSync(new URL(`./data/real/tr_bolge_${yil}.csv`, import.meta.url), 'utf8')).map((r) => [r.bolge, Object.fromEntries(ALT.map((a) => [a, num(r[a])]))]));
+  const hk = { iktidar: 1, ana_muhalefet: -1, kurt_sol: -1 };
+  const spec = { alan: 'siyaset', baglam: { ...MERCEK, ...(process.env.TOPLULUK !== '0' ? { bolge_paylari: bolge } : {}), iktidar_suresi_yil: yil - 2002, ekonomi_algisi: yil === 2015 ? -0.1 : -0.3, tehdit: yil === 2015 ? 0.7 : 0.5 }, secenekler: [
+    { id: 'iktidar', ekonomi: 0.3, kultur: 0.8, kimlik: 'sag', iktidar: true, guclu_lider: 0.9 },
+    { id: 'ana_muhalefet', ekonomi: -0.3, kultur: -0.5, kimlik: 'sol' },
+    yil === 2015 ? { id: 'milliyetci', ekonomi: 0.2, kultur: 0.7, kimlik: 'sag', guclu_lider: 0.6 } : { id: 'milliyetci', ekonomi: 0.2, kultur: 0.3, kimlik: 'sag', guclu_lider: 0.4 },
+    { id: 'kurt_sol', ekonomi: -0.6, kultur: -0.6, kimlik: 'sol', azinlik_temsili: true, duzen_karsiti: true },
+    { id: 'oy_yok', tur: 'cekimser' }] };
+  let raw = parseCSV(readFileSync(f, 'utf8'));
+  if (!tam) raw = raw.map(({ parti_yakinligi, onceki, ...r }) => r);
+  return { spec, rows: prepareRows(raw, spec).rows, attrs: [] };
+}
+
 // kaynak: 'tek' = bireysel üretim (TR_secmen.csv), 'hane' = hane temelli yaşam seyri mikrosimülasyonu (hane/TR_hane_secmen.csv)
 export function sentetikTR(surum = 'tam', kaynak = 'tek') {
   const S = new URL(kaynak === 'hane' ? './data/sentetik/hane/' : './data/sentetik/', import.meta.url);
@@ -361,7 +387,7 @@ const out = [];
 const t0 = Date.now();
 for (const [name, mk] of Object.entries(DATASETS)) {
   if (only.length && !only.includes(name)) continue;
-  if (!name.startsWith('SENTETIK') && !existsSync(fileOf(name.split('_')[0]))) { console.log(`- ${name}: dosya yok, atlandı`); continue; }
+  if (!name.startsWith('SENTETIK') && !name.startsWith('TR_') && !existsSync(fileOf(name.split('_')[0]))) { console.log(`- ${name}: dosya yok, atlandı`); continue; }
   const { spec, rows, attrs } = mk();
   const clean = cleanRows(rows);
   const base = DECISION_DOMAINS[spec.alan];
