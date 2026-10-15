@@ -85,12 +85,19 @@ export function poolFromPersonas(personas = BUILTIN_PERSONAS) {
 // matraix/calibrate.py çıktısını havuza çevirir.
 export function poolFromCalibration(json) {
   if (!json || !Array.isArray(json.personas)) throw new Error('persona-params.json biçimi geçersiz');
-  return json.personas.map((p) => ({
-    persona: p.persona_id,
-    weight: p.weight ?? 1,
-    speed: p.speed ?? 1.34,
-    behavior: finalize({ ...defaultBehavior(), ...p.behavior, compliance: { ...defaultBehavior().compliance, ...(p.behavior?.compliance || {}) } }).behavior,
-  }));
+  return json.personas.map((p) => {
+    // Anket cevabı yoksa (calibrate.py --personas tek başına) boyutlardan önsel eşleme.
+    if (!p.behavior) {
+      const { behavior, speed } = priorFromDimensions(p.dimensions || {});
+      return { persona: p.persona_id, weight: p.weight ?? 1, speed, behavior };
+    }
+    return {
+      persona: p.persona_id,
+      weight: p.weight ?? 1,
+      speed: p.speed ?? 1.34,
+      behavior: finalize({ ...defaultBehavior(), ...p.behavior, compliance: { ...defaultBehavior().compliance, ...(p.behavior.compliance || {}) } }).behavior,
+    };
+  });
 }
 
 // Ağırlıklara göre havuzdan bir persona seçip addAgent seçeneklerini döndürür.

@@ -1,0 +1,100 @@
+schemaVersion: "1.0"
+id: evacuation_announcement_response_v1
+title: Evacuation Announcement Response
+description: >
+  How a concert-goer reacts to a fire alarm and to exit announcements of different
+  tones. Answers calibrate a crowd evacuation simulator; each construct maps to one
+  behavioral parameter.
+questions:
+  - id: q_start
+    prompt: The fire alarm starts and you see no smoke or flames. What do you most likely do first?
+    type: single_choice
+    construct: start_delay
+    required: true
+    options:
+      - id: q_start_leave_now
+        label: Start heading out right away.
+      - id: q_start_look_around
+        label: Look around for a few seconds to see if it is real, then go.
+      - id: q_start_wait_crowd
+        label: Wait until people around me start moving.
+      - id: q_start_wait_official
+        label: Stay put until staff or an announcement confirms we must leave.
+  - id: q_default_exit
+    prompt: Nobody has told you which exit to use yet. Which way do you go?
+    type: single_choice
+    construct: default_exit
+    required: true
+    options:
+      - id: q_default_way_in
+        label: Back the way I came in — the main entrance I know.
+      - id: q_default_nearest_sign
+        label: Toward the nearest green exit sign, even if I have never used it.
+      - id: q_default_follow_crowd
+        label: Wherever most people around me are heading.
+  - id: q_herd
+    prompt: Most people around you head to one exit, but another exit looks closer to you. How likely are you to follow the crowd anyway?
+    type: likert
+    construct: herding
+    required: true
+    minValue: 1
+    maxValue: 5
+  - id: q_calm
+    prompt: "The speaker near you says calmly: \"Please make your way to the north exit.\" How likely are you to go there instead of where you were heading?"
+    type: likert
+    construct: compliance_calm
+    required: true
+    minValue: 1
+    maxValue: 5
+  - id: q_urgent
+    prompt: "The speaker near you says urgently: \"Evacuate now — use the north exit immediately!\" How likely are you to go there?"
+    type: likert
+    construct: compliance_urgent
+    required: true
+    minValue: 1
+    maxValue: 5
+  - id: q_reasoned
+    prompt: "The speaker near you says: \"The main entrance is congested. The north exit is clear — please use it.\" How likely are you to go there?"
+    type: likert
+    construct: compliance_reasoned
+    required: true
+    minValue: 1
+    maxValue: 5
+  - id: q_switch_speed
+    prompt: You decide to follow an announcement. When do you actually change direction?
+    type: single_choice
+    construct: announcement_delay
+    required: true
+    options:
+      - id: q_switch_immediately
+        label: Immediately.
+      - id: q_switch_see_exit
+        label: Once I can see the exit it mentioned.
+      - id: q_switch_see_others
+        label: Once I see other people going that way.
+  - id: q_urgency_effect
+    prompt: An urgent, loud announcement makes you...
+    type: single_choice
+    construct: panic
+    required: true
+    options:
+      - id: q_urgency_calm
+        label: Stay calm and keep my pace.
+      - id: q_urgency_hurry
+        label: Walk noticeably faster.
+      - id: q_urgency_push
+        label: Hurry and push through people if I have to.
+      - id: q_urgency_freeze
+        label: Freeze or get confused for a moment.
+  - id: q_pace
+    prompt: In a dense crowd, compared with most people, you move...
+    type: single_choice
+    construct: mobility
+    required: true
+    options:
+      - id: q_pace_slower
+        label: Slower (I'm with children, older relatives, or have limited mobility).
+      - id: q_pace_average
+        label: About the same as everyone.
+      - id: q_pace_faster
+        label: Faster than most.
