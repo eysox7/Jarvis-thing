@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<title>Karar Laboratuvarı</title>
+<style>
+:root{
+  --bg:#0b0f14; --bg-2:#121924; --bg-3:#18202c; --line:#243040;
+  --fg:#e6edf5; --fg-dim:#93a4b8; --accent:#4da3ff; --accent-2:#1f6feb;
+  --ok:#3fb950; --warn:#d29922; --err:#f85149; --radius:12px;
+}
+@media (prefers-color-scheme: light){
+  :root{ --bg:#f5f7fa; --bg-2:#ffffff; --bg-3:#eef2f7; --line:#d8dee8; --fg:#17202b; --fg-dim:#5a6a7e; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;-webkit-text-size-adjust:100%}
+button,input,textarea,select{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);padding:env(safe-area-inset-top) 0 0}
+.head{max-width:980px;margin:0 auto;padding:10px 16px 0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.head h1{font-size:18px;margin:0}
+.head .scn{color:var(--fg-dim);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+nav{max-width:980px;margin:0 auto;display:flex;gap:2px;padding:6px 10px 0;overflow-x:auto;scrollbar-width:none}
+nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--fg-dim);padding:8px 10px;cursor:pointer;white-space:nowrap}
+nav button.on{color:var(--fg);border-bottom-color:var(--accent)}
+main{max-width:980px;margin:0 auto;padding:16px 16px 80px}
+section{display:none} section.on{display:block}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-dim);margin:22px 0 10px}
+h2:first-child{margin-top:4px}
+.card{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grow{flex:1 1 200px}
+.muted{color:var(--fg-dim)} .small{font-size:12.5px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+.btn{display:inline-block;background:var(--bg-3);border:1px solid var(--line);border-radius:10px;padding:9px 14px;cursor:pointer;font-size:15px}
+.btn.primary{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
+.btn.danger{border-color:var(--err);color:var(--err)}
+.btn:disabled{opacity:.5;cursor:default}
+select,input[type=number],input[type=text],textarea{background:var(--bg-3);border:1px solid var(--line);border-radius:10px;padding:8px 10px;max-width:100%}
+textarea{width:100%;min-height:280px;resize:vertical}
+label.f{display:block;font-size:12.5px;color:var(--fg-dim);margin-bottom:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+.kpi{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:10px}
+.kpi b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--fg-dim)}
+.bars .bar{display:grid;grid-template-columns:minmax(80px,140px) 1fr 52px;gap:8px;align-items:center;margin:5px 0;font-size:13px}
+.bars .track{height:12px;background:var(--bg-3);border-radius:6px;position:relative;overflow:hidden}
+.bars .fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:6px}
+.bars .mark{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--warn)}
+.bars .val{text-align:right;font-variant-numeric:tabular-nums}
+.lever{margin-bottom:10px}
+.lever .opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;background:var(--bg-3)}
+.chip.on{border-color:var(--accent);color:var(--accent)}
+.timeline{list-style:none;margin:0;padding:0}
+.timeline li{display:grid;grid-template-columns:70px 1fr;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.timeline li .t{color:var(--fg-dim);font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--fg-dim);font-weight:500}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.note{border-left:3px solid var(--warn);padding:8px 12px;background:var(--bg-3);border-radius:6px;font-size:13.5px;margin:8px 0}
+.ok{color:var(--ok)} .err{color:var(--err)} .warn{color:var(--warn)}
+svg.spark{width:100%;height:120px;display:block}
+.answers{max-height:420px;overflow:auto}
+.answer{border-bottom:1px solid var(--line);padding:8px 0;font-size:13.5px}
+.answer .who{color:var(--fg-dim);font-size:12.5px}
+.scroll{overflow-x:auto}
+details summary{cursor:pointer;color:var(--fg-dim);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div class="head"><h1>Karar Laboratuvarı</h1><div class="scn" id="hdrScn"></div></div>
+  <nav id="tabs">
+    <button data-tab="scenario" class="on">Senaryo</button>
+    <button data-tab="population">Nüfus</button>
+    <button data-tab="forecast">Tahmin</button>
+    <button data-tab="strategy">Strateji</button>
+    <button data-tab="validate">Doğrulama</button>
+  </nav>
+</header>
+<main>
+  <!-- ── Senaryo ── -->
+  <section id="scenario" class="on">
+    <h2>Senaryo</h2>
+    <div class="card">
+      <div class="row">
+        <div class="grow"><label class="f">Şablon</label><select id="tplSel"></select></div>
+        <button class="btn" id="tplLoad">Yükle</button>
+      </div>
+      <p id="scnSummary" class="muted small"></p>
+    </div>
+    <h2>Kararlar ve seçenekler</h2>
+    <div id="scnLevers"></div>
+    <h2>Tek seferlik eylemler</h2>
+    <div id="scnEvents" class="card"></div>
+    <h2>Hedef fonksiyonu</h2>
+    <div class="card">
+      <p class="small muted">AlphaZero bu ağırlıklarla puanlanan sonucu en iyilemeye çalışır. Ne istediğini açıkça yazmak, neyi en iyilediğini görmenin tek yolu.</p>
+      <div id="scnObjective" class="grid"></div>
+    </div>
+    <details class="card"><summary>Senaryoyu JSON olarak düzenle / içe-dışa aktar</summary>
+      <p class="small muted">Kendi kararlarını, seçeneklerini ve etkilerini yazabilirsin. Etki: <span class="mono">effect: { base, traits: { eğilim: ağırlık } }</span>. Eğilimler: <span id="traitList" class="mono"></span></p>
+      <textarea id="scnJson" class="mono" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn primary" id="scnApply">Uygula</button><button class="btn" id="scnDownload">İndir (.json)</button><span id="scnErr" class="err small"></span></div>
+    </details>
+  </section>
+
+  <!-- ── Nüfus ── -->
+  <section id="population">
+    <h2>Nüfus</h2>
+    <div class="card">
+      <div id="popInfo"></div>
+      <div class="row" style="margin-top:10px">
+        <label class="btn">MatrAIx personalarını içe aktar (.yaml / .json)<input type="file" id="popFiles" multiple accept=".yaml,.yml,.json" hidden></label>
+        <button class="btn" id="popSynth">Sentetik örnek nüfus (300)</button>
+      </div>
+      <p class="small muted">MatrAIx: <span class="mono">persona/datasets/…/persona_XXXX.yaml</span> dosyaları ya da <span class="mono">calibrate.py</span> çıktısı. Veriler yalnızca bu tarayıcıda kalır.</p>
+    </div>
+    <h2>Segmentler</h2>
+    <div class="card">
+      <div class="row"><div class="grow"><label class="f">Segment boyutu</label><select id="segDim"></select></div></div>
+      <div class="scroll" style="margin-top:10px"><table id="segTable"></table></div>
+    </div>
+    <details class="card"><summary>Boyut → eğilim eşleme tablosu</summary>
+      <p class="small muted">MatrAIx boyutları bu kurallarla eğilimlere çevrilir. Bu bir başlangıç varsayımıdır; Doğrulama sekmesindeki kalibrasyon segment düzeyinde düzeltir.</p>
+      <div class="scroll"><table id="ruleTable"></table></div>
+    </details>
+  </section>
+
+  <!-- ── Tahmin ── -->
+  <section id="forecast">
+    <h2>Kararları seç</h2>
+    <div id="fcLevers" class="card"></div>
+    <div class="kpis" id="fcKpis"></div>
+    <h2>Segmentlere göre</h2>
+    <div class="card"><div class="bars" id="fcBars"></div><p class="small muted">Sarı çizgi: başlangıç tasarımı.</p></div>
+    <h2>Zaman içinde</h2>
+    <div class="card"><svg class="spark" id="fcSpark" viewBox="0 0 600 120" preserveAspectRatio="none"></svg></div>
+    <h2>Neden? — segment başına kararların etkisi</h2>
+    <div class="card scroll"><table id="fcWhy"></table></div>
+  </section>
+
+  <!-- ── Strateji ── -->
+  <section id="strategy">
+    <h2>AlphaZero</h2>
+    <div class="card">
+      <p class="small muted">Ajan önce kararları tasarlar, sonra her <span class="unit">ay</span> bir eylem seçer: değişiklik yok, bir kararı değiştir ya da tek seferlik bir eylem. Her hamle Monte Carlo ağaç aramasıyla, arama da kendi kendine oynayarak eğitilen bir sinir ağıyla yönlendirilir.</p>
+      <div class="row">
+        <div><label class="f">İterasyon</label><input type="number" id="azIters" value="20" min="1" max="200" style="width:90px"></div>
+        <div><label class="f">Oyun / iterasyon</label><input type="number" id="azGames" value="6" min="1" max="50" style="width:90px"></div>
+        <div><label class="f">Arama (MCTS sim.)</label><input type="number" id="azSims" value="64" min="8" max="400" style="width:90px"></div>
+        <button class="btn primary" id="azStart">Başlat</button>
+        <button class="btn danger" id="azStop" disabled>Durdur</button>
+      </div>
+      <p id="azStatus" class="small muted"></p>
+    </div>
+    <div class="kpis" id="azKpis"></div>
+    <h2>Önerilen plan</h2>
+    <div class="card"><ul class="timeline" id="azPlan"><li class="muted">Henüz çalıştırılmadı.</li></ul>
+      <div class="row" style="margin-top:10px"><button class="btn" id="azToForecast" disabled>Son tasarımı Tahmin'de aç</button><button class="btn" id="azToValidate" disabled>Planı doğrula →</button></div>
+    </div>
+    <h2>Segmentlere göre</h2>
+    <div class="card"><div class="bars" id="azBars"></div><p class="small muted">Sarı çizgi: başlangıç tasarımı, eylemsiz.</p></div>
+    <h2>Eğitim</h2>
+    <div class="card"><svg class="spark" id="azSpark" viewBox="0 0 600 120" preserveAspectRatio="none"></svg><div class="scroll"><table id="azHist"></table></div></div>
+  </section>
+
+  <!-- ── Doğrulama ── -->
+  <section id="validate">
+    <h2>LLM personaları</h2>
+    <div class="card">
+      <p class="small muted">Hızlı model bir tahmindir. Burada nüfustan örnek personalar bir dil modeline kendi kimlikleriyle sorulur (MatrAIx'in persona simülasyonu yaklaşımı), cevaplar modelle karşılaştırılır ve istersen model segment düzeyinde kalibre edilir. N.E.X.U.S.'taki API bağlantılarını kullanır.</p>
+      <div id="llmConn" class="small"></div>
+      <div class="row" style="margin-top:8px">
+        <div><label class="f">Sorulacak tasarım</label><select id="vCfg"></select></div>
+        <div><label class="f">Segment başına persona</label><input type="number" id="vPer" value="2" min="1" max="10" style="width:80px"></div>
+        <button class="btn primary" id="vAsk">Sor</button>
+        <button class="btn" id="vCalib" disabled>Modeli kalibre et</button>
+        <button class="btn" id="vReset">Kalibrasyonu sıfırla</button>
+      </div>
+      <p id="vStatus" class="small muted"></p>
+      <div class="scroll"><table id="vTable"></table></div>
+      <div class="answers" id="vAnswers"></div>
+    </div>
+    <h2>MatrAIx</h2>
+    <div class="card">
+      <p class="small muted">Daha büyük ve tekrarlanabilir ölçüm için senaryoyu MatrAIx anket görevine çevir; MatrAIx'te koş; sonuç klasörünü buraya yükle.</p>
+      <div class="row">
+        <button class="btn" id="mxExport">Anket görevini indir (.sh)</button>
+        <label class="btn">Sonuç klasörünü yükle<input type="file" id="mxResults" webkitdirectory multiple hidden></label>
+      </div>
+      <p id="mxStatus" class="small muted"></p>
+      <div class="scroll"><table id="mxTable"></table></div>
+    </div>
+    <div class="note">Bu bir karar destek aracıdır. Simüle edilmiş personalar gerçek insanların yerini tutmaz; önemli kararlar gerçek kullanıcı/vatandaş araştırmasıyla doğrulanmalıdır.</div>
+  </section>
+</main>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

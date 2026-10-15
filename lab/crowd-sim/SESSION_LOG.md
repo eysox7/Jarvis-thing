@@ -54,9 +54,9 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 - [x] C. Senaryo modeli + şablonlar (ürün lansmanı, politika reformu)
 - [x] D. Hızlı tepki motoru: boyut→tercih ağırlıkları, lojistik seçim, sosyal yayılım (zaman adımlı)
 - [x] E. AlphaZero ortamı: zaman adımlı kararlar, açık hedef fonksiyonları (pazarlama: benimseme+memnuniyet−terk; politika: destek + en düşük segment − kutuplaşma)
-- [ ] F. LLM persona motoru (NEXUS API bağlantılarını kullanır) + kalibrasyon
-- [ ] G. Arayüz: Nüfus / Senaryo / Tahmin / Strateji / Doğrulama sekmeleri (mobil uyumlu, NEXUS tarzı)
-- [ ] H. MatrAIx dışa aktarma (senaryo → anket görevi, sonuç → kalibrasyon)
+- [x] F. LLM persona motoru (NEXUS API bağlantılarını kullanır) + kalibrasyon
+- [x] G. Arayüz: Nüfus / Senaryo / Tahmin / Strateji / Doğrulama sekmeleri (mobil uyumlu, NEXUS tarzı)
+- [x] H. MatrAIx dışa aktarma (senaryo → anket görevi, sonuç → kalibrasyon)
 - [ ] I. README
 
 ## Uyanış günlüğü
@@ -78,7 +78,9 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 1d | 17:06 | **YÖN DEĞİŞİKLİĞİ (kullanıcı):** konser/tahliye değil; insanların kararları — pazarlama ve siyasi/kamu politikası kararları. Arayüz + sistem istendi. Konser eğitimi durduruldu, `lab/crowd-sim/` olduğu gibi bırakıldı. Yeni iş: `lab/decision-lab/` (aşağıdaki yeni yol haritası). Sınır: politika tasarımı + tepki tahmini evet; seçmen segmentine göre ikna/mikrohedefleme optimizasyonu hayır (kullanıcıya söylendi) | decision-lab çekirdeği |
 
-| 1e | 17:20 | `lab/core/` (nn, mcts, rng; crowd-sim de buradan). `decision-lab/`: population.js (MatrAIx YAML ayrıştırıcı, 10 eğilim + eşleme tablosu, sentetik nüfus, segmentler), scenarios.js (2 şablon: araç giriş ücreti / fitness uygulaması), model.js (fayda + aylık dinamik + açık hedef fonksiyonu + tasarım evresi), az.js. Bulgu: AlphaZero "düşük ücretle başla, son ay 120 TL'ye çık" (yem-ve-değiştir) buldu → etkinlik dönem ortalaması yapıldı. Sonuç (politika): taban 0.446, en iyi statik 0.575, AlphaZero 0.682; en düşük segment desteği 0.21→0.68 | G. arayüz |
+| 1e | 17:10 | `lab/core/` (nn, mcts, rng; crowd-sim de buradan). `decision-lab/`: population.js (MatrAIx YAML ayrıştırıcı, 10 eğilim + eşleme tablosu, sentetik nüfus, segmentler), scenarios.js (2 şablon: araç giriş ücreti / fitness uygulaması), model.js (fayda + aylık dinamik + açık hedef fonksiyonu + tasarım evresi), az.js. Bulgu: AlphaZero "düşük ücretle başla, son ay 120 TL'ye çık" (yem-ve-değiştir) buldu → etkinlik dönem ortalaması yapıldı. Sonuç (politika): taban 0.446, en iyi statik 0.575, AlphaZero 0.682; en düşük segment desteği 0.21→0.68 | G. arayüz |
+
+| 1f | 17:25 | Arayüz: `decision-lab/index.html` + `app.js` (5 sekme), `az-worker.js` (eğitim ayrı iş parçacığında + kaba kuvvet statik kıyas), `llm.js` (NEXUS API profilleriyle persona canlandırma, segment kalibrasyonu), `matraix.js` (senaryo → MatrAIx görev betiği .sh; sonuç klasörü okuma). Headless Chromium'da sahte LLM API ile uçtan uca gezildi (scratchpad, repoya test eklenmedi): hata yok; AZ 4 iterasyonda 0.446→0.589 (statik en iyi 0.575); 12 persona soruldu; kalibrasyon; .sh betiği geçerli görev üretiyor. Düzeltilen hatalar: worker'a iş gönderilmiyordu; kalibrasyon sonuçları siliyordu; label butonları stilsizdi | I. README; NEXUS'tan bağlantı |
 
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
