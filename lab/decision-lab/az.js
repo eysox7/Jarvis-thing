@@ -63,7 +63,7 @@ export function train(ctx, { iters = 20, games = 6, sims = 48, steps = 120, batc
       best: bestRun.result.total, base, accepted,
     };
     history.push(row);
-    onProgress({ ...row, plan: M.describeMoves(ctx, bestRun.final.moves), parts: bestRun.result.parts, segs: bestRun.result.segs, series: bestRun.final.series, config: bestRun.final.config });
+    onProgress({ ...row, moves: bestRun.final.moves.slice(), plan: M.describeMoves(ctx, bestRun.final.moves), parts: bestRun.result.parts, segs: bestRun.result.segs, series: bestRun.final.series, config: bestRun.final.config });
   }
   return { net: best, run: bestRun, base, history };
 }

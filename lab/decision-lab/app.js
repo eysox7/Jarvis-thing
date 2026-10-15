@@ -5,6 +5,7 @@ import * as M from './model.js';
 import * as L from './llm.js';
 import * as X from './matraix.js';
 import * as ED from './editor.js';
+import { rng } from '../core/rng.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -258,6 +259,18 @@ function stop(msg) {
   $('azStatus').textContent = msg;
   save(); RENDER.strategy();
 }
+$('rbRun').onclick = () => {
+  const c = ctx();
+  const plans = { 'Başlangıç tasarımı': [0] };
+  if (S.bestStatic?.config) plans['En iyi statik tasarım'] = M.movesForConfig(c, S.bestStatic.config);
+  if (S.az?.moves) plans['AlphaZero planı'] = S.az.moves;
+  const res = M.robustness(S.scenario, S.personas, plans, {
+    segmentDim: S.segDim, calibration: { segBias: S.calib[calibKey()] || [] },
+    worlds: Math.max(5, Math.min(300, +$('rbN').value)), magnitude: +$('rbMag').value, rng,
+  });
+  $('rbTable').innerHTML = '<tr><th>Plan</th><th class="num">Ortalama</th><th class="num">Kötü durum (%10)</th><th class="num">İyi durum (%90)</th><th class="num">En iyi olduğu dünyalar</th></tr>'
+    + Object.entries(res).map(([n, v]) => `<tr><td>${esc(n)}</td><td class="num">${f3(v.mean)}</td><td class="num">${f3(v.p10)}</td><td class="num">${f3(v.p90)}</td><td class="num">${pct(v.winRate)}</td></tr>`).join('');
+};
 $('azToForecast').onclick = () => { if (S.az?.config) { S.fcConfig = { ...S.az.config }; save(); document.querySelector('nav button[data-tab=forecast]').click(); } };
 $('azToValidate').onclick = () => { document.querySelector('nav button[data-tab=validate]').click(); $('vCfg').value = 'az'; };
 
@@ -276,7 +289,7 @@ RENDER.strategy = () => {
       + (az.parts ? `<li><span class="t">sonuç</span><span class="small">${Object.entries(az.parts).map(([k, v]) => `${esc(PART_LABELS[k] || k)} ${v.toFixed(2)}`).join(' · ')}</span></li>` : '');
     bars($('azBars'), c.seg.labels, az.segs, r0.segs);
   }
-  $('azToForecast').disabled = !az?.config; $('azToValidate').disabled = !az?.config;
+  $('azToForecast').disabled = !az?.config; $('azToValidate').disabled = !az?.config; $('rbRun').disabled = !az?.moves;
   if (az?.stale && !az.running) $('azStatus').innerHTML = '<span class="warn">Bu plan model kalibre edilmeden önce bulundu; yeniden çalıştır.</span>';
   const h = az?.history || [];
   spark($('azSpark'), [{ label: 'en iyi skor', data: h.map((x) => x.best) }, { label: 'arena', data: h.map((x) => x.score) }], { min: Math.min(r0.total, ...h.map((x) => x.score)), max: Math.max(r0.total, ...h.map((x) => x.best)) });

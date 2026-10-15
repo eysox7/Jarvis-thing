@@ -169,6 +169,16 @@ details summary{cursor:pointer;color:var(--fg-dim);font-size:13px}
     </div>
     <h2>Segmentlere göre</h2>
     <div class="card"><div class="bars" id="azBars"></div><p class="small muted">Sarı çizgi: başlangıç tasarımı, eylemsiz.</p></div>
+    <h2>Sağlamlık testi</h2>
+    <div class="card">
+      <p class="small muted">Seçeneklerin etkileri birer varsayım. Planlar, etkileri rastgele bozulmuş alternatif dünyalarda yeniden oynatılır. Yalnızca modelin tam doğru olduğu dünyada iyi olan bir plan, büyük olasılıkla modelin bir açığını sömürüyordur.</p>
+      <div class="row">
+        <div><label class="f">Belirsizlik</label><select id="rbMag"><option value="0.15">±%15</option><option value="0.3" selected>±%30</option><option value="0.5">±%50</option></select></div>
+        <div><label class="f">Dünya sayısı</label><input type="number" id="rbN" value="40" min="5" max="300" style="width:90px"></div>
+        <button class="btn" id="rbRun" disabled>Test et</button>
+      </div>
+      <div class="scroll"><table id="rbTable"></table></div>
+    </div>
     <h2>Eğitim</h2>
     <div class="card"><svg class="spark" id="azSpark" viewBox="0 0 600 120" preserveAspectRatio="none"></svg><div class="scroll"><table id="azHist"></table></div></div>
   </section>

@@ -86,5 +86,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 2-3 | 17:24 | Uyanış #2 ve #3 (geç ulaştı; o sırada iş sürüyordu). 2. parti uyanışlar zaten kurulu. Form tabanlı senaryo düzenleyici (`editor.js`): boş politika/pazarlama senaryosu, karar/seçenek/eğilim etkisi/eylem ekle-sil, alan değiştirme. Headless'ta denendi, hata yok | Sıradaki: senaryo şablonları (kullanıcı isterse), duyarlılık analizi ("bu varsayım yanlışsa sonuç değişir mi?") |
 
+| 3b | 17:27 | Sağlamlık testi (model.js `robustness`, Strateji sekmesi): planlar etkileri ±%15/30/50 bozulmuş dünyalarda yeniden oynatılır. Node: 8 iter/64 sim AZ planı 30 dünyanın %100'ünde en iyi (0.62–0.74). Tarayıcı: 5 iter/48 sim planı yalnızca %33 → kısa eğitimin güvenilmez plan verdiğini gösteriyor | Sıradaki: README'ye sağlamlık; eğitim varsayılanlarını gözden geçir |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

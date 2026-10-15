@@ -290,3 +290,64 @@ export function baselineScore(ctx, start) {
   while (!isTerminal(ctx, s)) apply(ctx, s, 0);
   return score(ctx, s).total;
 }
+
+// ── Sağlamlık (duyarlılık) testi ────────────────────────────────────────────
+// Seçenek etkileri varsayımdır. Planı, etkileri rastgele bozulmuş "alternatif dünyalarda"
+// yeniden oynatıp hâlâ iyi olup olmadığına bakarız. Bir plan yalnızca modelin tam olarak
+// doğru olduğu dünyada iyiyse, büyük olasılıkla modelin bir açığını sömürüyordur.
+export function perturbScenario(scn, rand, magnitude = 0.3) {
+  const gauss = () => Math.sqrt(-2 * Math.log(rand() || 1e-12)) * Math.cos(2 * Math.PI * rand());
+  const s = JSON.parse(JSON.stringify(scn));
+  for (const l of s.levers) for (const o of l.options) {
+    o.effect.base = (o.effect.base || 0) + gauss() * magnitude * 0.5;
+    for (const k of Object.keys(o.effect.traits || {})) o.effect.traits[k] *= 1 + gauss() * magnitude;
+  }
+  for (const e of s.events || []) e.strength = Math.max(0, e.strength * (1 + gauss() * magnitude));
+  return s;
+}
+
+// Kaydedilmiş hamle dizisini (tasarım evresi dahil) verilen bağlamda yeniden oynatır.
+export function replay(ctx, moves) {
+  const s = initialState(ctx, undefined, { design: true });
+  for (const m of moves) {
+    if (isTerminal(ctx, s)) break;
+    // Alternatif dünyada eylem yasal değilse (ör. bütçe yetmiyor) beklemeyle değiştir.
+    apply(ctx, s, legalMask(ctx, s)[m] ? m : 0);
+  }
+  while (!isTerminal(ctx, s)) apply(ctx, s, 0);
+  return score(ctx, s);
+}
+
+// plans: { ad: hamle dizisi }. Dönen: her plan için skor dağılımı ve kaç dünyada en iyi olduğu.
+export function robustness(scn, personas, plans, { segmentDim, calibration, worlds = 30, magnitude = 0.3, seed = 11, rng } = {}) {
+  const rand = rng(seed);
+  const names = Object.keys(plans);
+  const scores = Object.fromEntries(names.map((n) => [n, []]));
+  const wins = Object.fromEntries(names.map((n) => [n, 0]));
+  for (let w = 0; w < worlds; w++) {
+    const ctx = createContext(perturbScenario(scn, rand, magnitude), personas, { segmentDim, calibration });
+    let bestName = null, bestVal = -Infinity;
+    for (const n of names) {
+      const v = replay(ctx, plans[n]).total;
+      scores[n].push(v);
+      if (v > bestVal) { bestVal = v; bestName = n; }
+    }
+    wins[bestName]++;
+  }
+  const q = (arr, p) => { const a = arr.slice().sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(p * a.length))]; };
+  return Object.fromEntries(names.map((n) => [n, {
+    mean: scores[n].reduce((a, b) => a + b, 0) / worlds, p10: q(scores[n], 0.1), p90: q(scores[n], 0.9), winRate: wins[n] / worlds,
+  }]));
+}
+
+// Statik bir tasarımı hamle dizisine çevirir (tasarım evresinde kolları ayarla, onayla, bekle).
+export function movesForConfig(ctx, config) {
+  const init = initialConfig(ctx.scn);
+  const moves = [];
+  for (const l of ctx.scn.levers) {
+    if (config[l.id] === init[l.id]) continue;
+    moves.push(ctx.actions.findIndex((a) => a.type === 'set' && a.lever === l.id && a.option === config[l.id]));
+  }
+  moves.push(0);
+  return moves;
+}
