@@ -20,7 +20,7 @@ let S = load() || {
   personas: syntheticPopulation(300),
   popSource: 'synthetic',
   segDim: 'age_bracket',
-  calib: {},              // "senaryoId|segmentBoyutu" → segBias[]
+  calib: {},              // "senaryoId|segmentBoyutu" → { segmentAdı: düzeltme }
   fcConfig: null,
   az: null,               // son AlphaZero sonucu
   bestStatic: null,
@@ -30,9 +30,11 @@ function load() { try { return JSON.parse(localStorage.getItem(LS)); } catch { r
 function save() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch { /* kota dolu: yalnızca bellekte */ } }
 
 const calibKey = () => `${S.scenario.id}|${S.segDim}`;
+// Eski sürümler diziyle saklıyordu (segment sırasına bağlı, güvensiz); onları yok say.
+const calibration = () => { const c = S.calib[calibKey()]; return { byLabel: c && !Array.isArray(c) ? c : {} }; };
 let _ctx = null;
 function ctx() {
-  if (!_ctx) _ctx = M.createContext(S.scenario, S.personas, { segmentDim: S.segDim, calibration: { segBias: S.calib[calibKey()] || [] } });
+  if (!_ctx) _ctx = M.createContext(S.scenario, S.personas, { segmentDim: S.segDim, calibration: calibration() });
   return _ctx;
 }
 function invalidate({ keepAz = false, keepAnswers = false } = {}) {
@@ -184,7 +186,7 @@ RENDER.population = () => {
   const counts = new Array(K).fill(0);
   S.personas.forEach((p, i) => { const k = c.seg.index[i]; counts[k]++; for (const t of tk) sums[k][t] += c.T[t][i]; });
   const cell = (v) => `<td class="num" style="color:${v > 0.15 ? 'var(--ok)' : v < -0.15 ? 'var(--err)' : 'inherit'}">${v.toFixed(2)}</td>`;
-  const bias = S.calib[calibKey()] || [];
+  const bias = c.segBias;
   $('segTable').innerHTML = `<tr><th>Segment</th><th class="num">Kişi</th>${tk.map((t) => `<th class="num" title="${esc(TRAITS[t])}">${esc(TRAITS[t].split(' ')[0])}</th>`).join('')}<th class="num">Kalibr.</th></tr>`
     + c.seg.labels.map((l, k) => `<tr><td>${esc(l)}</td><td class="num">${counts[k]}</td>${tk.map((t) => cell(counts[k] ? sums[k][t] / counts[k] : 0)).join('')}<td class="num">${bias[k] ? bias[k].toFixed(2) : '–'}</td></tr>`).join('');
   $('ruleTable').innerHTML = '<tr><th>Boyut</th><th>Değer içerir</th><th>Etki</th></tr>'
@@ -239,7 +241,7 @@ $('azStart').onclick = () => {
   $('azStart').disabled = true; $('azStop').disabled = false;
   $('azStatus').textContent = 'Kıyas için tüm statik tasarımlar deneniyor…';
   worker.onmessage = ({ data }) => {
-    if (data.type === 'static') { S.bestStatic = data; $('azStatus').textContent = `${data.combos} statik tasarım denendi. Self-play başladı…`; }
+    if (data.type === 'static') { S.bestStatic = data; $('azStatus').textContent = data.approx ? `${data.combos} kombinasyon kaba kuvvet için çok fazla; koordinat yükselişiyle iyi bir başlangıç tasarımı bulundu. Self-play başladı…` : `${data.combos} statik tasarım denendi. Self-play başladı…`; }
     else if (data.type === 'progress') {
       S.az = { ...S.az, ...data, history: [...S.az.history, { it: data.it, score: data.score, best: data.best, z: data.selfPlayZ, loss: data.loss, accepted: data.accepted }] };
       $('azStatus').textContent = `İterasyon ${data.it}/${opts.iters} — en iyi skor ${f3(data.best)} (çıkış noktası: en iyi statik tasarım, ${f3(data.base)}).`;
@@ -248,7 +250,7 @@ $('azStart').onclick = () => {
     RENDER.strategy();
   };
   worker.onerror = (e) => stop('Hata: ' + e.message);
-  worker.postMessage({ scenario: S.scenario, personas: S.personas, segmentDim: S.segDim, calibration: { segBias: S.calib[calibKey()] || [] }, opts });
+  worker.postMessage({ scenario: S.scenario, personas: S.personas, segmentDim: S.segDim, calibration: calibration(), opts });
   RENDER.strategy();
 };
 $('azStop').onclick = () => stop('Durduruldu. Şimdiye kadarki en iyi plan geçerli.');
@@ -265,7 +267,7 @@ $('rbRun').onclick = () => {
   if (S.bestStatic?.config) plans['En iyi statik tasarım'] = { moves: [0], start: S.bestStatic.config };
   if (S.az?.moves) plans['AlphaZero planı'] = { moves: S.az.moves, start: S.az.start };
   const res = M.robustness(S.scenario, S.personas, plans, {
-    segmentDim: S.segDim, calibration: { segBias: S.calib[calibKey()] || [] },
+    segmentDim: S.segDim, calibration: calibration(),
     worlds: Math.max(5, Math.min(300, +$('rbN').value)), magnitude: +$('rbMag').value, rng,
   });
   $('rbTable').innerHTML = '<tr><th>Plan</th><th class="num">Ortalama</th><th class="num">Kötü durum (%10)</th><th class="num">İyi durum (%90)</th><th class="num">En iyi olduğu dünyalar</th></tr>'
@@ -280,7 +282,7 @@ RENDER.strategy = () => {
   const r0 = M.forecast(c, initialConfig(S.scenario));
   kpis($('azKpis'), [
     [f3(r0.total), 'Başlangıç tasarımı, eylemsiz'],
-    [st ? f3(st.total) : '–', 'En iyi statik tasarım (kaba kuvvet)'],
+    [st ? f3(st.total) : '–', st?.approx ? 'İyi statik tasarım (yaklaşık)' : 'En iyi statik tasarım (kaba kuvvet)'],
     [az?.best != null ? f3(az.best) : '–', 'AlphaZero planı'],
     [az?.segs ? pct(Math.min(...az.segs)) : '–', 'AlphaZero: en düşük segment'],
   ]);
@@ -373,7 +375,8 @@ function renderLlm() {
 
 $('vCalib').onclick = () => {
   const c = ctx();
-  S.calib[calibKey()] = L.fitSegBias(S.llmRows, c.seg.labels.length, S.calib[calibKey()] || []);
+  const fitted = L.fitSegBias(S.llmRows, c.seg.labels.length, Array.from(c.segBias));
+  S.calib[calibKey()] = Object.fromEntries(c.seg.labels.map((l, k) => [l, fitted[k]]));
   invalidate({ keepAz: true, keepAnswers: true });
   if (S.az) S.az.stale = true;
   // Tablodaki "model" sütunu artık kalibre edilmiş modeli göstersin.

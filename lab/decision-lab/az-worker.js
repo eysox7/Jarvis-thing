@@ -24,6 +24,21 @@ self.onmessage = ({ data }) => {
     rec(0, {});
     self.postMessage({ type: 'static', combos, ...best });
     startConfig = best.config;
+  } else {
+    // Çok fazla kombinasyon: koordinat yükselişi (her seferinde bir kararı en iyi seçeneğe
+    // çek, iyileşme bitene kadar tekrarla). Kesin en iyi değil ama iyi bir başlangıç.
+    let cfg = Object.fromEntries(scenario.levers.map((l) => [l.id, l.initial ?? l.options[0].id]));
+    let best = forecast(ctx, cfg);
+    for (let pass = 0, improved = true; improved && pass < 10; pass++) {
+      improved = false;
+      for (const l of scenario.levers) for (const o of l.options) {
+        if (o.id === cfg[l.id]) continue;
+        const r = forecast(ctx, { ...cfg, [l.id]: o.id });
+        if (r.total > best.total + 1e-9) { best = r; cfg = { ...cfg, [l.id]: o.id }; improved = true; }
+      }
+    }
+    self.postMessage({ type: 'static', combos, approx: true, total: best.total, parts: best.parts, segs: best.segs, config: cfg });
+    startConfig = cfg;
   }
 
   train(ctx, {

@@ -48,7 +48,8 @@ export function createContext(scn, personas, { segmentDim = 'age_bracket', calib
   for (const e of scn.events || []) actions.push({ type: 'event', event: e.id, label: e.label });
 
   const segBias = new Float64Array(seg.labels.length);
-  if (calibration?.segBias) calibration.segBias.forEach((b, k) => { if (k < segBias.length) segBias[k] = b; });
+  // Kalibrasyon segment ADINA göre eşlenir: nüfus değişince segment sırası değişebilir.
+  if (calibration?.byLabel) seg.labels.forEach((l, k) => { segBias[k] = calibration.byLabel[l] || 0; });
 
   return { scn, personas, n, w, wsum, T, seg, contrib, actions, segBias, calibration };
 }

@@ -96,5 +96,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 6 | 17:50 | Uyanış #6. N.E.X.U.S. Ayarlar → "Laboratuvar" bölümü (Karar Laboratuvarı bağlantısı); laboratuvarda "Nasıl kullanılır?" rehberi (ilk ziyarette açık). Ana uygulamanın mevcut testleri koşuldu: HEPSİ GEÇTİ | Sıradaki: kod gözden geçirme (hata avı), mobil düzen kontrolü |
 
+| 7 | 18:00 | Uyanış #7: kod gözden geçirme. Düzeltilen: (1) kalibrasyon segment sırasına göre saklanıyordu → nüfus değişince yanlış segmente uygulanırdı; artık segment adına göre (eski dizi biçimi yok sayılır). (2) >600 kombinasyonlu senaryolarda AZ ham başlangıçtan başlıyordu → koordinat yükselişiyle başlangıç tasarımı. Regresyon gezintisi hatasız | Sıradaki: mobil düzen kontrolü, kalan gözden geçirme (llm/matraix) |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
