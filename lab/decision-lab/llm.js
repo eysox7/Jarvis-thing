@@ -42,7 +42,9 @@ export async function askPersona(persona, scn, config, { signal } = {}) {
     system: SYSTEM(persona),
     messages: [{ role: 'user', content: questionFor(scn, config) }],
     temperature: 0.7,
-    maxTokens: 200,
+    // Düşünen modeller (Gemini 2.5, o4-mini, deepseek-reasoner) düşünmeyi de bu sınırdan
+    // harcar; dar tutulursa cevap boş döner. Asıl cevap kısa olduğu için bol pay bırakılır.
+    maxTokens: 2048,
     signal,
     proxy: store.settings()?.proxy,
   });

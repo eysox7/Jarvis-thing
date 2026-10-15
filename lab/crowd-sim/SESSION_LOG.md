@@ -98,5 +98,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 7 | 18:00 | Uyanış #7: kod gözden geçirme. Düzeltilen: (1) kalibrasyon segment sırasına göre saklanıyordu → nüfus değişince yanlış segmente uygulanırdı; artık segment adına göre (eski dizi biçimi yok sayılır). (2) >600 kombinasyonlu senaryolarda AZ ham başlangıçtan başlıyordu → koordinat yükselişiyle başlangıç tasarımı. Regresyon gezintisi hatasız | Sıradaki: mobil düzen kontrolü, kalan gözden geçirme (llm/matraix) |
 
+| 8 | 18:08 | Uyanış #8. Mobil (360 px) kontrol: Senaryo sekmesinde şablon listesi taşıyordu → düzeltildi, 5 sekmede de yatay kaydırma yok. llm.js: maxTokens 200 → 2048 (düşünen modeller sınırı düşünmeye harcayıp boş cevap verirdi; önerilen ücretsiz Gemini 2.5 dahil) | Sıradaki: README son hal, kapanışa hazırlık |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
