@@ -6,6 +6,7 @@ import * as L from './llm.js';
 import * as X from './matraix.js';
 import * as ED from './editor.js';
 import { rng } from '../core/rng.js';
+import { buildReport } from './report.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -95,7 +96,9 @@ function download(name, text, type = 'text/plain') {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type }));
   a.download = name;
+  document.body.append(a);     // bazı tarayıcılar sayfaya bağlı olmayan bağlantıda dosya adını yok sayar
   a.click();
+  a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
@@ -261,6 +264,11 @@ function stop(msg) {
   $('azStatus').textContent = msg;
   save(); RENDER.strategy();
 }
+let lastRobust = null;
+$('azReport').onclick = () => {
+  const md = buildReport(S, ctx(), lastRobust);
+  download(`${(S.scenario.title || 'rapor').replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase()}-rapor.md`, md, 'text/markdown');
+};
 $('rbRun').onclick = () => {
   const c = ctx();
   const plans = { 'Başlangıç tasarımı': { moves: [0] } };
@@ -270,6 +278,7 @@ $('rbRun').onclick = () => {
     segmentDim: S.segDim, calibration: calibration(),
     worlds: Math.max(5, Math.min(300, +$('rbN').value)), magnitude: +$('rbMag').value, rng,
   });
+  lastRobust = res;
   $('rbTable').innerHTML = '<tr><th>Plan</th><th class="num">Ortalama</th><th class="num">Kötü durum (%10)</th><th class="num">İyi durum (%90)</th><th class="num">En iyi olduğu dünyalar</th></tr>'
     + Object.entries(res).map(([n, v]) => `<tr><td>${esc(n)}</td><td class="num">${f3(v.mean)}</td><td class="num">${f3(v.p10)}</td><td class="num">${f3(v.p90)}</td><td class="num">${pct(v.winRate)}</td></tr>`).join('');
 };
@@ -298,7 +307,7 @@ RENDER.strategy = () => {
       + ex.rows.sort((a, b) => b.delta - a.delta).map((x) => `<tr><td class="muted">${esc(x.when)}</td><td>${esc(x.label)}</td><td class="num"><b>${x.delta >= 0 ? '+' : ''}${x.delta.toFixed(3)}</b></td>${x.segDelta.map(cell).join('')}</tr>`).join('')
       + (ex.rows.length ? '' : '<tr><td class="muted">Plan, başlangıç tasarımını değiştirmiyor.</td></tr>');
   }
-  $('azToForecast').disabled = !az?.config; $('azToValidate').disabled = !az?.config; $('rbRun').disabled = !az?.moves;
+  $('azToForecast').disabled = !az?.config; $('azToValidate').disabled = !az?.config; $('rbRun').disabled = !az?.moves; $('azReport').disabled = !az?.plan || !!az.running;
   if (az?.stale && !az.running) $('azStatus').innerHTML = '<span class="warn">Bu plan model kalibre edilmeden önce bulundu; yeniden çalıştır.</span>';
   const h = az?.history || [];
   spark($('azSpark'), [{ label: 'en iyi skor', data: h.map((x) => x.best) }, { label: 'arena', data: h.map((x) => x.score) }], { min: Math.min(r0.total, ...h.map((x) => x.score)), max: Math.max(r0.total, ...h.map((x) => x.best)) });

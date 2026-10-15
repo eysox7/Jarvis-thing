@@ -100,5 +100,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 8 | 18:08 | Uyanış #8. Mobil (360 px) kontrol: Senaryo sekmesinde şablon listesi taşıyordu → düzeltildi, 5 sekmede de yatay kaydırma yok. llm.js: maxTokens 200 → 2048 (düşünen modeller sınırı düşünmeye harcayıp boş cevap verirdi; önerilen ücretsiz Gemini 2.5 dahil) | Sıradaki: README son hal, kapanışa hazırlık |
 
+| 9 | 18:20 | Uyanış #9. Paylaşılabilir Markdown rapor (`report.js`, Strateji → "Raporu indir"): senaryo, nüfus kaynağı, kalibrasyon durumu, hedef, karşılaştırma, plan, segment farkları, "neden", sağlamlık, persona cevapları, varsayımlar. Örnek: `ornek-rapor.md`. Not: headless test tarayıcısı indirme adını "download" gösteriyor (blob indirme tuhaflığı olabilir; gerçek tarayıcıda doğrulanamadı) | Sıradaki: kapanış raporuna hazırlık |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
