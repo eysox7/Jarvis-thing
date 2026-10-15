@@ -31,7 +31,7 @@ Nüfus (MatrAIx personaları)        Senaryo (kararlar, seçenekler, eylemler, h
 | Sekme | Ne yapar |
 |---|---|
 | **Senaryo** | Şablon seç (politika: araç giriş ücreti, emeklilik yaşı reformu; pazarlama: fitness uygulaması, elektrikli otomobil lansmanı) ya da formla boş senaryodan başla ya da JSON ile kendi senaryonu yaz. Hedef fonksiyonu ağırlıklarını ayarla. |
-| **Nüfus** | MatrAIx persona YAML/JSON içe aktar ya da sentetik örnek nüfus kullan. Segment boyutunu seç; segmentlerin eğilim profillerini ve boyut→eğilim eşleme tablosunu gör. |
+| **Nüfus** | Pakette gelen 80 MatrAIx personasını yükle, kendi MatrAIx persona YAML/JSON dosyalarını içe aktar ya da sentetik örnek nüfus kullan. Segment boyutunu seç; segmentlerin eğilim profillerini ve boyut→eğilim eşleme tablosunu gör. |
 | **Tahmin** | Kararları seç; genel ve segment bazında destek/benimseme, zaman serisi ve "neden?" tablosu (her kararın her segmentteki etkisi). |
 | **Strateji** | AlphaZero'yu çalıştır. Başlangıç tasarımı, tüm statik tasarımların en iyisi (kaba kuvvet) ve AlphaZero planı yan yana. Plan zaman çizelgesi olarak. **Neden bu plan?:** her adım tek tek çıkarılıp katkısı ve hangi segmente yaradığı ölçülür. **Rapor:** sonuçlar tek tıkla Markdown rapor olarak indirilir ([örnek](ornek-rapor.md)). **Sağlamlık testi:** planlar, seçenek etkileri rastgele bozulmuş onlarca alternatif dünyada yeniden oynatılır; plan yalnızca modelin tam doğru olduğu dünyada iyiyse güvenme. |
 | **Doğrulama** | Örnek personaları bir LLM'e kendi kimlikleriyle sor; cevapları modelle karşılaştır, gerekçeleri segment bazında özetlet, modeli kalibre et. MatrAIx anket görevini indir, sonuç klasörünü yükle. |
@@ -103,6 +103,9 @@ içe aktarılıp denendi. Personalar seyrek: toplam 1052 farklı boyut var, her 
 Eşleme tablosu bu verideki sık boyutlara göre genişletildi (persona başına tetiklenen kural 2.0 → 5.25;
 hiç kural tetiklemeyen persona 10 → 6). Emeklilik reformu senaryosunda: başlangıç 0.418, en iyi statik
 0.553, AlphaZero 0.643; sağlamlık testinde %100.
+
+`data/matraix-dev-sample.json`: bu 80 persona (yalnızca `persona_id`, `display_name`, `dimensions`),
+MatrAIx'in MIT lisansıyla (`data/MATRAIX_LICENSE`). LLM ile üretilmiş sentetik personalardır, gerçek kişiler değildir.
 
 ## Bilinen sınırlar
 

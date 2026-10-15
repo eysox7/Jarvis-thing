@@ -108,5 +108,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 12 | 18:55 | Uyanış #12: **gerçek MatrAIx verisiyle ilk deneme.** raw.githubusercontent'tan dev örnekleminden 80 gerçek persona YAML indirildi (scratchpad'de; repoya eklenmedi). Bulgular: 1052 farklı boyut, seyrek; eşleme tablosu persona başına ort. 2.0 kural tetikliyordu, 10/80 hiç. Gerçek boyutlar için ~37 kural eklendi (risk_tolerance, values_priority, dominant_trait, demo_generation, schwartz_value_*, att_ai…) → ort. 5.25, sıfır 6. "null" metinli boş değerler + eksik boyut tek "Bilinmiyor" segmentinde. Arayüzden 80 dosya içe aktarıldı → AZ: başlangıç 0.418, statik 0.553, AZ 0.643, sağlamlık %100, hatasız | — |
 
+| 13 | 19:00 | Uyanış #13. 80 MatrAIx dev personası tek JSON olarak pakete eklendi (`data/matraix-dev-sample.json`, 404 KB, MIT lisans dosyasıyla); Nüfus → "MatrAIx örnek personaları (80)" butonu. Tarayıcıda denendi, hatasız | Sıradaki: kapanışa doğru son kontroller |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

@@ -168,6 +168,19 @@ $('popSynth').onclick = () => {
   if (!S.personas.some((p) => p.dims[S.segDim])) S.segDim = 'age_bracket';
   invalidate(); RENDER.population();
 };
+$('popMx').onclick = async () => {
+  try {
+    const res = await fetch('data/matraix-dev-sample.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { personas } = importFiles([{ name: 'matraix-dev-sample.json', text: await res.text() }]);
+    S.personas = personas; S.popSource = 'matraix';
+    if (!personas.some((p) => p.dims[S.segDim])) S.segDim = 'age_bracket';
+    invalidate(); RENDER.population();
+    $('popInfo').insertAdjacentHTML('beforeend', '<p class="small muted">MatrAIx dev örneklemi (MIT lisanslı; LLM ile üretilmiş sentetik personalar). Personalar seyrek: her biri 1052 boyutun bir kısmını taşır, eksik değerler "Bilinmiyor" segmentinde toplanır.</p>');
+  } catch (e) {
+    $('popInfo').insertAdjacentHTML('beforeend', `<p class="small err">Yüklenemedi: ${esc(e.message)}</p>`);
+  }
+};
 $('popFiles').onchange = async (e) => {
   const files = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, text: await f.text() })));
   const { personas, errors } = importFiles(files);
