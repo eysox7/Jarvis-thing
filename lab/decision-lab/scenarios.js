@@ -98,6 +98,91 @@ export const TEMPLATES = [
     ],
     objective: { revenue: 0.45, adoption: 0.3, satisfaction: 0.25, churn: 0.3 },
   },
+  {
+    id: 'pension-age',
+    domain: 'policy',
+    title: 'Emeklilik yaşı reformu',
+    summary: 'Sosyal güvenlik sisteminin finansman açığını kapatmak için emeklilik yaşının yükseltilmesi ve geçiş düzenlemeleri.',
+    question: 'Bu reformu destekler misiniz?',
+    unit: 'ay', horizon: 12, budget: 30,
+    levers: [
+      {
+        id: 'age', label: 'Yeni emeklilik yaşı', initial: 'a67',
+        options: [
+          { id: 'a65', label: '65', impact: 0.55, cost: 0, effect: { base: -0.1, traits: { security: -0.3, habit: -0.3 } } },
+          { id: 'a67', label: '67', impact: 0.85, cost: 0, effect: { base: -0.5, traits: { security: -0.7, habit: -0.6, fairness: -0.2 } } },
+          { id: 'a67life', label: '67, sonra yaşam süresine bağlı', impact: 1.0, cost: 0, effect: { base: -0.7, traits: { security: -0.9, habit: -0.6, trust: 0.4, novelty: 0.2 } } },
+        ],
+      },
+      {
+        id: 'transition', label: 'Geçiş', initial: 'now',
+        options: [
+          { id: 'now', label: 'Yürürlüğe girdiği yıl herkes için', impact: 1.0, cost: 0, effect: { base: -0.4, traits: { habit: -0.7, security: -0.4 } } },
+          { id: 'gradual', label: '15 yılda kademeli (yaşa yakın olanlar etkilenmez)', impact: 0.75, cost: 0, effect: { base: 0.2, traits: { fairness: 0.4, habit: 0.4, security: 0.3 } } },
+        ],
+      },
+      {
+        id: 'protect', label: 'Koruma düzenlemesi', initial: 'none',
+        options: [
+          { id: 'none', label: 'Yok', impact: 1.0, cost: 0, effect: { base: 0, traits: { fairness: -0.5 } } },
+          { id: 'hard', label: 'Ağır ve yıpratıcı işlerde erken emeklilik korunur', impact: 0.9, cost: 1, effect: { base: 0.15, traits: { fairness: 0.7, security: 0.3 } } },
+          { id: 'minimum', label: 'En düşük emekli aylığı yükseltilir', impact: 0.8, cost: 2, effect: { base: 0.2, traits: { fairness: 0.5, price: 0.6, security: 0.4 } } },
+        ],
+      },
+      {
+        id: 'option', label: 'Esneklik', initial: 'fixed',
+        options: [
+          { id: 'fixed', label: 'Sabit yaş', impact: 1.0, cost: 0, effect: { base: 0, traits: {} } },
+          { id: 'flex', label: 'Kesintili erken ya da primli geç emeklilik seçeneği', impact: 0.9, cost: 0.5, effect: { base: 0.15, traits: { novelty: 0.3, time: 0.3, trust: 0.2 } } },
+        ],
+      },
+    ],
+    events: [
+      { id: 'inform', label: 'Sistemin finansman durumunu açıklayan bilgilendirme', kind: 'information', strength: 0.3, cost: 3 },
+      { id: 'consult', label: 'Sendikalar ve emekli dernekleriyle müzakere', kind: 'consultation', strength: 0.4, cost: 4 },
+      { id: 'report', label: 'Bağımsız aktüerya raporunu yayımla', kind: 'evidence', strength: 0.3, cost: 1 },
+    ],
+    objective: { impact: 0.4, support: 0.35, minSegment: 0.25, polarization: 0.3 },
+  },
+  {
+    id: 'ev-launch',
+    domain: 'marketing',
+    title: 'Elektrikli otomobil lansmanı',
+    summary: 'Orta segmentte yeni bir elektrikli otomobilin pazara sunulması.',
+    question: 'Bir sonraki aracınız olarak bu otomobili ciddi şekilde düşünür müydünüz?',
+    unit: 'ay', horizon: 12, budget: 40,
+    levers: [
+      {
+        id: 'price', label: 'Fiyat', initial: 'list',
+        options: [
+          { id: 'list', label: '1.6 milyon TL', impact: 1.0, cost: 0, effect: { base: -0.3, traits: { price: -1.2 } } },
+          { id: 'promo', label: '1.4 milyon TL (lansman fiyatı)', impact: 0.75, cost: 0, effect: { base: 0.1, traits: { price: -0.6 } } },
+          { id: 'lease', label: 'Aylık kiralama, bakım dahil', impact: 0.8, cost: 0.5, effect: { base: 0.0, traits: { price: -0.3, time: 0.5, habit: -0.2, novelty: 0.2 } } },
+        ],
+      },
+      {
+        id: 'warranty', label: 'Batarya garantisi', initial: 'std',
+        options: [
+          { id: 'std', label: '5 yıl', impact: 1.0, cost: 0, effect: { base: 0, traits: { security: -0.3 } } },
+          { id: 'long', label: '10 yıl, değer kaybı güvencesi', impact: 0.85, cost: 1, effect: { base: 0.2, traits: { security: 0.6, habit: 0.3, trust: 0.2 } } },
+        ],
+      },
+      {
+        id: 'charging', label: 'Şarj', initial: 'paid',
+        options: [
+          { id: 'paid', label: 'Ortak şarj ağı, standart ücret', impact: 1.0, cost: 0, effect: { base: -0.2, traits: { time: -0.4, habit: -0.3 } } },
+          { id: 'home', label: 'Ev şarj ünitesi ve kurulum hediye', impact: 0.9, cost: 1, effect: { base: 0.2, traits: { time: 0.4, habit: 0.2 } } },
+          { id: 'free', label: '1 yıl ücretsiz hızlı şarj', impact: 0.85, cost: 1.5, effect: { base: 0.2, traits: { price: 0.5, time: 0.2 } } },
+        ],
+      },
+    ],
+    events: [
+      { id: 'ads', label: 'Lansman kampanyası', kind: 'awareness', strength: 0.25, cost: 5 },
+      { id: 'drive', label: 'Hafta sonu test sürüşü etkinlikleri', kind: 'trial', strength: 0.5, cost: 3 },
+      { id: 'test', label: 'Bağımsız menzil ve güvenlik testlerini yayımla', kind: 'evidence', strength: 0.3, cost: 1 },
+    ],
+    objective: { revenue: 0.45, adoption: 0.3, satisfaction: 0.25, churn: 0.3 },
+  },
 ];
 
 export function cloneScenario(s) { return JSON.parse(JSON.stringify(s)); }

@@ -90,5 +90,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 4 | 17:35 | Uyanış #4. Eğitim ayarı ölçümü: AZ sık sık statik en iyinin ALTINDA kalıyordu (fitness: 0.362 vs 0.451; tasarım evresinde çok adımlı keşif eğitimsiz ağla zor) ve tohuma göre çok değişkendi. Düzeltme: AZ kaba kuvvetle bulunan en iyi statik tasarımdan başlıyor (açılış bilgisi). Sonra: tüm ayar/tohumlarda sağlamlık %100; politika 0.575→0.70-0.71, fitness 0.451→0.59-0.62 (20/6/64 ≈ 25 sn). Eğitim bitince sağlamlık testi otomatik. Headless gezinti hatasız | Sıradaki: README güncelle; hesap birimini (tek oyun) iyileştirme fırsatları |
 
+| 5 | 17:40 | Uyanış #5. İki yeni şablon: emeklilik yaşı reformu (politika), elektrikli otomobil lansmanı (pazarlama). İkisi de geçerli; AZ sağlamlık %100 (emeklilik 0.600→0.685, EV 0.448→0.608) | Sıradaki: "Neden bu plan?" açıklaması (her adımın segmentlere etkisi) |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
