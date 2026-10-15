@@ -37,14 +37,16 @@ export const PARAMS = {
 // ── Dünya kurulumu ──────────────────────────────────────────────────────────
 // Dikdörtgen oda; çıkışlar duvarlardaki boşluklardır.
 // exit: { id, side: 'left'|'right'|'top'|'bottom', center, width, open }
-export function createWorld({ width = 30, height = 20, exits, agents = [], seed = 1 } = {}) {
+export function createWorld({ width = 30, height = 20, exits, agents = [], seed = 1, homeExit = 0 } = {}) {
   const world = {
     t: 0,
     width,
     height,
     exits: (exits || defaultExits(width, height)).map((e, i) => ({ id: i, open: true, ...e })),
     agents: [],
-    evacuated: [],     // { id, t, exit }
+    evacuated: [],     // { id, t, exit, persona }
+    announcements: [], // { t, exit, kind }
+    homeExit,          // insanların içeri girdiği, alışık oldukları kapı
     nextId: 0,
     seed,
     rngState: seed >>> 0,
@@ -61,17 +63,73 @@ export function defaultExits(width, height) {
   ];
 }
 
-export function addAgent(world, { x, y, vx = 0, vy = 0, radius = 0.25, speed = 1.34, target = null, persona = null } = {}) {
+// Davranış parametreleri (personas.js bunları persona verisinden üretir):
+//   delay       alarmdan sonra harekete geçmeden önce bekleme (s)
+//   compliance  anons türüne göre uyma olasılığı { calm, urgent, reasoned } ∈ [0,1]
+//   annDelay    anonsu duyduktan sonra yön değiştirmeye kadar geçen süre (s)
+//   herding     kararsızken çevredekilerin çıkışını benimseme eğilimi ∈ [0,1]
+//   familiarity girdiği kapıya (world.homeExit) geri dönme eğilimi ∈ [0,1]
+//   panic       acil anonsta hızlanma / itişme eğilimi ∈ [0,1]
+export const DEFAULT_BEHAVIOR = {
+  delay: 2, compliance: { calm: 0.6, urgent: 0.7, reasoned: 0.75 }, annDelay: 2,
+  herding: 0.3, familiarity: 0.5, panic: 0.2,
+};
+
+export function addAgent(world, { x, y, vx = 0, vy = 0, radius = 0.25, speed = 1.34, target = null, persona = null, behavior = null } = {}) {
+  const b = { ...DEFAULT_BEHAVIOR, ...(behavior || {}) };
+  b.compliance = { ...DEFAULT_BEHAVIOR.compliance, ...((behavior && behavior.compliance) || {}) };
+  const rand = worldRand(world);
   const agent = {
     id: world.nextId++,
     x, y, vx, vy,
     radius,
     speed,           // istenen hız v0 (m/s)
-    target,          // hedef çıkış id'si; null ise en yakın açık çıkış
-    persona,         // persona adı (adım 2'de doldurulur)
+    baseSpeed: speed,
+    target,          // hedef çıkış id'si; null ise davranışa göre seçilir
+    persona,         // persona kimliği / adı
+    ...b,
+    // Kapıya alışkanlık bir kez, yerleştirmede zarla belirlenir (deterministik).
+    habitual: rand() < b.familiarity,
+    pending: null,   // { exit, at } — anonsa uyma kararı, gecikmeyle uygulanır
+    cur: null,       // bu adımda yöneldiği çıkış (sürü davranışı için)
   };
   world.agents.push(agent);
   return agent;
+}
+
+// ── Müdahaleler ─────────────────────────────────────────────────────────────
+// Anons: kind ∈ 'calm' | 'urgent' | 'reasoned'. Her ajan kendi uyma olasılığıyla
+// karar verir; karar anında zarla belirlenir, uygulama annDelay sonra olur.
+// Anons, o çıkışın yanındaki hoparlörden yapılır ve yalnızca `radius` metre içindekiler duyar.
+// (Tüm salona tek kapı söylemek herkesi aynı kapıya yığar; gerçek sistemler bölgesel anons yapar.)
+export const ANNOUNCE_RADIUS = 12;
+
+export function announce(world, exitId, kind = 'calm', radius = ANNOUNCE_RADIUS) {
+  const exit = world.exits[exitId];
+  if (!exit) throw new Error('bilinmeyen çıkış: ' + exitId);
+  const rand = worldRand(world);
+  const { mid } = exitGeometry(world, exit);
+  world.announcements.push({ t: world.t, exit: exitId, kind });
+  for (const a of world.agents) {
+    if ((a.x - mid[0]) ** 2 + (a.y - mid[1]) ** 2 > radius * radius) continue;
+    const p = a.compliance[kind] ?? 0;
+    const roll = rand();
+    if (kind === 'urgent') {
+      // Acil ton herkesi hızlandırır ve bekleyenleri harekete geçirir; panik eğilimi
+      // yüksek olanlar daha çok hızlanır.
+      a.speed = Math.min(a.baseSpeed * (1 + 0.6 * a.panic), 2.6);
+      a.delay = Math.min(a.delay, world.t + 0.5);
+    } else if (kind === 'reasoned') {
+      a.delay = Math.min(a.delay, world.t + 1);
+    }
+    if (roll < p) a.pending = { exit: exitId, at: world.t + a.annDelay };
+  }
+}
+
+export function setExit(world, exitId, open) {
+  const exit = world.exits[exitId];
+  if (!exit) throw new Error('bilinmeyen çıkış: ' + exitId);
+  exit.open = !!open;
 }
 
 // Odaya rastgele, birbirine girmeyen ajanlar yerleştirir.
@@ -108,6 +166,7 @@ export function clone(world) {
     exits: world.exits.map((e) => ({ ...e })),
     agents: world.agents.map((a) => ({ ...a })),
     evacuated: world.evacuated.slice(),
+    announcements: world.announcements.slice(),
     stats: { ...world.stats },
   };
 }
@@ -150,8 +209,10 @@ function wallPoints(world, x, y) {
 
 // ── Hedef seçimi ────────────────────────────────────────────────────────────
 export function chooseExit(world, agent) {
-  if (agent.target != null) {
-    const e = world.exits[agent.target];
+  // Öncelik: anonsla verilen hedef → alışkanlık (girdiği kapı) → sürüden kapılan hedef → en yakın.
+  for (const id of [agent.target, agent.habitual ? world.homeExit : null, agent.herdTarget]) {
+    if (id == null) continue;
+    const e = world.exits[id];
     if (e && e.open) return e;
   }
   let best = null, bestD = Infinity;
@@ -198,12 +259,46 @@ export function step(world, P = PARAMS) {
     bucket.push(i);
   }
 
+  // Gecikmeli anons kararlarını uygula.
+  for (const a of agents) {
+    if (a.pending && world.t >= a.pending.at) {
+      a.target = a.pending.exit;
+      a.habitual = false;      // anonsa uyan kişi alışkanlığını bırakır
+      a.pending = null;
+    }
+  }
+
+  // Sürü davranışı: saniyede bir, kendi kararı olmayan ajanlar çevrelerindeki
+  // çoğunluğun yöneldiği çıkışı herding olasılığıyla benimser.
+  const herdTick = Math.floor(world.t) !== Math.floor(world.t + dt);
+  if (herdTick) {
+    const rand = worldRand(world);
+    for (let i = 0; i < n; i++) {
+      const a = agents[i];
+      if (a.target != null) continue;
+      const votes = new Map();
+      const cx = Math.floor(a.x / P.interactRange), cy = Math.floor(a.y / P.interactRange);
+      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+        for (const j of grid.get(key(cx + ox, cy + oy)) || []) {
+          const b = agents[j];
+          if (j === i || b.cur == null) continue;
+          if ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 > 9) continue;
+          votes.set(b.cur, (votes.get(b.cur) || 0) + 1);
+        }
+      }
+      let top = null, topN = 0;
+      for (const [id, c] of votes) if (c > topN) { top = id; topN = c; }
+      if (top != null && topN >= 3 && rand() < a.herding) a.herdTarget = top;
+    }
+  }
+
   for (let i = 0; i < n; i++) {
     const a = agents[i];
     const exit = chooseExit(world, a);
+    a.cur = exit ? exit.id : null;
 
-    // 1) Sürüş kuvveti: istenen hıza doğru hızlan.
-    if (exit) {
+    // 1) Sürüş kuvveti: istenen hıza doğru hızlan. Tepki süresi dolmadıysa yerinde dur.
+    if (exit && world.t >= a.delay) {
       const [tx, ty] = waypoint(world, a, exit);
       const dx = tx - a.x, dy = ty - a.y;
       const d = Math.hypot(dx, dy) || 1e-9;

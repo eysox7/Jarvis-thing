@@ -10,26 +10,50 @@ Oturum kesilirse (kota, container kapanması) çalışma buradan devam eder.
 - 1. parti: 16:52, 17:02 … 18:22 UTC (10 adet). 2. parti (uyanış #1'de kurulacak): 18:32 … 19:42 UTC (8 adet)
 - Dal: `ccr-d833b36c-mcm2st`
 
-## Hedef
-Konuşmada önerilen prototip: 2D mekânda yaya simülasyonu (social force modeli),
-farklı persona tipleri ve tahliye sırasında kapıları/anonsları yöneten bir MCTS ajanı.
-Bağımlılıksız vanilla JS, repo'nun geri kalanıyla aynı tarz. `lab/crowd-sim/` altında, ana uygulamaya dokunmadan.
+## Hedef (kullanıcı tarafından 16:50'de netleştirildi)
+AlphaZero mantığını MatrAIx'e entegre etmek: kitle psikolojisi / tahliye senaryosu.
+Kullanıcı notu: **test dosyası yazılmayacak** (kota). Sadece kısa duman koşuları.
+
+## Mimari
+```
+MatrAIx anket görevi (matraix/tasks/evacuation-announcement-response)
+   → personalar anonslara nasıl tepki verdiğini cevaplar (survey_result.json)
+matraix/calibrate.py
+   → persona YAML + cevaplar → persona-params.json (uyum, gecikme, sürü, panik, hız)
+personas.js  → parametreleri yükler; veri yoksa MatrAIx boyutlarından önsel eşleme
+sim.js       → social force + persona davranışı (anons, gecikme, sürü, panik)
+env.js       → AlphaZero "oyunu": durum kodlama, eylemler (kapı/anons), ödül
+nn.js        → saf JS MLP, policy + value başı, Adam
+mcts.js      → PUCT araması (AlphaZero)
+alphazero.js → self-play → tampon → eğitim → arena
+cli.mjs      → train / eval / compare
+matraix/export_plan.py (sonra) → en iyi planı MatrAIx'e doğrulama anketi olarak geri gönder
+```
+MatrAIx bilgileri (raw.githubusercontent üzerinden okundu; HF erişimi proxy'de 403):
+- Persona YAML: `persona_id`, `dimensions:` (kategorik), `provenance`
+- Anket görevi: `task.toml`, `instruction.md`, `input/context.md`, `input/questionnaire.yaml`,
+  `persona_strategy.json`, `reporting.json`, `tests/`; çıktı `/app/output/survey_result.json`
+  → `{answers:[{questionId,value,rationale?,confidence?}], trajectory:[...]}`
 
 ## Yol haritası
-- [ ] 1. Social force simülatörü (ajanlar, duvarlar, çıkışlar, yoğunluk ölçümü)
-- [ ] 2. Persona tipleri (hız, tepki gecikmesi, anons uyumu, panik eğilimi)
-- [ ] 3. Müdahale (eylem) uzayı: kapı aç/kapa, çıkışa yönlendirme anonsu
-- [ ] 4. MCTS ajanı (simülasyonu kopyalayıp ileri sarar, ödül = tahliye süresi + yoğunluk cezası)
-- [ ] 5. Karşılaştırma: müdahalesiz / sabit kural / MCTS
-- [ ] 6. Testler (`tests/` altındaki mevcut düzene uygun)
-- [ ] 7. Tarayıcıda görselleştirme sayfası
-- [ ] 8. README
+- [x] 1. Social force simülatörü → `sim.js`
+- [x] 2. Persona davranışı (sim.js) + `personas.js`
+- [x] 3. `env.js` (eylem uzayı, durum kodlama, ödül)
+- [ ] 4. `nn.js`
+- [ ] 5. `mcts.js`
+- [ ] 6. `alphazero.js` + `cli.mjs`
+- [ ] 7. MatrAIx anket görevi + `calibrate.py`
+- [ ] 8. Eğitim koşusu, karşılaştırma (müdahalesiz / kural / AlphaZero)
+- [ ] 9. `export_plan.py` (doğrulama döngüsü)
+- [ ] 10. Görselleştirme sayfası + README
 
 ## Uyanış günlüğü
 | # | Zaman (UTC) | Yapılan | Sonraki adım |
 |---|---|---|---|
 | 0 | 16:40 | Oturum başladı, plan yazıldı, 1. parti uyanışlar kuruldu (16:52 → 18:22 UTC) | Adım 1 |
 | 0b | 16:45 | `sim.js` yazıldı. Deterministik, klonlanabilir. 150 kişi/2 kapı: 46.8 sn; tek kapı: 82.4 sn (~1.8 kişi/sn, literatürle uyumlu). 300 kişi ≈ 1 sn hesap | Adım 2: personalar |
+
+| 0c | 16:58 | Görev netleşti (AlphaZero × MatrAIx). MatrAIx şeması incelendi. Persona davranışı + `personas.js` + `env.js` yazıldı. Bulgu: salon geneli anons herkesi tek kapıya yığıyor → anonslar kapı başı hoparlör (12 m) yapıldı. Senaryo: 199 kişi, 4 kapı; müdahalesiz maliyet 86/69, iyi elle planlar 53-60 | Adım 4-6: nn, mcts, alphazero |
 
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
