@@ -10,6 +10,7 @@
 
 import { traitsOf, segmentBy, TRAIT_KEYS } from './population.js';
 import { initialConfig } from './scenarios.js';
+export { initialConfig };
 
 const sig = (x) => 1 / (1 + Math.exp(-x));
 const pos = (x) => (x > 0 ? x : 0);
@@ -260,8 +261,15 @@ export function encode(ctx, s) {
 export const inputSize = (ctx) => encode(ctx, initialState(ctx)).length;
 
 // Hamle dizisini okunur plana çevirir: [{ t, label, phase }]
-export function describeMoves(ctx, moves) {
+export function describeMoves(ctx, moves, start = null) {
   const out = [];
+  if (start) {
+    const init = initialConfig(ctx.scn);
+    for (const l of ctx.scn.levers) {
+      if (start[l.id] === init[l.id]) continue;
+      out.push({ t: 0, phase: 'design', label: `${l.label} → ${l.options.find((o) => o.id === start[l.id])?.label} (en iyi statik tasarımdan)` });
+    }
+  }
   let design = true, t = 0;
   for (const m of moves) {
     const a = ctx.actions[m];
@@ -307,8 +315,8 @@ export function perturbScenario(scn, rand, magnitude = 0.3) {
 }
 
 // Kaydedilmiş hamle dizisini (tasarım evresi dahil) verilen bağlamda yeniden oynatır.
-export function replay(ctx, moves) {
-  const s = initialState(ctx, undefined, { design: true });
+export function replay(ctx, moves, start) {
+  const s = initialState(ctx, start, { design: true });
   for (const m of moves) {
     if (isTerminal(ctx, s)) break;
     // Alternatif dünyada eylem yasal değilse (ör. bütçe yetmiyor) beklemeyle değiştir.
@@ -318,7 +326,7 @@ export function replay(ctx, moves) {
   return score(ctx, s);
 }
 
-// plans: { ad: hamle dizisi }. Dönen: her plan için skor dağılımı ve kaç dünyada en iyi olduğu.
+// plans: { ad: { moves, start } } (start: başlangıç tasarımı; yoksa senaryonunki). Dönen: her plan için skor dağılımı ve kaç dünyada en iyi olduğu.
 export function robustness(scn, personas, plans, { segmentDim, calibration, worlds = 30, magnitude = 0.3, seed = 11, rng } = {}) {
   const rand = rng(seed);
   const names = Object.keys(plans);
@@ -328,7 +336,7 @@ export function robustness(scn, personas, plans, { segmentDim, calibration, worl
     const ctx = createContext(perturbScenario(scn, rand, magnitude), personas, { segmentDim, calibration });
     let bestName = null, bestVal = -Infinity;
     for (const n of names) {
-      const v = replay(ctx, plans[n]).total;
+      const v = replay(ctx, plans[n].moves, plans[n].start).total;
       scores[n].push(v);
       if (v > bestVal) { bestVal = v; bestName = n; }
     }

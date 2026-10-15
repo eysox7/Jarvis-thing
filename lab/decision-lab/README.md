@@ -36,6 +36,19 @@ Nüfus (MatrAIx personaları)        Senaryo (kararlar, seçenekler, eylemler, h
 | **Strateji** | AlphaZero'yu çalıştır. Başlangıç tasarımı, tüm statik tasarımların en iyisi (kaba kuvvet) ve AlphaZero planı yan yana. Plan zaman çizelgesi olarak. **Sağlamlık testi:** planlar, seçenek etkileri rastgele bozulmuş onlarca alternatif dünyada yeniden oynatılır; plan yalnızca modelin tam doğru olduğu dünyada iyiyse güvenme. |
 | **Doğrulama** | Örnek personaları bir LLM'e kendi kimlikleriyle sor; cevapları modelle karşılaştır, modeli kalibre et. MatrAIx anket görevini indir, sonuç klasörünü yükle. |
 
+### AlphaZero nereden başlar?
+
+Önce tüm statik tasarımlar (her karar için bir seçenek, eylem yok) kaba kuvvetle denenir. AlphaZero
+en iyi statik tasarımdan başlar ve onu zamanlama, tek seferlik eylemler ve ek tasarım değişiklikleriyle
+geliştirmeye çalışır. İlk sürümde sıfırdan başlıyordu; eğitimsiz ağla çok adımlı tasarım keşfi zor
+olduğu için sık sık statik en iyinin altında kalıyordu. Ölçüm (300 persona, 20 iterasyon / 6 oyun /
+64 arama, ~25 sn):
+
+| Senaryo | Başlangıç | En iyi statik | AlphaZero | Sağlamlık (40 dünya) |
+|---|---|---|---|---|
+| Araç giriş ücreti | 0.446 | 0.575 | 0.70–0.71 | %100 |
+| Fitness uygulaması | 0.246 | 0.451 | 0.59–0.62 | %100 |
+
 ### Hedef fonksiyonu
 
 AlphaZero neyi en iyilediğini bilmeli; bu yüzden hedef açık ve ayarlanabilir:

@@ -10,6 +10,7 @@ self.onmessage = ({ data }) => {
   // Kıyas: tüm statik tasarımları dene (kombinasyon sayısı makulse). AlphaZero bunu,
   // üstüne zamanlama ve tek seferlik eylemleri ekleyerek geçebilmeli.
   const combos = scenario.levers.reduce((m, l) => m * l.options.length, 1);
+  let startConfig = null;
   if (combos <= 600) {
     let best = null;
     const rec = (i, cfg) => {
@@ -22,10 +23,12 @@ self.onmessage = ({ data }) => {
     };
     rec(0, {});
     self.postMessage({ type: 'static', combos, ...best });
+    startConfig = best.config;
   }
 
   train(ctx, {
     ...opts,
+    startConfig,
     onProgress: (p) => self.postMessage({ type: 'progress', ...p, series: Array.from(p.series) }),
   });
   self.postMessage({ type: 'done' });

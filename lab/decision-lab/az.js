@@ -7,8 +7,8 @@ import { rng } from '../core/rng.js';
 import * as M from './model.js';
 
 // Tek oyun. explore=false: gürültüsüz, en çok ziyaret edilen hamle (değerlendirme/plan).
-export function playGame(ctx, env, net, { sims = 64, explore = true, rand = Math.random, base, tempMoves = 4 } = {}) {
-  let root = new Node(M.initialState(ctx, undefined, { design: true }));
+export function playGame(ctx, env, net, { sims = 64, explore = true, rand = Math.random, base, tempMoves = 4, start } = {}) {
+  let root = new Node(M.initialState(ctx, start, { design: true }));
   const examples = [];
   let move = 0;
   while (!env.isTerminal(root.state)) {
@@ -26,23 +26,27 @@ export function playGame(ctx, env, net, { sims = 64, explore = true, rand = Math
 }
 
 // Eğitim döngüsü. onProgress({ it, ... }) her iterasyonda çağrılır; shouldStop() true dönerse durur.
-export function train(ctx, { iters = 20, games = 6, sims = 48, steps = 120, batch = 64, lr = 2e-3, seed = 1, onProgress = () => {}, shouldStop = () => false } = {}) {
+// startConfig: aramanın başlayacağı tasarım. Kaba kuvvetle bulunan en iyi statik tasarım
+// verilirse AlphaZero onun üstüne (zamanlama, eylemler, ek tasarım değişiklikleri) inşa eder.
+// Eğitimsiz ağla çok adımlı tasarım keşfi zor olduğu için bu, sonucun statik en iyinin altına
+// düşmemesini sağlar (AlphaGo'nun açılış bilgisi gibi bir sıçrama tahtası).
+export function train(ctx, { iters = 20, games = 6, sims = 48, steps = 120, batch = 64, lr = 2e-3, seed = 1, startConfig, onProgress = () => {}, shouldStop = () => false } = {}) {
   const env = M.makeEnv(ctx);
-  const start = M.initialState(ctx, undefined, { design: true });
-  const base = M.baselineScore(ctx, start);
+  const start = startConfig ? { ...M.initialConfig(ctx.scn), ...startConfig } : M.initialConfig(ctx.scn);
+  const base = M.baselineScore(ctx, M.initialState(ctx, start, { design: true }));
   const rand = rng(seed);
 
   let net = new Net({ input: M.inputSize(ctx), actions: ctx.actions.length, hidden: [64, 64], seed });
   net.policy.b[0] = 1.5;     // başlangıçta "bekle/onayla" biraz daha olası (eylemlerin çoğu müdahale)
   let best = net.copy();
-  let bestRun = playGame(ctx, env, best, { sims, explore: false, base });
+  let bestRun = playGame(ctx, env, best, { sims, explore: false, base, start });
   const buffer = [];
   const history = [];
 
   for (let it = 1; it <= iters && !shouldStop(); it++) {
     let zSum = 0;
     for (let g = 0; g < games; g++) {
-      const r = playGame(ctx, env, net, { sims, explore: true, rand, base });
+      const r = playGame(ctx, env, net, { sims, explore: true, rand, base, start });
       buffer.push(...r.examples);
       zSum += r.z;
     }
@@ -54,7 +58,7 @@ export function train(ctx, { iters = 20, games = 6, sims = 48, steps = 120, batc
       loss += net.train(b, { lr }).loss;
     }
 
-    const run = playGame(ctx, env, net, { sims, explore: false, base });
+    const run = playGame(ctx, env, net, { sims, explore: false, base, start });
     const accepted = run.result.total >= bestRun.result.total;
     if (accepted) { best = net.copy(); bestRun = run; } else net = best.copy();
 
@@ -63,7 +67,7 @@ export function train(ctx, { iters = 20, games = 6, sims = 48, steps = 120, batc
       best: bestRun.result.total, base, accepted,
     };
     history.push(row);
-    onProgress({ ...row, moves: bestRun.final.moves.slice(), plan: M.describeMoves(ctx, bestRun.final.moves), parts: bestRun.result.parts, segs: bestRun.result.segs, series: bestRun.final.series, config: bestRun.final.config });
+    onProgress({ ...row, start, moves: bestRun.final.moves.slice(), plan: M.describeMoves(ctx, bestRun.final.moves, startConfig ? start : null), parts: bestRun.result.parts, segs: bestRun.result.segs, series: bestRun.final.series, config: bestRun.final.config });
   }
-  return { net: best, run: bestRun, base, history };
+  return { net: best, run: bestRun, base, start, history };
 }

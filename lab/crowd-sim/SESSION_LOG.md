@@ -88,5 +88,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 3b | 17:27 | Sağlamlık testi (model.js `robustness`, Strateji sekmesi): planlar etkileri ±%15/30/50 bozulmuş dünyalarda yeniden oynatılır. Node: 8 iter/64 sim AZ planı 30 dünyanın %100'ünde en iyi (0.62–0.74). Tarayıcı: 5 iter/48 sim planı yalnızca %33 → kısa eğitimin güvenilmez plan verdiğini gösteriyor | Sıradaki: README'ye sağlamlık; eğitim varsayılanlarını gözden geçir |
 
+| 4 | 17:35 | Uyanış #4. Eğitim ayarı ölçümü: AZ sık sık statik en iyinin ALTINDA kalıyordu (fitness: 0.362 vs 0.451; tasarım evresinde çok adımlı keşif eğitimsiz ağla zor) ve tohuma göre çok değişkendi. Düzeltme: AZ kaba kuvvetle bulunan en iyi statik tasarımdan başlıyor (açılış bilgisi). Sonra: tüm ayar/tohumlarda sağlamlık %100; politika 0.575→0.70-0.71, fitness 0.451→0.59-0.62 (20/6/64 ≈ 25 sn). Eğitim bitince sağlamlık testi otomatik. Headless gezinti hatasız | Sıradaki: README güncelle; hesap birimini (tek oyun) iyileştirme fırsatları |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

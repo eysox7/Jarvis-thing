@@ -242,7 +242,7 @@ $('azStart').onclick = () => {
     if (data.type === 'static') { S.bestStatic = data; $('azStatus').textContent = `${data.combos} statik tasarım denendi. Self-play başladı…`; }
     else if (data.type === 'progress') {
       S.az = { ...S.az, ...data, history: [...S.az.history, { it: data.it, score: data.score, best: data.best, z: data.selfPlayZ, loss: data.loss, accepted: data.accepted }] };
-      $('azStatus').textContent = `İterasyon ${data.it}/${opts.iters} — en iyi skor ${f3(data.best)} (başlangıç tasarımı ${f3(data.base)}).`;
+      $('azStatus').textContent = `İterasyon ${data.it}/${opts.iters} — en iyi skor ${f3(data.best)} (çıkış noktası: en iyi statik tasarım, ${f3(data.base)}).`;
     } else if (data.type === 'done') { stop('Tamamlandı. Sağlamlık testi otomatik çalıştırıldı (aşağıda).'); $('rbRun').click(); }
     save();
     RENDER.strategy();
@@ -261,9 +261,9 @@ function stop(msg) {
 }
 $('rbRun').onclick = () => {
   const c = ctx();
-  const plans = { 'Başlangıç tasarımı': [0] };
-  if (S.bestStatic?.config) plans['En iyi statik tasarım'] = M.movesForConfig(c, S.bestStatic.config);
-  if (S.az?.moves) plans['AlphaZero planı'] = S.az.moves;
+  const plans = { 'Başlangıç tasarımı': { moves: [0] } };
+  if (S.bestStatic?.config) plans['En iyi statik tasarım'] = { moves: [0], start: S.bestStatic.config };
+  if (S.az?.moves) plans['AlphaZero planı'] = { moves: S.az.moves, start: S.az.start };
   const res = M.robustness(S.scenario, S.personas, plans, {
     segmentDim: S.segDim, calibration: { segBias: S.calib[calibKey()] || [] },
     worlds: Math.max(5, Math.min(300, +$('rbN').value)), magnitude: +$('rbMag').value, rng,
