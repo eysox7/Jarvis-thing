@@ -109,10 +109,14 @@ export function announce(world, exitId, kind = 'calm', radius = ANNOUNCE_RADIUS)
   if (!exit) throw new Error('bilinmeyen çıkış: ' + exitId);
   const rand = worldRand(world);
   const { mid } = exitGeometry(world, exit);
+  // Anons yorgunluğu: aynı kapı için son 30 sn'deki her tekrar uyumu yarıya indirir.
+  // (İnsanlar tekrar eden anonsu "arka plan gürültüsü" olarak algılamaya başlar.)
+  const repeats = world.announcements.filter((r) => r.exit === exitId && world.t - r.t < 30).length;
+  const fatigue = 0.5 ** repeats;
   world.announcements.push({ t: world.t, exit: exitId, kind });
   for (const a of world.agents) {
     if ((a.x - mid[0]) ** 2 + (a.y - mid[1]) ** 2 > radius * radius) continue;
-    const p = a.compliance[kind] ?? 0;
+    const p = (a.compliance[kind] ?? 0) * fatigue;
     const roll = rand();
     if (kind === 'urgent') {
       // Acil ton herkesi hızlandırır ve bekleyenleri harekete geçirir; panik eğilimi

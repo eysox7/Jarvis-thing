@@ -63,7 +63,8 @@ export function legalMask(state) {
   return ACTIONS.map((a) => {
     if (a.type === 'noop') return true;
     const e = w.exits[a.exit];
-    if (a.type === 'announce') return e.open;
+    // "Ana giriş tıkalı, X'i kullanın" gerekçesi ana girişin kendisi için anlamsızdır.
+    if (a.type === 'announce') return e.open && !(a.kind === 'reasoned' && a.exit === w.homeExit);
     // Kapatma: en az bir çıkış açık kalmalı.
     return !e.open || openCount > 1;
   });
@@ -91,7 +92,7 @@ export function cost(state) {
   const meanExit = (times.reduce((s, v) => s + v, 0) + remaining * MAX_TIME * 1.5) / Math.max(1, state.n0);
   const lastExit = remaining ? MAX_TIME * 1.5 : Math.max(0, ...times);
   const interventions = state.moves.filter((m) => ACTIONS[m].type !== 'noop').length;
-  return meanExit + 0.5 * lastExit + 10 * w.stats.dangerTime + 0.5 * interventions;
+  return meanExit + 0.5 * lastExit + 10 * w.stats.dangerTime + 1.5 * interventions;
 }
 
 // Hiç müdahale etmeden oynanan oyunun maliyeti: kıyas noktası.

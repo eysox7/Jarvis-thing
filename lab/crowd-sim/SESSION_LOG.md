@@ -44,7 +44,7 @@ MatrAIx bilgileri (raw.githubusercontent üzerinden okundu; HF erişimi proxy'de
 - [x] 6. `alphazero.js` + `cli.mjs`
 - [x] 7. MatrAIx anket görevi + `calibrate.py`
 - [ ] 8. Eğitim koşusu, karşılaştırma (müdahalesiz / kural / AlphaZero)
-- [ ] 9. `export_plan.py` (doğrulama döngüsü)
+- [x] 9. `export_plan.py` (doğrulama döngüsü)
 - [ ] 10. Görselleştirme sayfası + README
 
 ## Uyanış günlüğü
@@ -58,6 +58,9 @@ MatrAIx bilgileri (raw.githubusercontent üzerinden okundu; HF erişimi proxy'de
 | 0d | 16:52 | `nn.js` (saf JS MLP, policy+value, Adam), `mcts.js` (PUCT, Dirichlet gürültü, alt ağaç yeniden kullanımı), `alphazero.js` (self-play, tampon, arena kapı bekçisi), `worker.mjs` (4 çekirdek paralel), `cli.mjs` (train/compare/plan). Duman koşusu OK. Arka planda asıl eğitim başlatıldı: 30 iter × 8 oyun, 16 sim, 200 kişi → `models/` | Eğitim sürerken: MatrAIx görevi + calibrate.py |
 
 | 0e | 16:57 | İlk eğitim yanlış klasörden başladığı için hemen bitti, mutlak yolla yeniden başlatıldı (~28 sn/iter). MatrAIx görevi `matraix/tasks/survey_evacuation-announcement-response/` (9 soru, her biri bir parametre) + doğrulayıcı + `matraix/calibrate.py`. Sahte job çıktısıyla uçtan uca doğrulandı (scratchpad'de, repoya test eklenmedi) | Eğitim bitince: compare, plan; sonra export_plan.py, görselleştirme, README |
+
+| 1 | 16:54 | Uyanış #1: 2. parti uyanışlar kuruldu (18:32 … 19:42 UTC, 8 adet; toplam 18). `matraix/export_plan.py` (plan → MatrAIx doğrulama anketi + karşılaştırma) yazıldı | — |
+| 1b | 17:00 | Doğrulama döngüsü ilk denemede iki simülatör açığını gösterdi: AlphaZero (a) ana girişe "ana giriş tıkalı" gerekçeli anons yapıyor, (b) aynı anonsu 9 kez tekrarlıyor. Düzeltme: anons yorgunluğu (30 sn içinde her tekrar uyumu ½), ana girişe gerekçeli anons yasak, müdahale bedeli 0.5→1.5. Eski model silindi, eğitim baştan (40 iter) | Eğitim bitince compare/plan, görselleştirme, README |
 
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
