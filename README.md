@@ -219,6 +219,15 @@ Ortak kullanılan bir cihazda kullanma — `localStorage` şifreli değildir.
   bırakır.
 - **Anahtarlar tarayıcıda** durduğundan, cihazına erişen biri onları görebilir.
 
+## Laboratuvar
+
+`lab/` altında ana uygulamadan bağımsız deneyler:
+
+- **[Karar Laboratuvarı](lab/decision-lab/)**: pazarlama ve kamu politikası kararlarında nüfus
+  tepkisini simüle eder, AlphaZero ile strateji arar, MatrAIx personaları ve LLM ile doğrular.
+  N.E.X.U.S.'taki API bağlantılarını kullanır. Adres: `<site>/lab/decision-lab/`
+- [Tahliye simülasyonu](lab/crowd-sim/): ilk deney (kalabalık tahliyesi, social force + AlphaZero).
+
 ## Lisans
 
 MIT.

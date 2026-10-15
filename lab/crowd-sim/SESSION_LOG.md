@@ -57,7 +57,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 - [x] F. LLM persona motoru (NEXUS API bağlantılarını kullanır) + kalibrasyon
 - [x] G. Arayüz: Nüfus / Senaryo / Tahmin / Strateji / Doğrulama sekmeleri (mobil uyumlu, NEXUS tarzı)
 - [x] H. MatrAIx dışa aktarma (senaryo → anket görevi, sonuç → kalibrasyon)
-- [ ] I. README
+- [x] I. README
 
 ## Uyanış günlüğü
 | # | Zaman (UTC) | Yapılan | Sonraki adım |
@@ -81,6 +81,8 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 | 1e | 17:10 | `lab/core/` (nn, mcts, rng; crowd-sim de buradan). `decision-lab/`: population.js (MatrAIx YAML ayrıştırıcı, 10 eğilim + eşleme tablosu, sentetik nüfus, segmentler), scenarios.js (2 şablon: araç giriş ücreti / fitness uygulaması), model.js (fayda + aylık dinamik + açık hedef fonksiyonu + tasarım evresi), az.js. Bulgu: AlphaZero "düşük ücretle başla, son ay 120 TL'ye çık" (yem-ve-değiştir) buldu → etkinlik dönem ortalaması yapıldı. Sonuç (politika): taban 0.446, en iyi statik 0.575, AlphaZero 0.682; en düşük segment desteği 0.21→0.68 | G. arayüz |
 
 | 1f | 17:25 | Arayüz: `decision-lab/index.html` + `app.js` (5 sekme), `az-worker.js` (eğitim ayrı iş parçacığında + kaba kuvvet statik kıyas), `llm.js` (NEXUS API profilleriyle persona canlandırma, segment kalibrasyonu), `matraix.js` (senaryo → MatrAIx görev betiği .sh; sonuç klasörü okuma). Headless Chromium'da sahte LLM API ile uçtan uca gezildi (scratchpad, repoya test eklenmedi): hata yok; AZ 4 iterasyonda 0.446→0.589 (statik en iyi 0.575); 12 persona soruldu; kalibrasyon; .sh betiği geçerli görev üretiyor. Düzeltilen hatalar: worker'a iş gönderilmiyordu; kalibrasyon sonuçları siliyordu; label butonları stilsizdi | I. README; NEXUS'tan bağlantı |
+
+| 1g | 17:20 | `decision-lab/README.md` + kök README'ye "Laboratuvar" bölümü | Sıradaki uyanışlarda: kendi senaryonu oluşturma kolaylığı (JSON yerine form), gerçek veriyle deneme rehberi, iyileştirmeler |
 
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
