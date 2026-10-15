@@ -104,5 +104,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 10 | 18:27 | Uyanış #10. Doğrulama → "Cevapları özetle": persona gerekçeleri LLM'e segment bazında özetletilir (kaygı, destek nedeni, görüşü değiştirecek şey, ortak 3 nokta). Sahte API ile denendi, hatasız | Sıradaki: kalan uyanışlarda yalnızca değerli iş; kapanış raporu #18'de |
 
+| 11 | 18:38 | Uyanış #11. Ölçek: 3000 persona → tahmin 20 ms (300'de 6 ms), AZ ~3 kat yavaş. AlphaZero ve sağlamlık testi >800 personada segment oranlarını koruyan, ağırlığı düzeltilmiş temsilî örneklemle çalışıyor (3000→800: skor farkı ≤0.006). Tahmin tam nüfusla. Depolama kotası dolarsa kullanıcı uyarılıyor. Regresyon hatasız | — |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

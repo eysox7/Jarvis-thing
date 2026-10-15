@@ -1,6 +1,6 @@
 // Karar Laboratuvarı — arayüz.
 import { TEMPLATES, cloneScenario, initialConfig, validateScenario } from './scenarios.js';
-import { syntheticPopulation, importFiles, dimensionsOf, TRAITS, TRAIT_RULES } from './population.js';
+import { syntheticPopulation, importFiles, dimensionsOf, TRAITS, TRAIT_RULES, representativeSample } from './population.js';
 import * as M from './model.js';
 import * as L from './llm.js';
 import * as X from './matraix.js';
@@ -28,7 +28,17 @@ let S = load() || {
   llmRows: [],
 };
 function load() { try { return JSON.parse(localStorage.getItem(LS)); } catch { return null; } }
-function save() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch { /* kota dolu: yalnızca bellekte */ } }
+let saveWarned = false;
+function save() {
+  try { localStorage.setItem(LS, JSON.stringify(S)); }
+  catch {
+    // Kota dolu: çalışmaya devam edilir ama sayfa yenilenince kaybolur; kullanıcı bilmeli.
+    if (!saveWarned) { saveWarned = true; alert('Tarayıcı depolama alanı doldu: nüfus çok büyük olabilir. Çalışma bu sekmede sürer ama sayfa yenilenince kaybolur.'); }
+  }
+}
+// AlphaZero ve sağlamlık testi büyük nüfusta temsilî örneklemle çalışır (tahmin tam nüfusla).
+const AZ_MAX = 800;
+const azPersonas = () => representativeSample(S.personas, S.segDim, AZ_MAX);
 
 const calibKey = () => `${S.scenario.id}|${S.segDim}`;
 // Eski sürümler diziyle saklıyordu (segment sırasına bağlı, güvensiz); onları yok say.
@@ -242,7 +252,7 @@ $('azStart').onclick = () => {
   worker = new Worker(new URL('./az-worker.js', import.meta.url), { type: 'module' });
   S.az = { history: [], running: true }; save();
   $('azStart').disabled = true; $('azStop').disabled = false;
-  $('azStatus').textContent = 'Kıyas için tüm statik tasarımlar deneniyor…';
+  $('azStatus').textContent = (S.personas.length > AZ_MAX ? `Hız için ${S.personas.length} personadan segment oranları korunarak ${AZ_MAX} kişilik temsilî örneklem kullanılıyor. ` : '') + 'Kıyas için statik tasarımlar deneniyor…';
   worker.onmessage = ({ data }) => {
     if (data.type === 'static') { S.bestStatic = data; $('azStatus').textContent = data.approx ? `${data.combos} kombinasyon kaba kuvvet için çok fazla; koordinat yükselişiyle iyi bir başlangıç tasarımı bulundu. Self-play başladı…` : `${data.combos} statik tasarım denendi. Self-play başladı…`; }
     else if (data.type === 'progress') {
@@ -253,7 +263,7 @@ $('azStart').onclick = () => {
     RENDER.strategy();
   };
   worker.onerror = (e) => stop('Hata: ' + e.message);
-  worker.postMessage({ scenario: S.scenario, personas: S.personas, segmentDim: S.segDim, calibration: calibration(), opts });
+  worker.postMessage({ scenario: S.scenario, personas: azPersonas(), segmentDim: S.segDim, calibration: calibration(), opts });
   RENDER.strategy();
 };
 $('azStop').onclick = () => stop('Durduruldu. Şimdiye kadarki en iyi plan geçerli.');
@@ -274,7 +284,7 @@ $('rbRun').onclick = () => {
   const plans = { 'Başlangıç tasarımı': { moves: [0] } };
   if (S.bestStatic?.config) plans['En iyi statik tasarım'] = { moves: [0], start: S.bestStatic.config };
   if (S.az?.moves) plans['AlphaZero planı'] = { moves: S.az.moves, start: S.az.start };
-  const res = M.robustness(S.scenario, S.personas, plans, {
+  const res = M.robustness(S.scenario, azPersonas(), plans, {
     segmentDim: S.segDim, calibration: calibration(),
     worlds: Math.max(5, Math.min(300, +$('rbN').value)), magnitude: +$('rbMag').value, rng,
   });

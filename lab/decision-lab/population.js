@@ -215,3 +215,26 @@ export function dimensionsOf(personas) {
   for (const p of personas) for (const d of Object.keys(p.dims || {})) c.set(d, (c.get(d) || 0) + 1);
   return [...c.entries()].sort((a, b) => b[1] - a[1]).map(([d, n]) => ({ dim: d, n }));
 }
+
+// Temsilî örneklem: büyük nüfuslarda AlphaZero ve sağlamlık testi için. Her segmentten nüfustaki
+// payı kadar persona seçilir ve ağırlıklar, segmentin toplam ağırlığı korunacak şekilde ölçeklenir.
+// Deterministiktir (aynı nüfus → aynı örneklem).
+export function representativeSample(personas, dim, max = 800) {
+  if (personas.length <= max) return personas;
+  const seg = segmentBy(personas, dim);
+  const K = seg.labels.length;
+  const members = Array.from({ length: K }, () => []);
+  personas.forEach((p, i) => members[seg.index[i]].push(i));
+  const total = personas.reduce((s, p) => s + (p.weight ?? 1), 0);
+  const out = [];
+  for (const m of members) {
+    if (!m.length) continue;
+    const segW = m.reduce((s, i) => s + (personas[i].weight ?? 1), 0);
+    const take = Math.max(1, Math.round((max * segW) / total));
+    const step = m.length / take;
+    const picked = Array.from({ length: Math.min(take, m.length) }, (_, j) => m[Math.floor(j * step)]);
+    const pw = picked.reduce((s, i) => s + (personas[i].weight ?? 1), 0);
+    for (const i of picked) out.push({ ...personas[i], weight: ((personas[i].weight ?? 1) * segW) / pw });
+  }
+  return out;
+}

@@ -104,6 +104,7 @@ bağlamda bu, kitlesel manipülasyon aracına dönüşür.
   sorar; söylenenle yapılan farklı olabilir.
 - Görev biçimi MatrAIx'in örnek anket görevinden kopyalandı; MatrAIx içinde henüz koşturulmadı.
 - Ağ küçük, eğitim tarayıcıda ve kısa; çıkan plan bir başlangıç önerisidir.
+- 800'den büyük nüfuslarda AlphaZero ve sağlamlık testi segment oranlarını koruyan temsilî bir örneklemle çalışır (tahmin tam nüfusla). Çok büyük nüfuslar (on binlerce) tarayıcı depolamasına sığmayabilir.
 - Otomatik test yok.
 
 > Bu bir karar destek aracıdır. Önemli kararlar gerçek kullanıcı ve vatandaş araştırmasıyla doğrulanmalıdır.
