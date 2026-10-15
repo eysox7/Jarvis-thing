@@ -39,9 +39,9 @@ MatrAIx bilgileri (raw.githubusercontent üzerinden okundu; HF erişimi proxy'de
 - [x] 1. Social force simülatörü → `sim.js`
 - [x] 2. Persona davranışı (sim.js) + `personas.js`
 - [x] 3. `env.js` (eylem uzayı, durum kodlama, ödül)
-- [ ] 4. `nn.js`
-- [ ] 5. `mcts.js`
-- [ ] 6. `alphazero.js` + `cli.mjs`
+- [x] 4. `nn.js`
+- [x] 5. `mcts.js`
+- [x] 6. `alphazero.js` + `cli.mjs`
 - [ ] 7. MatrAIx anket görevi + `calibrate.py`
 - [ ] 8. Eğitim koşusu, karşılaştırma (müdahalesiz / kural / AlphaZero)
 - [ ] 9. `export_plan.py` (doğrulama döngüsü)
@@ -53,7 +53,9 @@ MatrAIx bilgileri (raw.githubusercontent üzerinden okundu; HF erişimi proxy'de
 | 0 | 16:40 | Oturum başladı, plan yazıldı, 1. parti uyanışlar kuruldu (16:52 → 18:22 UTC) | Adım 1 |
 | 0b | 16:45 | `sim.js` yazıldı. Deterministik, klonlanabilir. 150 kişi/2 kapı: 46.8 sn; tek kapı: 82.4 sn (~1.8 kişi/sn, literatürle uyumlu). 300 kişi ≈ 1 sn hesap | Adım 2: personalar |
 
-| 0c | 16:58 | Görev netleşti (AlphaZero × MatrAIx). MatrAIx şeması incelendi. Persona davranışı + `personas.js` + `env.js` yazıldı. Bulgu: salon geneli anons herkesi tek kapıya yığıyor → anonslar kapı başı hoparlör (12 m) yapıldı. Senaryo: 199 kişi, 4 kapı; müdahalesiz maliyet 86/69, iyi elle planlar 53-60 | Adım 4-6: nn, mcts, alphazero |
+| 0c | 16:48 | Görev netleşti (AlphaZero × MatrAIx). MatrAIx şeması incelendi. Persona davranışı + `personas.js` + `env.js` yazıldı. Bulgu: salon geneli anons herkesi tek kapıya yığıyor → anonslar kapı başı hoparlör (12 m) yapıldı. Senaryo: 199 kişi, 4 kapı; müdahalesiz maliyet 86/69, iyi elle planlar 53-60 | Adım 4-6: nn, mcts, alphazero |
+
+| 0d | 16:52 | `nn.js` (saf JS MLP, policy+value, Adam), `mcts.js` (PUCT, Dirichlet gürültü, alt ağaç yeniden kullanımı), `alphazero.js` (self-play, tampon, arena kapı bekçisi), `worker.mjs` (4 çekirdek paralel), `cli.mjs` (train/compare/plan). Duman koşusu OK. Arka planda asıl eğitim başlatıldı: 30 iter × 8 oyun, 16 sim, 200 kişi → `models/` | Eğitim sürerken: MatrAIx görevi + calibrate.py |
 
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
