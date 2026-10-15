@@ -110,5 +110,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 13 | 19:00 | Uyanış #13. 80 MatrAIx dev personası tek JSON olarak pakete eklendi (`data/matraix-dev-sample.json`, 404 KB, MIT lisans dosyasıyla); Nüfus → "MatrAIx örnek personaları (80)" butonu. Tarayıcıda denendi, hatasız | Sıradaki: kapanışa doğru son kontroller |
 
+| 14 | 19:10 | Uyanış #14: kapanış kontrolü. 4 şablon × (sentetik / MatrAIx 80) arayüzde uçtan uca (tahmin, AZ 5 iter, neden, sağlamlık, rapor): hepsi hatasız; AZ her senaryoda statiği geçti (0.671/0.648/0.636/0.608), sağlamlık %100/%100/%85/%100. Ana uygulama testleri: HEPSİ GEÇTİ | Kapanış #18 |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
