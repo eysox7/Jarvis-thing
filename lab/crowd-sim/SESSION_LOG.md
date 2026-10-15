@@ -47,6 +47,18 @@ MatrAIx bilgileri (raw.githubusercontent üzerinden okundu; HF erişimi proxy'de
 - [x] 9. `export_plan.py` (doğrulama döngüsü)
 - [~] 10. Görselleştirme sayfası (`index.html`, bitti) + README (sırada)
 
+## YENİ HEDEF (17:06'dan itibaren): Karar Laboratuvarı — `lab/decision-lab/`
+Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem + arayüz.
+- [ ] A. Ortak çekirdek: `lab/core/` (nn.js, mcts.js, rng) — crowd-sim de buradan kullanır
+- [ ] B. Nüfus modeli: MatrAIx YAML içe aktarma, sentetik örnek nüfus, segmentler
+- [ ] C. Senaryo modeli + şablonlar (ürün lansmanı, politika reformu)
+- [ ] D. Hızlı tepki motoru: boyut→tercih ağırlıkları, lojistik seçim, sosyal yayılım (zaman adımlı)
+- [ ] E. AlphaZero ortamı: zaman adımlı kararlar, açık hedef fonksiyonları (pazarlama: benimseme+memnuniyet−terk; politika: destek + en düşük segment − kutuplaşma)
+- [ ] F. LLM persona motoru (NEXUS API bağlantılarını kullanır) + kalibrasyon
+- [ ] G. Arayüz: Nüfus / Senaryo / Tahmin / Strateji / Doğrulama sekmeleri (mobil uyumlu, NEXUS tarzı)
+- [ ] H. MatrAIx dışa aktarma (senaryo → anket görevi, sonuç → kalibrasyon)
+- [ ] I. README
+
 ## Uyanış günlüğü
 | # | Zaman (UTC) | Yapılan | Sonraki adım |
 |---|---|---|---|
@@ -63,6 +75,8 @@ MatrAIx bilgileri (raw.githubusercontent üzerinden okundu; HF erişimi proxy'de
 | 1b | 17:00 | Doğrulama döngüsü ilk denemede iki simülatör açığını gösterdi: AlphaZero (a) ana girişe "ana giriş tıkalı" gerekçeli anons yapıyor, (b) aynı anonsu 9 kez tekrarlıyor. Düzeltme: anons yorgunluğu (30 sn içinde her tekrar uyumu ½), ana girişe gerekçeli anons yasak, müdahale bedeli 0.5→1.5. Eski model silindi, eğitim baştan (40 iter) | Eğitim bitince compare/plan, görselleştirme, README |
 
 | 1c | 17:08 | Kullanıcı sordu: "eski modeli sildim" ne demek → açıklandı (sadece ağırlık dosyası, git'te `e6da6c9`'da duruyor). `index.html` görselleştirme yazıldı, headless Chromium'da çalıştığı görüldü. Bulgu: run1 policy'si yine anons yağdırıyor (16/17 eylem müdahale, tekdüze öncel + 16 sim yetersiz). run1 `models/run1/`'e taşındı (silinmedi). Düzeltme: "bekle" eylemine başlangıç önceliği (bias 2.5), sim 16→32. Arena kıyası: müdahalesiz 76.2, kural 60.7, run1 68.1 | Yeni eğitim (30 iter, ~25 dk) |
+
+| 1d | 17:06 | **YÖN DEĞİŞİKLİĞİ (kullanıcı):** konser/tahliye değil; insanların kararları — pazarlama ve siyasi/kamu politikası kararları. Arayüz + sistem istendi. Konser eğitimi durduruldu, `lab/crowd-sim/` olduğu gibi bırakıldı. Yeni iş: `lab/decision-lab/` (aşağıdaki yeni yol haritası). Sınır: politika tasarımı + tepki tahmini evet; seçmen segmentine göre ikna/mikrohedefleme optimizasyonu hayır (kullanıcıya söylendi) | decision-lab çekirdeği |
 
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
