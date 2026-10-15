@@ -1,2 +1,3 @@
 {"it":1,"at":"2026-10-15T16:52:58.997Z","secs":28,"selfPlayZ":-0.227,"buffer":173,"loss":2.7179,"vLoss":0.1709,"pLoss":2.5469,"arenaCost":53.3,"bestCost":53.3,"accepted":true,"sims":16,"games":8,"nAgents":200,"pool":"yerleşik sentetik personalar"}
 {"it":2,"at":"2026-10-15T16:53:23.062Z","secs":24,"selfPlayZ":0.483,"buffer":277,"loss":2.5653,"vLoss":0.0245,"pLoss":2.5407,"arenaCost":56.3,"bestCost":53.3,"accepted":false,"sims":16,"games":8,"nAgents":200,"pool":"yerleşik sentetik personalar"}
+{"it":3,"at":"2026-10-15T16:53:45.470Z","secs":22,"selfPlayZ":0.568,"buffer":375,"loss":2.5824,"vLoss":0.0309,"pLoss":2.5515,"arenaCost":52.79,"bestCost":52.79,"accepted":true,"sims":16,"games":8,"nAgents":200,"pool":"yerleşik sentetik personalar"}
