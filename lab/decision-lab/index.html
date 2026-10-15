@@ -86,6 +86,16 @@ details summary{cursor:pointer;color:var(--fg-dim);font-size:13px}
 <main>
   <!-- ── Senaryo ── -->
   <section id="scenario" class="on">
+    <details class="card" id="guide"><summary><b>Nasıl kullanılır?</b></summary>
+      <ol class="small" style="padding-left:18px;margin:8px 0 0">
+        <li><b>Senaryo:</b> bir şablon yükle ya da boş senaryo aç. Kararları, seçenekleri ve her seçeneğin kimde nasıl karşılanacağını yaz. Hedef ağırlıklarıyla neyi en iyilemek istediğini belirle.</li>
+        <li><b>Nüfus:</b> MatrAIx persona dosyalarını içe aktar (yoksa sentetik örnek nüfus kullanılır). Sonuçları görmek istediğin segment boyutunu seç (yaş, bölge, gelir…).</li>
+        <li><b>Tahmin:</b> seçenekleri tıkla; her segmentin tepkisini ve nedenini anında gör.</li>
+        <li><b>Strateji:</b> AlphaZero'yu başlat (~25 sn). Plana, "Neden bu plan?" tablosuna ve sağlamlık testine bak. Sağlamlık düşükse planı ciddiye alma.</li>
+        <li><b>Doğrulama:</b> N.E.X.U.S.'ta bir API bağlantın varsa örnek personaları LLM'e sor, modeli kalibre et. Büyük ölçüm için MatrAIx anket görevini indir.</li>
+      </ol>
+      <p class="small muted" style="margin:8px 0 0">Her şey bu tarayıcıda kalır. Sayılar bir modelin tahminidir; gerçek araştırmanın yerini tutmaz.</p>
+    </details>
     <h2>Senaryo</h2>
     <div class="card">
       <div class="row">

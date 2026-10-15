@@ -94,5 +94,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 5b | 17:45 | "Neden bu plan?" (model.js `explainPlan`, ablasyon): her adım çıkarılıp yeniden oynatılır; katkı + segment etkisi tablosu Strateji sekmesinde. Emeklilik örneği: en büyük katkı kademeli geçiş (+0.205, 65+ için +43 puan). Headless hatasız | Sıradaki: kendi kullanımı için kısa "nasıl kullanılır" rehberi arayüzde; NEXUS'tan lab'a bağlantı |
 
+| 6 | 17:50 | Uyanış #6. N.E.X.U.S. Ayarlar → "Laboratuvar" bölümü (Karar Laboratuvarı bağlantısı); laboratuvarda "Nasıl kullanılır?" rehberi (ilk ziyarette açık). Ana uygulamanın mevcut testleri koşuldu: HEPSİ GEÇTİ | Sıradaki: kod gözden geçirme (hata avı), mobil düzen kontrolü |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

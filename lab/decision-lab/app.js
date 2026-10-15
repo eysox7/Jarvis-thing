@@ -441,6 +441,12 @@ RENDER.validate = () => {
 };
 
 // ── Başlat ──────────────────────────────────────────────────────────────────
+// Rehber ilk ziyarette açık gelir; sonra kullanıcının bıraktığı gibi kalır.
+try {
+  const g = $('guide');
+  g.open = localStorage.getItem('decisionlab.guide') !== 'closed';
+  g.addEventListener('toggle', () => { try { localStorage.setItem('decisionlab.guide', g.open ? 'open' : 'closed'); } catch {} });
+} catch {}
 if (S.az?.running) S.az.running = false;   // sayfa yenilendiyse eğitim durmuştur
 const startTab = (() => { try { return sessionStorage.getItem('decisionlab.tab'); } catch { return null; } })();
 RENDER.scenario();

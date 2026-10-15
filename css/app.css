@@ -75,6 +75,7 @@ h3{margin:22px 0 10px;font-size:14px;letter-spacing:.08em;text-transform:upperca
   background:var(--bg-3);border:1px solid var(--line);color:var(--fg);
   padding:9px 13px;border-radius:10px;cursor:pointer;
 }
+a.btn{display:inline-block;text-decoration:none}
 .btn:active{transform:translateY(1px)}
 .btn.primary{background:var(--accent-2);border-color:var(--accent-2)}
 .btn.danger{background:#3a1518;border-color:#5c2126;color:#ffb4ae}
