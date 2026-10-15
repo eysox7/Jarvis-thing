@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tahliye Laboratuvarı</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --text: #e6e8ee; --muted: #8b93a7; --line: #2a2f3a;
+    --accent: #4f8cff; --open: #3ccf91; --closed: #e5484d; --ann: #f5a524;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f6f7f9; --panel: #ffffff; --text: #1a1d24; --muted: #5b6475; --line: #dde1e8; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 14px; color: var(--muted); }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  button, select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font: inherit; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  canvas { width: 100%; height: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: block; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 10px 0; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { color: var(--muted); font-size: 12px; }
+  #log { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; max-height: 180px; overflow: auto; font: 13px/1.5 ui-monospace, monospace; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 12px; margin: 6px 0 10px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+  #note { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tahliye Laboratuvarı</h1>
+  <p class="sub">AlphaZero × MatrAIx — 200 kişilik konser salonunda alarm. Ajan her 5 saniyede bir karar verir: bekle, bir kapıdan anons yap ya da kapı aç/kapa.</p>
+
+  <div class="bar">
+    <select id="mode">
+      <option value="az">AlphaZero (MCTS + ağ)</option>
+      <option value="policy">Yalnızca policy ağı (hızlı)</option>
+      <option value="rule">Kural: tüm acil kapılara gerekçeli anons</option>
+      <option value="none">Müdahale yok</option>
+    </select>
+    <select id="seed"></select>
+    <button id="run" class="primary">▶ Başlat</button>
+    <button id="pause">⏸</button>
+  </div>
+  <div id="note"></div>
+
+  <canvas id="c" width="900" height="600"></canvas>
+  <div class="legend" id="legend"></div>
+
+  <div class="stats">
+    <div class="stat"><b id="sT">0.0</b><span>süre (sn)</span></div>
+    <div class="stat"><b id="sOut">0</b><span>tahliye edilen</span></div>
+    <div class="stat"><b id="sDen">0</b><span>en yüksek yoğunluk (kişi/m²)</span></div>
+    <div class="stat"><b id="sDanger">0.0</b><span>tehlikeli yoğunluk (sn)</span></div>
+    <div class="stat"><b id="sCost">–</b><span>maliyet (müdahalesiz: <span id="sBase">–</span>)</span></div>
+  </div>
+  <div id="log"></div>
+</main>
+
+<script type="module">
+import * as S from './sim.js';
+import * as E from './env.js';
+import { Net } from './nn.js';
+import { Node, search, pick } from './mcts.js';
+import { ENV } from './alphazero.js';
+
+const $ = (id) => document.getElementById(id);
+const canvas = $('c'), ctx = canvas.getContext('2d');
+const SCALE = 28, PAD = 30;   // piksel/metre, kenar boşluğu
+canvas.width = 30 * SCALE + PAD * 2; canvas.height = 20 * SCALE + PAD * 2;
+
+const PERSONA_COLORS = ['#4f8cff', '#a78bfa', '#f472b6', '#22d3ee', '#facc15', '#fb923c', '#34d399'];
+const personaColor = new Map();
+const colorOf = (p) => { if (!personaColor.has(p)) personaColor.set(p, PERSONA_COLORS[personaColor.size % PERSONA_COLORS.length]); return personaColor.get(p); };
+
+for (let i = 0; i < 8; i++) $('seed').append(new Option(`senaryo ${i + 1}`, String(5001 + i)));
+
+let net = null;
+for (const path of ['trained/best.json', 'models/best.json']) {
+  try {
+    const r = await fetch(path);
+    if (r.ok) { net = Net.fromJSON(await r.json()); $('note').textContent = `Model: ${path}`; break; }
+  } catch {}
+}
+if (!net) {
+  $('note').textContent = 'Eğitilmiş model bulunamadı (node cli.mjs train). AlphaZero modları devre dışı.';
+  for (const o of $('mode').options) if (o.value === 'az' || o.value === 'policy') o.disabled = true;
+  $('mode').value = 'rule';
+}
+
+let state, base, running = false, paused = false, nextDecision = 0, rulePlan = [];
+
+function log(msg) { const d = document.createElement('div'); d.textContent = msg; $('log').prepend(d); }
+
+function decide() {
+  const mode = $('mode').value;
+  if (mode === 'none') return 0;
+  if (mode === 'rule') return rulePlan.shift() ?? 0;
+  const mask = E.legalMask(state);
+  if (mode === 'policy') {
+    const { p } = net.predict(E.encode(state), mask);
+    return pick(p, 0);
+  }
+  const root = new Node(E.clone(state));
+  const visits = search(root, { env: ENV, net, base, sims: 16 });
+  return pick(visits, 0);
+}
+
+function start() {
+  const seed = Number($('seed').value);
+  state = E.initialState(seed);
+  base = E.baselineCost(state);
+  $('sBase').textContent = base.toFixed(1);
+  $('sCost').textContent = '–';
+  $('log').innerHTML = '';
+  rulePlan = [];
+  for (let e = 1; e < E.hallExits().length; e++) rulePlan.push(E.ACTIONS.findIndex((a) => a.type === 'announce' && a.exit === e && a.kind === 'reasoned'));
+  nextDecision = 0; running = true; paused = false;
+  log(`Senaryo ${seed}: ${state.n0} kişi. Alarm çaldı.`);
+}
+
+// Simülasyonu env.apply ile değil adım adım ilerletiyoruz ki hareket görünsün;
+// karar anlarında hamleyi env ile aynı biçimde (state.moves'a ekleyerek) uygularız.
+function tick() {
+  if (running && !paused) {
+    for (let k = 0; k < 4 && running; k++) {
+      const w = state.world;
+      if (w.t >= nextDecision - 1e-9) {
+        const a = decide();
+        const act = E.ACTIONS[a];
+        if (act.type === 'announce') S.announce(w, act.exit, act.kind);
+        else if (act.type === 'toggle') S.setExit(w, act.exit, !w.exits[act.exit].open);
+        state.moves.push(a);
+        if (act.type !== 'noop') log(`t=${w.t.toFixed(0)} sn  ${E.describe(act)}`);
+        nextDecision += E.DECISION;
+      }
+      S.step(w);
+      if (E.isTerminal(state)) {
+        running = false;
+        const c = E.cost(state);
+        $('sCost').textContent = c.toFixed(1);
+        log(`Bitti: ${w.evacuated.length} kişi ${w.t.toFixed(1)} sn'de çıktı. Maliyet ${c.toFixed(1)} (müdahalesiz ${base.toFixed(1)}).`);
+      }
+    }
+  }
+  draw();
+  requestAnimationFrame(tick);
+}
+
+function draw() {
+  const css = getComputedStyle(document.documentElement);
+  const v = (n) => css.getPropertyValue(n).trim();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!state) return;
+  const w = state.world;
+  const X = (x) => PAD + x * SCALE, Y = (y) => PAD + y * SCALE;
+
+  // Yoğunluk ısı haritası
+  const { cols, rows, g } = S.densityGrid(w);
+  for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
+    const d = g[cy * cols + cx];
+    if (d < 1.5) continue;
+    ctx.fillStyle = `rgba(229,72,77,${Math.min(0.55, (d - 1.5) / 6)})`;
+    ctx.fillRect(X(cx), Y(cy), SCALE, SCALE);
+  }
+
+  // Duvarlar
+  ctx.strokeStyle = v('--muted'); ctx.lineWidth = 3;
+  ctx.strokeRect(X(0), Y(0), w.width * SCALE, w.height * SCALE);
+  // Çıkışlar
+  for (const e of w.exits) {
+    const { a, b } = S.exitGeometry(w, e);
+    const recent = w.announcements.some((r) => r.exit === e.id && w.t - r.t < 3);
+    ctx.strokeStyle = e.open ? v('--open') : v('--closed');
+    ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(X(a[0]), Y(a[1])); ctx.lineTo(X(b[0]), Y(b[1])); ctx.stroke();
+    if (recent) {
+      const { mid } = S.exitGeometry(w, e);
+      ctx.strokeStyle = v('--ann'); ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+      ctx.beginPath(); ctx.arc(X(mid[0]), Y(mid[1]), S.ANNOUNCE_RADIUS * SCALE, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.fillStyle = v('--muted'); ctx.font = '12px system-ui';
+    const { mid, out } = S.exitGeometry(w, e);
+    // Yan duvardaki kapıların etiketi salonun içine yaslanır (kenardan taşmasın).
+    ctx.textAlign = out[0] < 0 ? 'left' : out[0] > 0 ? 'right' : 'center';
+    ctx.fillText(E.hallExits()[e.id].name, X(mid[0]) - out[0] * 8, out[1] ? Y(mid[1]) + out[1] * 16 + 4 : Y(mid[1]) - 22);
+  }
+
+  // Ajanlar
+  for (const ag of w.agents) {
+    ctx.fillStyle = colorOf(ag.persona);
+    ctx.globalAlpha = w.t < ag.delay ? 0.45 : 1;   // henüz harekete geçmeyenler soluk
+    ctx.beginPath(); ctx.arc(X(ag.x), Y(ag.y), ag.radius * SCALE, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  $('sT').textContent = w.t.toFixed(1);
+  $('sOut').textContent = `${w.evacuated.length}/${state.n0}`;
+  $('sDen').textContent = w.stats.maxDensity.toFixed(0);
+  $('sDanger').textContent = w.stats.dangerTime.toFixed(1);
+  $('legend').innerHTML = [...personaColor].map(([p, c]) => `<span><i style="background:${c}"></i>${p}</span>`).join('')
+    + '<span><i style="background:var(--ann)"></i>anons menzili</span><span><i style="background:rgba(229,72,77,.5)"></i>yoğunluk</span>';
+}
+
+$('run').onclick = start;
+$('pause').onclick = () => { paused = !paused; $('pause').textContent = paused ? '▶' : '⏸'; };
+requestAnimationFrame(tick);
+start();
+</script>
+</body>
+</html>

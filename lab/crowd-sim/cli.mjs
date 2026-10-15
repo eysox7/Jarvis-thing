@@ -45,7 +45,7 @@ async function train() {
 
   let best = existsSync(bestPath) && !args.fresh
     ? Net.fromJSON(JSON.parse(readFileSync(bestPath, 'utf8')))
-    : new Net({ input: env.INPUT_SIZE, actions: env.ACTIONS.length, seed: 1 });
+    : freshNet();
   let net = best.copy();
   const replay = new Replay(num('buffer', 4000));
   const arenaSeeds = [9001, 9002, 9003, 9004];
@@ -79,6 +79,14 @@ async function train() {
     appendFileSync(logPath, JSON.stringify(row) + '\n');
     console.log(`#${it} ${row.secs}sn  self-play z=${row.selfPlayZ}  kayıp=${row.loss} (v ${row.vLoss}, p ${row.pLoss})  arena=${row.arenaCost}  en iyi=${row.bestCost} ${accepted ? '✔ kabul' : '✖ ret'}`);
   }
+}
+
+function freshNet() {
+  const net = new Net({ input: env.INPUT_SIZE, actions: env.ACTIONS.length, seed: 1 });
+  // 17 eylemin 16'sı müdahale: tekdüze bir öncel, aramayı rastgele anons yağmuruna iter.
+  // Başlangıçta "bekle" (eylem 0) olasılığı ~%40 olsun; gerisini self-play öğrensin.
+  net.policy.b[0] = 2.5;
+  return net;
 }
 
 // ── Karşılaştırma ───────────────────────────────────────────────────────────

@@ -45,7 +45,7 @@ MatrAIx bilgileri (raw.githubusercontent üzerinden okundu; HF erişimi proxy'de
 - [x] 7. MatrAIx anket görevi + `calibrate.py`
 - [ ] 8. Eğitim koşusu, karşılaştırma (müdahalesiz / kural / AlphaZero)
 - [x] 9. `export_plan.py` (doğrulama döngüsü)
-- [ ] 10. Görselleştirme sayfası + README
+- [~] 10. Görselleştirme sayfası (`index.html`, bitti) + README (sırada)
 
 ## Uyanış günlüğü
 | # | Zaman (UTC) | Yapılan | Sonraki adım |
@@ -61,6 +61,8 @@ MatrAIx bilgileri (raw.githubusercontent üzerinden okundu; HF erişimi proxy'de
 
 | 1 | 16:54 | Uyanış #1: 2. parti uyanışlar kuruldu (18:32 … 19:42 UTC, 8 adet; toplam 18). `matraix/export_plan.py` (plan → MatrAIx doğrulama anketi + karşılaştırma) yazıldı | — |
 | 1b | 17:00 | Doğrulama döngüsü ilk denemede iki simülatör açığını gösterdi: AlphaZero (a) ana girişe "ana giriş tıkalı" gerekçeli anons yapıyor, (b) aynı anonsu 9 kez tekrarlıyor. Düzeltme: anons yorgunluğu (30 sn içinde her tekrar uyumu ½), ana girişe gerekçeli anons yasak, müdahale bedeli 0.5→1.5. Eski model silindi, eğitim baştan (40 iter) | Eğitim bitince compare/plan, görselleştirme, README |
+
+| 1c | 17:08 | Kullanıcı sordu: "eski modeli sildim" ne demek → açıklandı (sadece ağırlık dosyası, git'te `e6da6c9`'da duruyor). `index.html` görselleştirme yazıldı, headless Chromium'da çalıştığı görüldü. Bulgu: run1 policy'si yine anons yağdırıyor (16/17 eylem müdahale, tekdüze öncel + 16 sim yetersiz). run1 `models/run1/`'e taşındı (silinmedi). Düzeltme: "bekle" eylemine başlangıç önceliği (bias 2.5), sim 16→32. Arena kıyası: müdahalesiz 76.2, kural 60.7, run1 68.1 | Yeni eğitim (30 iter, ~25 dk) |
 
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
