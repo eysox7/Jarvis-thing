@@ -74,6 +74,46 @@ export const TRAIT_RULES = [
   ['role_function', 'teaching', { fairness: 0.2 }],
   ['acad_economics', 'interested', { price: 0.1, trust: 0.05 }],
   ['acad_civics', 'interested', { fairness: 0.2, trust: 0.1 }],
+  // MatrAIx dev örnekleminde (80 gerçek persona) sık görülen boyutlar:
+  ['economic_motivation', 'indifferent', { price: -0.2 }],
+  ['risk_tolerance', 'seeking', { novelty: 0.4, security: -0.3 }],
+  ['risk_tolerance', 'cautious', { security: 0.4, habit: 0.2, novelty: -0.2 }],
+  ['values_priority', 'security', { security: 0.5 }],
+  ['values_priority', 'tradition', { habit: 0.5, novelty: -0.2 }],
+  ['values_priority', 'novelty', { novelty: 0.5 }],
+  ['values_priority', 'community', { fairness: 0.3, social: 0.2 }],
+  ['values_priority', 'autonomy', { trust: -0.2 }],
+  ['values_priority', 'achievement', { time: 0.2 }],
+  ['dominant_trait', 'neuroticism', { security: 0.3 }],
+  ['dominant_trait', 'openness', { novelty: 0.4 }],
+  ['dominant_trait', 'conscientiousness', { habit: 0.1, price: 0.1 }],
+  ['demo_generation', 'gen z', { novelty: 0.3, social: 0.2 }],
+  ['demo_generation', 'millennial', { novelty: 0.2, time: 0.1 }],
+  ['demo_generation', 'boomer', { habit: 0.3, novelty: -0.2 }],
+  ['demo_generation', 'silent', { habit: 0.4, novelty: -0.3 }],
+  ['demo_employment_status', 'retired', { time: -0.3, price: 0.1 }],
+  ['demo_employment_status', 'self-employed', { trust: -0.1, time: 0.2 }],
+  ['age_bracket', '85', { habit: 0.5, novelty: -0.4, security: 0.2 }],
+  ['schwartz_value_security', 'high', { security: 0.4 }],
+  ['schwartz_value_security', 'low', { security: -0.2 }],
+  ['schwartz_value_conformity', 'high', { social: 0.3, habit: 0.2 }],
+  ['schwartz_value_conformity', 'low', { social: -0.2 }],
+  ['schwartz_value_universalism', 'high', { fairness: 0.4, environment: 0.4 }],
+  ['schwartz_value_benevolence', 'high', { fairness: 0.2 }],
+  ['schwartz_value_stimulation', 'high', { novelty: 0.4 }],
+  ['schwartz_value_stimulation', 'low', { novelty: -0.2 }],
+  ['schwartz_value_self_direction', 'high', { trust: -0.1, novelty: 0.1 }],
+  ['schwartz_value_power', 'high', { fairness: -0.2 }],
+  ['trait_fairness', 'strong', { fairness: 0.4 }],
+  ['trait_fairness', 'signature', { fairness: 0.5 }],
+  ['trait_open_mindedness', 'strong', { novelty: 0.3 }],
+  ['trait_curiosity', 'strong', { novelty: 0.3 }],
+  ['trait_prudence', 'strong', { price: 0.2, security: 0.2 }],
+  ['att_ai', 'skeptic', { novelty: -0.3, privacy: 0.2 }],
+  ['att_ai', 'opposed', { novelty: -0.4, privacy: 0.3 }],
+  ['att_ai', 'enthusiast', { novelty: 0.4 }],
+  ['att_new_technology', 'enthusiast', { novelty: 0.6 }],
+  ['val_community', 'core', { fairness: 0.3, social: 0.2 }],
 ];
 
 const clamp = (v, lo = -1, hi = 1) => Math.max(lo, Math.min(hi, v));
@@ -192,17 +232,24 @@ export function syntheticPopulation(n = 300, seed = 7) {
 }
 
 // ── Segmentler ──────────────────────────────────────────────────────────────
+// MatrAIx boş değerleri "null" metni olarak da yazabiliyor; hepsi tek bir "Bilinmiyor" grubu olsun.
+const MISSING = new Set(['', 'null', 'none', 'n/a', '—']);
+const segValue = (p, dim) => {
+  const v = p.dims?.[dim];
+  return v == null || MISSING.has(String(v).trim().toLowerCase()) ? 'Bilinmiyor' : String(v);
+};
+
 // Bir boyuta göre gruplar; en kalabalık maxK değer ayrı, gerisi "Diğer".
 export function segmentBy(personas, dim, maxK = 6) {
   const counts = new Map();
   for (const p of personas) {
-    const v = p.dims?.[dim] ?? '—';
-    counts.set(v, (counts.get(v) || 0) + p.weight);
+    const v = segValue(p, dim);
+    counts.set(v, (counts.get(v) || 0) + (p.weight ?? 1));
   }
   const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, maxK).map(([v]) => v);
   const labels = counts.size > maxK ? [...top, 'Diğer'] : top;
   const index = personas.map((p) => {
-    const v = p.dims?.[dim] ?? '—';
+    const v = segValue(p, dim);
     const i = top.indexOf(v);
     return i >= 0 ? i : labels.length - 1;
   });

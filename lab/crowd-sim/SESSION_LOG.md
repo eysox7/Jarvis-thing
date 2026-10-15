@@ -106,5 +106,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 11 | 18:38 | Uyanış #11. Ölçek: 3000 persona → tahmin 20 ms (300'de 6 ms), AZ ~3 kat yavaş. AlphaZero ve sağlamlık testi >800 personada segment oranlarını koruyan, ağırlığı düzeltilmiş temsilî örneklemle çalışıyor (3000→800: skor farkı ≤0.006). Tahmin tam nüfusla. Depolama kotası dolarsa kullanıcı uyarılıyor. Regresyon hatasız | — |
 
+| 12 | 18:55 | Uyanış #12: **gerçek MatrAIx verisiyle ilk deneme.** raw.githubusercontent'tan dev örnekleminden 80 gerçek persona YAML indirildi (scratchpad'de; repoya eklenmedi). Bulgular: 1052 farklı boyut, seyrek; eşleme tablosu persona başına ort. 2.0 kural tetikliyordu, 10/80 hiç. Gerçek boyutlar için ~37 kural eklendi (risk_tolerance, values_priority, dominant_trait, demo_generation, schwartz_value_*, att_ai…) → ort. 5.25, sıfır 6. "null" metinli boş değerler + eksik boyut tek "Bilinmiyor" segmentinde. Arayüzden 80 dosya içe aktarıldı → AZ: başlangıç 0.418, statik 0.553, AZ 0.643, sağlamlık %100, hatasız | — |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

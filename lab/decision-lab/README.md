@@ -96,6 +96,14 @@ bağlamda bu, kitlesel manipülasyon aracına dönüşür.
 3. **Doğrulama** → "Sonuç klasörünü yükle" → `jobs/<job>` klasörünü seç. Persona kimlikleri içe
    aktarılan nüfusla eşleşirse segment kalibrasyonu yapılabilir.
 
+## Gerçek MatrAIx verisiyle deneme
+
+MatrAIx dev örnekleminden 80 gerçek persona (`persona/datasets/matraix-persona-dev-sample/`) arayüzden
+içe aktarılıp denendi. Personalar seyrek: toplam 1052 farklı boyut var, her personada bunların bir kısmı.
+Eşleme tablosu bu verideki sık boyutlara göre genişletildi (persona başına tetiklenen kural 2.0 → 5.25;
+hiç kural tetiklemeyen persona 10 → 6). Emeklilik reformu senaryosunda: başlangıç 0.418, en iyi statik
+0.553, AlphaZero 0.643; sağlamlık testinde %100.
+
 ## Bilinen sınırlar
 
 - Boyut→eğilim kuralları ve seçenek etkileri **varsayımdır**. Kalibrasyon yalnızca segment düzeyinde
