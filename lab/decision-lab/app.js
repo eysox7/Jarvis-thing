@@ -243,7 +243,7 @@ $('azStart').onclick = () => {
     else if (data.type === 'progress') {
       S.az = { ...S.az, ...data, history: [...S.az.history, { it: data.it, score: data.score, best: data.best, z: data.selfPlayZ, loss: data.loss, accepted: data.accepted }] };
       $('azStatus').textContent = `İterasyon ${data.it}/${opts.iters} — en iyi skor ${f3(data.best)} (başlangıç tasarımı ${f3(data.base)}).`;
-    } else if (data.type === 'done') stop('Tamamlandı.');
+    } else if (data.type === 'done') { stop('Tamamlandı. Sağlamlık testi otomatik çalıştırıldı (aşağıda).'); $('rbRun').click(); }
     save();
     RENDER.strategy();
   };
