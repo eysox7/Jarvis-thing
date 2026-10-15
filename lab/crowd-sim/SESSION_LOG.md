@@ -112,5 +112,8 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 14 | 19:10 | Uyanış #14: kapanış kontrolü. 4 şablon × (sentetik / MatrAIx 80) arayüzde uçtan uca (tahmin, AZ 5 iter, neden, sağlamlık, rapor): hepsi hatasız; AZ her senaryoda statiği geçti (0.671/0.648/0.636/0.608), sağlamlık %100/%100/%85/%100. Ana uygulama testleri: HEPSİ GEÇTİ | Kapanış #18 |
 
+| 15 | 19:12 | Uyanış #15: ağaç temiz, bekleyen iş yok (commit yok) | — |
+| 16 | 19:25 | Uyanış #16: kapanış raporu erkenden yazıldı → `lab/KAPANIS_RAPORU.md` (kesinti olursa hazır dursun) | #18'de son hali |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.
