@@ -115,5 +115,9 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 | 15 | 19:12 | Uyanış #15: ağaç temiz, bekleyen iş yok (commit yok) | — |
 | 16 | 19:25 | Uyanış #16: kapanış raporu erkenden yazıldı → `lab/KAPANIS_RAPORU.md` (kesinti olursa hazır dursun) | #18'de son hali |
 
+| 17 | 19:32 | Uyanış #17: ağaç temiz, uzak dalla eşit (commit yok) | — |
+| 18 | 19:42 | **Kapanış.** Yarım iş yok. Test sunucuları kapatıldı. Kapanış raporu: `lab/KAPANIS_RAPORU.md`. 18/18 uyanış çalıştı | — |
+
 ## Kesinti / kota
+- Oturum boyunca kota/limit hatası görülmedi; sıfırlanma uyanışı gerekmedi.
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

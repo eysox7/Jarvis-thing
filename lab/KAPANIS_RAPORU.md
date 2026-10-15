@@ -76,4 +76,4 @@ mesajı optimize eden bir eylem türü **yoktur** (kitlesel manipülasyon aracı
 - `lab/crowd-sim/`: oturumun ilk saatindeki kalabalık tahliye deneyi (sonra yön değişti). Olduğu gibi
   duruyor; istersen silinebilir.
 - `lab/core/`: iki deneyin ortak AlphaZero çekirdeği (`nn.js`, `mcts.js`, `rng.js`).
-- Kota: oturum boyunca bir kota/limit hatası görülmedi.
+- Kota: oturum boyunca bir kota/limit hatası görülmedi; 18 uyanışın hepsi çalıştı.
