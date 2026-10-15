@@ -84,5 +84,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 1g | 17:20 | `decision-lab/README.md` + kök README'ye "Laboratuvar" bölümü | Sıradaki uyanışlarda: kendi senaryonu oluşturma kolaylığı (JSON yerine form), gerçek veriyle deneme rehberi, iyileştirmeler |
 
+| 2-3 | 17:24 | Uyanış #2 ve #3 (geç ulaştı; o sırada iş sürüyordu). 2. parti uyanışlar zaten kurulu. Form tabanlı senaryo düzenleyici (`editor.js`): boş politika/pazarlama senaryosu, karar/seçenek/eğilim etkisi/eylem ekle-sil, alan değiştirme. Headless'ta denendi, hata yok | Sıradaki: senaryo şablonları (kullanıcı isterse), duyarlılık analizi ("bu varsayım yanlışsa sonuç değişir mi?") |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

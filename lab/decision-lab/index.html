@@ -36,6 +36,7 @@ h2:first-child{margin-top:4px}
 .btn{display:inline-block;background:var(--bg-3);border:1px solid var(--line);border-radius:10px;padding:9px 14px;cursor:pointer;font-size:15px}
 .btn.primary{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
 .btn.danger{border-color:var(--err);color:var(--err)}
+.btn.small{padding:4px 10px;font-size:13px}
 .btn:disabled{opacity:.5;cursor:default}
 select,input[type=number],input[type=text],textarea{background:var(--bg-3);border:1px solid var(--line);border-radius:10px;padding:8px 10px;max-width:100%}
 textarea{width:100%;min-height:280px;resize:vertical}
@@ -91,12 +92,15 @@ details summary{cursor:pointer;color:var(--fg-dim);font-size:13px}
         <div class="grow"><label class="f">Şablon</label><select id="tplSel"></select></div>
         <button class="btn" id="tplLoad">Yükle</button>
       </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="newPolicy">+ Boş politika senaryosu</button>
+        <button class="btn" id="newMarketing">+ Boş pazarlama senaryosu</button>
+      </div>
       <p id="scnSummary" class="muted small"></p>
     </div>
     <h2>Kararlar ve seçenekler</h2>
-    <div id="scnLevers"></div>
-    <h2>Tek seferlik eylemler</h2>
-    <div id="scnEvents" class="card"></div>
+    <p class="small muted">Her karar bir "kol": karar verici seçeneklerden birini seçer. Seçeneğin etkisini, kimin hangi eğilimine göre olumlu ya da olumsuz karşılanacağıyla tanımla (ör. fiyat artışı: fiyat hassasiyeti −1). "Amaca katkı" ise seçeneğin senin asıl hedefine (politikada etkinlik, pazarlamada kullanıcı başı gelir) ne kadar hizmet ettiği.</p>
+    <div id="scnEditor"></div>
     <h2>Hedef fonksiyonu</h2>
     <div class="card">
       <p class="small muted">AlphaZero bu ağırlıklarla puanlanan sonucu en iyilemeye çalışır. Ne istediğini açıkça yazmak, neyi en iyilediğini görmenin tek yolu.</p>

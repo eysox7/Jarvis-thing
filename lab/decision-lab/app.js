@@ -4,6 +4,7 @@ import { syntheticPopulation, importFiles, dimensionsOf, TRAITS, TRAIT_RULES } f
 import * as M from './model.js';
 import * as L from './llm.js';
 import * as X from './matraix.js';
+import * as ED from './editor.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -109,11 +110,7 @@ RENDER.scenario = () => {
   const scn = S.scenario;
   $('tplSel').value = TEMPLATES.some((t) => t.id === scn.id) ? scn.id : TEMPLATES[0].id;
   $('scnSummary').textContent = `${scn.summary} Ufuk: ${scn.horizon} ${scn.unit}. Bütçe: ${scn.budget} birim.`;
-  $('scnLevers').innerHTML = scn.levers.map((l) => `
-    <div class="card lever"><b>${esc(l.label)}</b>
-      <div class="opts">${l.options.map((o) => `<span class="chip ${o.id === l.initial ? 'on' : ''}" title="etki: ${esc(JSON.stringify(o.effect.traits))}">${esc(o.label)}${o.cost ? ` · ${o.cost}/${esc(scn.unit)}` : ''}</span>`).join('')}</div>
-      <div class="small muted" style="margin-top:6px">Mavi: başlangıç tasarımı.</div></div>`).join('');
-  $('scnEvents').innerHTML = (scn.events || []).map((e) => `<div class="row" style="justify-content:space-between"><span>${esc(e.label)}</span><span class="muted small">${e.cost} birim</span></div>`).join('') || '<span class="muted">Yok</span>';
+  ED.render($('scnEditor'), scn);
   $('scnObjective').innerHTML = Object.entries(scn.objective).map(([k, v]) => `
     <div><label class="f">${esc(PART_LABELS[k] || k)}: <b id="ov-${k}">${v.toFixed(2)}</b></label>
     <input type="range" min="0" max="1" step="0.05" value="${v}" data-k="${k}" style="width:100%"></div>`).join('');
@@ -124,6 +121,18 @@ RENDER.scenario = () => {
   $('scnJson').value = JSON.stringify(scn, null, 2);
   $('scnErr').textContent = '';
 };
+ED.bind($('scnEditor'), () => S.scenario, (structural) => {
+  S.fcConfig = null;
+  invalidate();
+  header();
+  const errs = validateScenario(S.scenario);
+  $('scnErr').textContent = errs.join(' · ');
+  if (structural) RENDER.scenario();
+  else { $('scnJson').value = JSON.stringify(S.scenario, null, 2); $('scnSummary').textContent = `${S.scenario.summary} Ufuk: ${S.scenario.horizon} ${S.scenario.unit}. Bütçe: ${S.scenario.budget} birim.`; }
+});
+for (const [id, domain] of [['newPolicy', 'policy'], ['newMarketing', 'marketing']]) {
+  $(id).onclick = () => { S.scenario = ED.blankScenario(domain); S.fcConfig = null; invalidate(); RENDER.scenario(); };
+}
 $('scnApply').onclick = () => {
   try {
     const s = JSON.parse($('scnJson').value);
