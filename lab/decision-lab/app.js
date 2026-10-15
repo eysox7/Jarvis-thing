@@ -370,6 +370,7 @@ function renderLlm() {
   const c = ctx();
   const rows = S.llmRows || [];
   $('vCalib').disabled = !rows.length;
+  $('vSum').disabled = !rows.some((x) => x.reason && !x.reason.startsWith('(MatrAIx)'));
   if (!rows.length) { $('vTable').innerHTML = ''; $('vAnswers').innerHTML = ''; return; }
   $('vTable').innerHTML = '<tr><th>Segment</th><th class="num">n</th><th class="num">LLM</th><th class="num">Model</th><th class="num">Fark</th></tr>'
     + c.seg.labels.map((l, k) => {
@@ -395,6 +396,18 @@ $('vCalib').onclick = () => {
   save();
   $('vStatus').textContent = 'Model kalibre edildi; tablodaki "Model" sütunu güncellendi. Strateji sekmesinde AlphaZero\'yu yeniden çalıştırman önerilir.';
   renderLlm();
+};
+$('vSum').onclick = async () => {
+  const box = $('vSummary');
+  box.style.display = 'block';
+  box.textContent = 'Özetleniyor…';
+  $('vSum').disabled = true;
+  try {
+    box.textContent = await L.summarizeReasons(S.scenario, S.llmRows.filter((x) => !x.reason.startsWith('(MatrAIx)')), ctx().seg.labels);
+  } catch (e) {
+    box.innerHTML = `<span class="err">${esc(e.message)}</span>`;
+  }
+  $('vSum').disabled = false;
 };
 $('vReset').onclick = () => {
   delete S.calib[calibKey()];

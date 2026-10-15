@@ -102,5 +102,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 9 | 18:20 | Uyanış #9. Paylaşılabilir Markdown rapor (`report.js`, Strateji → "Raporu indir"): senaryo, nüfus kaynağı, kalibrasyon durumu, hedef, karşılaştırma, plan, segment farkları, "neden", sağlamlık, persona cevapları, varsayımlar. Örnek: `ornek-rapor.md`. Not: headless test tarayıcısı indirme adını "download" gösteriyor (blob indirme tuhaflığı olabilir; gerçek tarayıcıda doğrulanamadı) | Sıradaki: kapanış raporuna hazırlık |
 
+| 10 | 18:27 | Uyanış #10. Doğrulama → "Cevapları özetle": persona gerekçeleri LLM'e segment bazında özetletilir (kaygı, destek nedeni, görüşü değiştirecek şey, ortak 3 nokta). Sahte API ile denendi, hatasız | Sıradaki: kalan uyanışlarda yalnızca değerli iş; kapanış raporu #18'de |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

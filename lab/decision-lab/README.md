@@ -34,7 +34,7 @@ Nüfus (MatrAIx personaları)        Senaryo (kararlar, seçenekler, eylemler, h
 | **Nüfus** | MatrAIx persona YAML/JSON içe aktar ya da sentetik örnek nüfus kullan. Segment boyutunu seç; segmentlerin eğilim profillerini ve boyut→eğilim eşleme tablosunu gör. |
 | **Tahmin** | Kararları seç; genel ve segment bazında destek/benimseme, zaman serisi ve "neden?" tablosu (her kararın her segmentteki etkisi). |
 | **Strateji** | AlphaZero'yu çalıştır. Başlangıç tasarımı, tüm statik tasarımların en iyisi (kaba kuvvet) ve AlphaZero planı yan yana. Plan zaman çizelgesi olarak. **Neden bu plan?:** her adım tek tek çıkarılıp katkısı ve hangi segmente yaradığı ölçülür. **Rapor:** sonuçlar tek tıkla Markdown rapor olarak indirilir ([örnek](ornek-rapor.md)). **Sağlamlık testi:** planlar, seçenek etkileri rastgele bozulmuş onlarca alternatif dünyada yeniden oynatılır; plan yalnızca modelin tam doğru olduğu dünyada iyiyse güvenme. |
-| **Doğrulama** | Örnek personaları bir LLM'e kendi kimlikleriyle sor; cevapları modelle karşılaştır, modeli kalibre et. MatrAIx anket görevini indir, sonuç klasörünü yükle. |
+| **Doğrulama** | Örnek personaları bir LLM'e kendi kimlikleriyle sor; cevapları modelle karşılaştır, gerekçeleri segment bazında özetlet, modeli kalibre et. MatrAIx anket görevini indir, sonuç klasörünü yükle. |
 
 ### AlphaZero nereden başlar?
 

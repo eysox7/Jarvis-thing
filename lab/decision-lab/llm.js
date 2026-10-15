@@ -92,3 +92,26 @@ export function fitSegBias(rows, K, current = []) {
   }
   return bias;
 }
+
+// Toplanan persona gerekçelerini segment bazında özetletir: başlıca kaygılar, destek nedenleri
+// ve kararı değiştirebilecek şey. Karar vericiye tek tek cevap okutmamak için.
+export async function summarizeReasons(scn, rows, labels, { signal } = {}) {
+  const profiles = connections();
+  if (!profiles.length) throw new Error('Kayıtlı API bağlantısı yok.');
+  const bySeg = labels.map((l, k) => {
+    const r = rows.filter((x) => x.seg === k && x.reason);
+    return r.length ? `### ${l}\n${r.map((x) => `- (${x.score}/5) ${x.reason}`).join('\n')}` : '';
+  }).filter(Boolean).join('\n\n');
+  const out = await chatWithFallback(profiles, {
+    system: 'Bir kamuoyu/pazar araştırması analistisin. Sana simüle edilmiş katılımcıların gerekçeleri verilecek. '
+      + 'Yalnızca verilen cevaplara dayan, uydurma. Türkçe, kısa ve maddeli yaz.',
+    messages: [{
+      role: 'user',
+      content: `Konu: ${scn.title}\nSoru: ${scn.question}\n\nSegmentlere göre cevaplar (puan 1-5):\n\n${bySeg}\n\n`
+        + 'Her segment için: (1) başlıca kaygı, (2) destekleyenlerin nedeni, (3) bu segmentin görüşünü değiştirebilecek şey. '
+        + 'Sonra tüm segmentlerde ortak olan en önemli 3 noktayı yaz.',
+    }],
+    temperature: 0.3, maxTokens: 4096, signal, proxy: store.settings()?.proxy,
+  });
+  return out.text;
+}
