@@ -1,1 +1,3 @@
 train.out
+# Eğitim sırasında sürekli değişir; bitmiş model trained/ altına kopyalanır.
+models/
