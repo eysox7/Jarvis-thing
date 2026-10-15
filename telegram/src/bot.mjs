@@ -4,6 +4,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { addUsage } from './claude.mjs';
 import { EFFORTS } from './config.mjs';
+import {
+  REMINDER_TOOLS, ReminderScheduler, addReminder, cancelReminder, formatLocal, listReminders,
+} from './reminders.mjs';
 import { transcribe } from './stt.mjs';
 import { TelegramError } from './telegram.mjs';
 
@@ -26,6 +29,7 @@ export const COMMANDS = [
   { command: 'durum', description: 'Token, maliyet ve ayarlar' },
   { command: 'efor', description: 'Düşünme seviyesi: /efor low|medium|high' },
   { command: 'web', description: 'Web araması: /web ac veya /web kapat' },
+  { command: 'hatirlatmalar', description: 'Hatırlatmaları listele: /hatirlatmalar sil 2' },
   { command: 'yardim', description: 'Komutlar ve kullanım' },
 ];
 
@@ -34,6 +38,7 @@ const ALIASES = {
   yeni: 'yeni', new: 'yeni', hafiza: 'hafiza', memory: 'hafiza',
   hatirla: 'hatirla', remember: 'hatirla', unut: 'unut', forget: 'unut',
   durum: 'durum', status: 'durum', efor: 'efor', effort: 'efor', web: 'web',
+  hatirlatmalar: 'hatirlatmalar', hatirlatma: 'hatirlatmalar', reminders: 'hatirlatmalar',
 };
 
 export function parseCommand(text, botName) {
@@ -53,15 +58,21 @@ Art arda attığın mesajlar tek istekte birleşir. Uzayan sohbet kendiliğinden
 /unut <no | hepsi> — hafızadan sil
 /durum — token, maliyet, ayarlar
 /efor low|medium|high — düşünme seviyesi
-/web ac|kapat — web araması`;
+/web ac|kapat — web araması
+/hatirlatmalar — kurulu hatırlatmalar (/hatirlatmalar sil 2)
+
+"Yarın 9'da faturayı hatırlat" demen yeter; zamanı gelince yazarım.`;
 
 // Sistem isteminin bota özgü, sabit kısmı (önbelleğe uygun olsun diye değişmez).
 const BOT_NOTE = `## Ortam
 - Telegram üzerinden konuşuyorsun. Kullanıcı mesajının başındaki [tarih saat] onun yerel zamanıdır; cevapta tekrar etme.
 - Biçim: **kalın**, \`kod\`, kod bloğu, "- " liste ve [metin](link) çalışır; başlık (#) ve tablo kullanma.
 - Hafıza ve özet sistem tarafından otomatik tutulur; "hatırla" denirse kısaca onayla.
-- [Fotoğraf], [PDF], [Dosya] işaretleri o turda gönderilmiş, artık geçmişte bulunmayan ekleri gösterir. [Sesli] mesaj dikteden yazıya çevrilmiştir.`;
+- [Fotoğraf], [PDF], [Dosya] işaretleri o turda gönderilmiş, artık geçmişte bulunmayan ekleri gösterir. [Sesli] mesaj dikteden yazıya çevrilmiştir.
+- Kendiliğinden yalnızca hatırlatma mesajı gönderebilirsin; başka bir işi sonradan yapacağına ya da başka bir uygulamada işlem yapacağına söz verme.`;
 const WEB_NOTE = '- Web aramasını yalnızca güncel ya da doğrulanması gereken bilgi için kullan.';
+const REMINDER_NOTE = '- Hatırlatma istenince hatirlatici_kur aracını kullan ve kurulan zamanı kısaca onayla. "[… hatırlattım: «…»]" işareti senin gönderdiğin bir hatırlatmadır.';
+const NO_REMINDER_NOTE = '- Hatırlatma kuramazsın; istenirse bunu söyle.';
 
 export function renderContext(memory, summary) {
   const parts = [];
@@ -83,6 +94,7 @@ export class Bot {
     this.pending = new Map();
     this.rejected = new Map();
     this.running = false;
+    this.reminders = new ReminderScheduler({ store, telegram, tz: cfg.timezone, log });
   }
 
   // ── yaşam döngüsü ──────────────────────────────────────────────
@@ -96,6 +108,7 @@ export class Bot {
     this.running = true;
     this.sweeper = setInterval(() => this.sweepIdle(), 10 * 60_000);
     this.sweeper.unref?.();
+    if (this.cfg.reminders) this.reminders.start();
     this.loop = this.poll();
     return me;
   }
@@ -136,6 +149,7 @@ export class Bot {
     this.running = false;
     this.abort?.abort();
     clearInterval(this.sweeper);
+    await this.reminders.stop();
     for (const key of [...this.pending.keys()]) this.flush(key);
     await this.loop;
     await Promise.allSettled([...this.chains.values()]);
@@ -214,7 +228,11 @@ export class Bot {
   buildSystem(s) {
     const blocks = [{
       type: 'text',
-      text: `${this.skill.chat}\n\n${BOT_NOTE}${this.webOn(s) ? `\n${WEB_NOTE}` : ''}`,
+      text: [
+        this.skill.chat, '', BOT_NOTE,
+        this.cfg.reminders ? REMINDER_NOTE : NO_REMINDER_NOTE,
+        ...(this.webOn(s) ? [WEB_NOTE] : []),
+      ].join('\n'),
     }];
     const ctx = renderContext(s.memory, s.summary);
     if (ctx) blocks.push({ type: 'text', text: ctx });
@@ -301,7 +319,9 @@ export class Bot {
       for (const n of notices) await this.tg.sendText(chatId, `⚠️ ${n}`, { html: false });
       if (!lines.length) return;
 
-      const turnText = `[${this.stamp()}] ${lines.join('\n')}`;
+      // Bot'un kendiliğinden yolladığı hatırlatmalar bu turda bağlam olarak gider.
+      const notes = s.notes || [];
+      const turnText = `[${this.stamp()}] ${[...notes, ...lines].join('\n')}`;
       const messages = [
         ...s.turns.map((t) => ({ role: t.role, content: t.text })),
         { role: 'user', content: [...blocks, { type: 'text', text: turnText }] },
@@ -311,6 +331,8 @@ export class Bot {
         messages,
         effort: s.settings.effort || this.cfg.effort,
         web: this.webOn(s),
+        tools: this.cfg.reminders ? REMINDER_TOOLS : [],
+        runTool: (name, input) => this.runTool(chatId, name, input),
       });
       addUsage(s.usage, r.usage);
       s.lastActivity = Date.now();
@@ -324,6 +346,7 @@ export class Bot {
       let reply = r.text || '(boş yanıt)';
       if (r.truncated) reply += '\n\n…(yanıt uzunluk sınırında kesildi)';
       s.turns.push({ role: 'user', text: turnText }, { role: 'assistant', text: reply });
+      if (notes.length) s.notes = (s.notes || []).filter((n) => !notes.includes(n));
       s.lastPromptTokens = r.promptTokens;
       this.store.save(chatId);
 
@@ -340,6 +363,29 @@ export class Bot {
       await this.tg.sendText(chatId, `⚠️ ${friendly(e)}`, { html: false }).catch(() => {});
     } finally {
       stopTyping();
+    }
+  }
+
+  // Claude'un istemci araçları. Hata fırlatırsa sonuç is_error olarak modele döner.
+  runTool(chatId, name, input) {
+    const s = this.store.get(chatId);
+    const tz = this.cfg.timezone;
+    switch (name) {
+      case 'hatirlatici_kur': {
+        const r = addReminder(s, input, tz);
+        this.store.save(chatId);
+        this.log.info(`[hatırlatma ${chatId}] #${r.id} kuruldu`);
+        return `Kuruldu #${r.id}: ${formatLocal(r.at, tz)}${r.repeat !== 'yok' ? ` (${r.repeat})` : ''} — ${r.text}`;
+      }
+      case 'hatirlaticilari_listele':
+        return listReminders(s, tz) || 'Kurulu hatırlatma yok.';
+      case 'hatirlatici_iptal': {
+        const r = cancelReminder(s, input.no);
+        this.store.save(chatId);
+        return `İptal edildi #${r.id}: ${r.text}`;
+      }
+      default:
+        throw new Error(`Bilinmeyen araç: ${name}`);
     }
   }
 
@@ -460,6 +506,21 @@ export class Bot {
         return say(`✅ Web araması ${s.settings.web ? 'açık' : 'kapalı'}.${blocked ? ' (API reddettiği için bu oturumda devre dışı.)' : ''}`);
       }
 
+      case 'hatirlatmalar': {
+        const m = fold(cmd.arg).match(/^(sil|iptal|cancel)\s+#?(\d+)$/);
+        if (m) {
+          try {
+            const r = cancelReminder(s, m[2]);
+            save();
+            return say(`🗑 İptal: #${r.id} ${r.text}`, { html: false });
+          } catch (e) {
+            return say(e.message, { html: false });
+          }
+        }
+        const list = listReminders(s, this.cfg.timezone);
+        return say(list ? `⏰ Hatırlatmalar\n${list}\n\nSilmek için: /hatirlatmalar sil 2` : 'Kurulu hatırlatma yok.', { html: false });
+      }
+
       default:
         return say('Bilinmeyen komut. /yardim');
     }
@@ -472,6 +533,7 @@ export class Bot {
       `Model: \`${this.cfg.model}\` · efor: ${s.settings.effort || this.cfg.effort} · web: ${this.webOn(s) ? 'açık' : 'kapalı'}`,
       `Geçmiş: ${s.turns.length} mesaj · son istem ~${kfmt(s.lastPromptTokens)} token (damıtma eşiği ${kfmt(this.cfg.compactAtTokens)})`,
       `Hafıza: ${s.memory.length} satır · özet ${words(s.summary)} kelime · ${s.compactions} kez damıtıldı`,
+      `Hatırlatma: ${(s.reminders || []).length} kurulu`,
       `Toplam: ${u.requests} istek · giriş ${kfmt(u.input + u.cacheRead + u.cacheWrite)} (önbellekten ${kfmt(u.cacheRead)}) · çıkış ${kfmt(u.output)}${u.webSearches ? ` · ${u.webSearches} arama` : ''}`,
       `Tahmini maliyet: $${u.costUsd.toFixed(3)}`,
     ].join('\n');

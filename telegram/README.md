@@ -1,7 +1,8 @@
 # Nexus · Telegram
 
 Claude ile telefondan, Telegram üzerinden konuşma köprüsü. Dışarıdayken yaz, sesli mesaj
-at, fotoğraf ya da PDF gönder; kısa ve işe yarar cevap gelir.
+at, fotoğraf ya da PDF gönder; kısa ve işe yarar cevap gelir. "Yarın 9'da faturayı hatırlat"
+dersen zamanı gelince bot sana yazar.
 
 Asıl iş **token tasarrufu**: sohbet uzadıkça boş laf geçmişte birikip her mesajda yeniden
 gönderilmez. Bot, [`verimli-sohbet`](../.claude/skills/verimli-sohbet/SKILL.md) skill'ini
@@ -87,8 +88,20 @@ sesli mesaj.
 | `/durum` | Model, efor, token, tahmini maliyet |
 | `/efor low\|medium\|high\|xhigh\|max` | Düşünme seviyesi |
 | `/web ac` · `/web kapat` | Web araması |
+| `/hatirlatmalar` · `/hatirlatmalar sil 2` | Kurulu hatırlatmalar |
 
 Sohbet içinde "bunu hatırla" ya da "şunu unut" demen de yeter; bir sonraki damıtmada işlenir.
+
+## Hatırlatma
+
+Normal cümleyle iste: "iki saat sonra annemi aramamı hatırlat", "hafta içi her gün 8:30'da
+ilaç", "cuma 18:00'deki hatırlatmayı iptal et". Claude zamanı senin saat dilimine (`TIMEZONE`)
+göre çözer, bot kurar ve zamanı gelince `⏰` ile yazar. Tekrar seçenekleri: her gün, hafta içi,
+her hafta. Bot kapalıyken kaçan hatırlatma açılınca "gecikmeli" notuyla gelir.
+
+Hatırlatmayı gördükten sonra yazdığın ilk mesajda Claude neyi hatırlattığını bilir
+("tamam, yarına ertele" yeter). Bunun dışında bot kendiliğinden mesaj atmaz; Claude'a da
+başka bir işi sonradan yapacağına söz vermemesi söylenir.
 
 ## Sesli mesaj
 
@@ -122,10 +135,15 @@ Tamamı [.env.example](.env.example) içinde açıklamalı. Öne çıkanlar:
 | `IDLE_COMPACT_MINUTES` | `180` | Sessizlik damıtması (0 = kapalı) |
 | `WEB_SEARCH` | `on` | Web araması |
 | `FALLBACKS` | `on` | Güvenlik reddinde sunucu tarafı yedek model |
+| `REMINDERS` | `on` | Hatırlatma araçları |
+| `MAX_TOKENS` | `64000` | Tek cevabın üst sınırı (düşünme dahil); harcama değil tavan |
 
 Ortamda (shell, systemd, Docker) tanımlı bir değişken `.env`'deki aynı adlı değeri ezer.
 
-API isteğe bağlı bir özelliği (web araması, yedek model) reddederse bot o mesajı onlarsız
+Sohbet istekleri akışlı (streaming) gider; `/efor high` veya `max` ile uzun düşünmede zaman
+aşımı olmaz.
+
+API isteğe bağlı bir özelliği (web araması, yedek model, katı araç şeması) reddederse bot o mesajı onlarsız
 yeniden dener, özelliği o çalışma boyunca kapatır ve loga yazar.
 
 ## Veri ve gizlilik
@@ -146,6 +164,7 @@ src/telegram.mjs  Bot API istemcisi (fetch), HTML/düz metin gönderimi, dosya i
 src/format.mjs    Markdown → Telegram HTML, 4096 karakter bölme
 src/store.mjs     sohbet başına JSON durum (atomik yazma)
 src/skill.mjs     SKILL.md + references/damitma.md okuyucu
+src/reminders.mjs hatırlatma araçları, saat dilimi hesabı, zamanlayıcı
 src/stt.mjs       sesli mesaj → yazı
 ```
 

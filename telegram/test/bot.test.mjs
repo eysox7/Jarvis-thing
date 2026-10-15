@@ -2,7 +2,14 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { tzParts } from '../src/reminders.mjs';
 import { mockServer, setup, userMsg, USER, waitFor, waitSent } from './helpers.mjs';
+
+const pad = (n) => String(n).padStart(2, '0');
+const localIn = (ms, tz = 'Europe/Istanbul') => {
+  const p = tzParts(Date.now() + ms, tz);
+  return `${p.y}-${pad(p.mo)}-${pad(p.d)} ${pad(p.h)}:${pad(p.mi)}`;
+};
 
 const lastUserBlocks = (req) => req.body.messages.at(-1).content;
 
@@ -51,8 +58,11 @@ test('metin → Claude → HTML cevap; istek token tasarruflu kurulur; geçmişe
     assert.deepEqual(b.cache_control, { type: 'ephemeral' });
     assert.equal(b.fallbacks, 'default');
     assert.match(req.headers['anthropic-beta'], /server-side-fallback-2026-07-01/);
-    assert.equal(b.tools[0].type, 'web_search_20260209');
-    assert.equal(b.tools[0].max_uses, 3);
+    assert.deepEqual(b.tools.map((t) => t.name), ['hatirlatici_kur', 'hatirlaticilari_listele', 'hatirlatici_iptal', 'web_search']);
+    assert.deepEqual(b.tools.map((t) => t.strict), [true, undefined, true, undefined]);
+    assert.equal(b.tools[3].type, 'web_search_20260209');
+    assert.equal(b.tools[3].max_uses, 3);
+    assert.equal(b.stream, true, 'sohbet akışlı gider');
     assert.equal(b.thinking, undefined, 'Opus 5.5 düşünmeyi kendisi yönetir');
 
     const sys = b.system[0].text;
@@ -267,7 +277,7 @@ test('güvenlik reddi geçmişe yazılmaz', async () => {
 
 test('web araması reddedilirse bir kez özelliksiz denenir ve kapatılır', async () => {
   const h = await setup();
-  h.cl.state.chat = (body) => (body.tools
+  h.cl.state.chat = (body) => (body.tools.some((t) => t.name === 'web_search')
     ? { status: 400, json: { type: 'error', error: { type: 'invalid_request_error', message: 'web_search is not enabled' } } }
     : { text: 'Aramasız cevap.' });
   try {
@@ -276,7 +286,9 @@ test('web araması reddedilirse bir kez özelliksiz denenir ve kapatılır', asy
     assert.equal(sent.text, 'Aramasız cevap.');
     const [first, second] = h.cl.chats();
     assert.ok(first.body.tools && first.body.fallbacks);
-    assert.equal(second.body.tools, undefined);
+    assert.deepEqual(second.body.tools.map((t) => t.name), ['hatirlatici_kur', 'hatirlaticilari_listele', 'hatirlatici_iptal'],
+      'istemci araçları kalır, yalnızca web araması çıkar');
+    assert.ok(second.body.tools.every((t) => t.strict === undefined));
     assert.equal(second.body.fallbacks, undefined);
     assert.equal(second.headers['anthropic-beta'], undefined);
     assert.ok(h.bot.claude.disabled.has('web'));
@@ -330,7 +342,7 @@ test('komutlar: hatirla, hafiza, efor, web, unut, durum', async () => {
     await waitSent(h, 6);
     const b = h.cl.chats()[0].body;
     assert.deepEqual(b.output_config, { effort: 'high' });
-    assert.equal(b.tools, undefined);
+    assert.ok(!b.tools.some((t) => t.name === 'web_search'));
     assert.doesNotMatch(b.system[0].text, /Web aramasını/);
     assert.match(b.system[1].text, /- Kahveyi şekersiz içer/);
 
@@ -402,6 +414,107 @@ test('durum dosyası yeniden başlatmada geri yüklenir', async () => {
     assert.deepEqual(h.saved().memory, ['Adı Asil']);
     h.store.cache.clear();
     assert.deepEqual(h.store.get(String(USER)).memory, ['Adı Asil']);
+  } finally {
+    await h.close();
+  }
+});
+
+test('hatırlatma: model aracı çağırır, bot kurar, zamanı gelince yollar, sonraki turda bağlam olur', async () => {
+  const h = await setup();
+  const when = localIn(2 * 3600_000);
+  h.cl.state.chat = (body, n) => {
+    if (n === 1) {
+      return {
+        stop_reason: 'tool_use',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'sig-1' },
+          { type: 'text', text: 'Kuruyorum.' },
+          { type: 'tool_use', id: 'tu_1', name: 'hatirlatici_kur', input: { zaman: when, metin: 'Toplantı', tekrar: 'yok' } },
+        ],
+      };
+    }
+    if (n === 2) return { text: 'Kurdum, iki saat sonra yazarım.' };
+    return { text: 'Tamam.' };
+  };
+  try {
+    h.tg.push(userMsg('iki saat sonra toplantıyı hatırlat'));
+    const sent = await waitSent(h, 1);
+    assert.equal(sent.text, 'Kurdum, iki saat sonra yazarım.', 'araç öncesi ön söz gösterilmez');
+
+    const second = h.cl.chats()[1].body.messages;
+    assert.equal(second.at(-2).role, 'assistant');
+    assert.equal(second.at(-2).content[0].signature, 'sig-1', 'tur içinde düşünme bloğu aynen geri gider');
+    assert.deepEqual(second.at(-1).content[0].type, 'tool_result');
+    assert.equal(second.at(-1).content[0].tool_use_id, 'tu_1');
+    assert.match(second.at(-1).content[0].content, /^Kuruldu #1: \d{4}-\d{2}-\d{2} \S+ \d{2}:\d{2} — Toplantı$/);
+
+    const saved = h.saved();
+    assert.equal(saved.reminders.length, 1);
+    assert.deepEqual(saved.turns.map((t) => t.role), ['user', 'assistant']);
+    assert.doesNotMatch(JSON.stringify(saved.turns), /tool_use|tool_result|sig-1/);
+
+    h.state().reminders[0].at = Date.now() - 1000;
+    await h.bot.reminders.tick();
+    assert.equal((await waitSent(h, 2)).text, '⏰ Toplantı');
+    assert.equal(h.state().reminders.length, 0);
+
+    h.tg.push(userMsg('tamam geldim'));
+    await waitSent(h, 3);
+    const t = h.cl.chats()[2].body.messages.at(-1).content.at(-1).text;
+    assert.match(t, /^\[.+\] \[.+ hatırlattım: «Toplantı»\]\ntamam geldim$/);
+    assert.deepEqual(h.state().notes, []);
+  } finally {
+    await h.close();
+  }
+});
+
+test('hatırlatma aracı hatası modele is_error olarak döner', async () => {
+  const h = await setup();
+  h.cl.state.chat = (body, n) => (n === 1
+    ? { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_x', name: 'hatirlatici_kur', input: { zaman: '2020-01-01 10:00', metin: 'eski', tekrar: 'yok' } }] }
+    : { text: 'O zaman geçmişte kalmış.' });
+  try {
+    h.tg.push(userMsg('2020de hatırlat'));
+    await waitSent(h, 1);
+    const result = h.cl.chats()[1].body.messages.at(-1).content[0];
+    assert.equal(result.is_error, true);
+    assert.match(result.content, /geçmişte/);
+    assert.equal((h.state().reminders || []).length, 0);
+  } finally {
+    await h.close();
+  }
+});
+
+test('tekrarlı hatırlatma ateşlenince bir sonraki güne kayar; /hatirlatmalar listeler ve siler', async () => {
+  const h = await setup();
+  try {
+    const s = h.state();
+    s.reminders = [{ id: 1, at: Date.now() - 1000, text: 'İlaç', repeat: 'her_gun' }];
+    s.nextReminderId = 1;
+    await h.bot.reminders.tick();
+    assert.equal((await waitSent(h, 1)).text, '⏰ İlaç');
+    const next = h.state().reminders[0].at;
+    assert.ok(next > Date.now() + 23 * 3600_000 && next < Date.now() + 25 * 3600_000);
+
+    h.tg.push(userMsg('/hatirlatmalar'));
+    assert.match((await waitSent(h, 2)).text, /#1 · .+ \(her gün\) — İlaç/);
+    h.tg.push(userMsg('/hatırlatmalar sil 1'));
+    assert.match((await waitSent(h, 3)).text, /İptal: #1 İlaç/);
+    h.tg.push(userMsg('/hatirlatmalar'));
+    assert.equal((await waitSent(h, 4)).text, 'Kurulu hatırlatma yok.');
+  } finally {
+    await h.close();
+  }
+});
+
+test('REMINDERS=off: araç gönderilmez, model söz vermemesi için uyarılır', async () => {
+  const h = await setup({ REMINDERS: 'off', WEB_SEARCH: 'off' });
+  try {
+    h.tg.push(userMsg('yarın hatırlat'));
+    await waitSent(h, 1);
+    const b = h.cl.chats()[0].body;
+    assert.equal(b.tools, undefined);
+    assert.match(b.system[0].text, /Hatırlatma kuramazsın/);
   } finally {
     await h.close();
   }

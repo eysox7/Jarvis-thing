@@ -39,17 +39,21 @@ export function toTelegramHTML(md) {
   flushQuote();
   s = out.join('\n');
 
-  // 4) Satır içi biçim.
+  // 4) Bağlantılar: adresin içindeki _ ve * biçim sanılmasın diye saklanır.
   s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, text, url) =>
-    `<a href="${url.replace(/"/g, '&quot;')}">${text}</a>`);
+    hold(`<a href="${url.replace(/"/g, '&quot;')}">${text}</a>`));
+  s = s.replace(/https?:\/\/[^\s<>"]+[^\s<>".,;:!?)]/g, (url) => hold(url));
+
+  // 5) Satır içi biçim.
   s = s.replace(/\*\*(?=\S)([^\n]*?\S)\*\*/g, '<b>$1</b>');
   s = s.replace(/(^|[^\w])__(?=\S)([^\n]*?\S)__(?!\w)/g, '$1<b>$2</b>');
   s = s.replace(/~~(?=\S)([^\n]*?\S)~~/g, '<s>$1</s>');
   s = s.replace(/(^|[^\w*])\*(?=[^\s*])([^*\n]*?[^\s*])\*(?![\w*])/g, '$1<i>$2</i>');
   s = s.replace(/(^|[^\w])_(?=[^\s_])([^_\n]*?[^\s_])_(?!\w)/g, '$1<i>$2</i>');
 
-  // 5) Saklananları geri koy.
-  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => slots[+i]);
+  // 6) Saklananları geri koy (bağlantı metnindeki kod gibi iç içe olanlar dahil).
+  while (/\u0000\d+\u0000/.test(s)) s = s.replace(/\u0000(\d+)\u0000/g, (_, i) => slots[+i]);
+  return s;
 }
 
 // Metni sınırı aşmayan parçalara böler; mümkünse paragraf/satır sınırından.

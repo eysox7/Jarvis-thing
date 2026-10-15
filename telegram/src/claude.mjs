@@ -5,6 +5,7 @@
 //  - Önbellek (prompt caching): aynı önek art arda gelen mesajlarda ~%95 ucuza okunur.
 //  - Efor varsayılan "low": sohbette düşünme tokenlarını kısar; /efor ile değişir.
 //  - Damıtma (distill): eski mesajlar kompakt hafıza + özete indirilir.
+//  - Sohbet istekleri akışlı (stream) gider: yüksek eforda uzun düşünme zaman aşımına uğramaz.
 
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -81,7 +82,7 @@ export class Claude {
   constructor(cfg, skill) {
     this.cfg = cfg;
     this.skill = skill;
-    this.disabled = new Set(); // API'nin reddettiği isteğe bağlı özellikler (web, fallbacks)
+    this.disabled = new Set(); // API'nin reddettiği isteğe bağlı özellikler (web, fallbacks, strict)
     this.client = new Anthropic({
       apiKey: cfg.anthropicKey,
       baseURL: cfg.anthropicBaseURL,
@@ -90,19 +91,21 @@ export class Claude {
     });
   }
 
-  // Ortak istek gövdesi. features: { web, cache }
-  request(model, { system, messages, effort, maxTokens, web, cache }) {
+  // Ortak istek gövdesi. tools: istemci araçları (hatırlatma); web: sunucu tarafı web araması.
+  request(model, { system, messages, effort, maxTokens, web, cache, tools = [] }) {
     const req = { model, max_tokens: maxTokens, system, messages };
     const betas = [];
     if (effort && !NO_EFFORT.test(model)) req.output_config = { effort };
     if (cache) req.cache_control = { type: 'ephemeral' };
+    const all = this.disabled.has('strict') ? tools.map(({ strict, ...t }) => t) : [...tools];
     if (web && !this.disabled.has('web')) {
-      req.tools = [{
+      all.push({
         type: WEB_DYNAMIC.test(model) ? 'web_search_20260209' : 'web_search_20250305',
         name: 'web_search',
         max_uses: this.cfg.webSearchMaxUses,
-      }];
+      });
     }
+    if (all.length) req.tools = all;
     if (this.cfg.fallbacks && !this.disabled.has('fallbacks') && FALLBACK_MODELS.has(model)) {
       betas.push('server-side-fallback-2026-07-01');
       req.fallbacks = 'default';
@@ -111,38 +114,54 @@ export class Claude {
     return req;
   }
 
-  // 400 gelirse ve istekte isteğe bağlı özellik varsa bir kez onlarsız dener;
-  // başarılı olursa o özelliği bu çalışma boyunca kapatır (sahibi loga bakar).
-  async create(req) {
+  // 400 gelirse ve istekte isteğe bağlı özellik varsa (web araması, yedek model, strict araç
+  // şeması) bir kez onlarsız dener; başarılı olursa onları bu çalışma boyunca kapatır.
+  // İstemci araçları kalır: geçmişte tool_use blokları varken araç listesi silinemez.
+  async create(req, { stream = false } = {}) {
+    const send = (body) => (stream
+      ? this.client.beta.messages.stream(body).finalMessage()
+      : this.client.beta.messages.create(body));
     try {
-      return await this.client.beta.messages.create(req);
+      return await send(req);
     } catch (e) {
-      const optional = [req.tools && 'web', req.fallbacks && 'fallbacks'].filter(Boolean);
+      const isWeb = (t) => /^web_search/.test(t.type || '');
+      const optional = [
+        req.tools?.some(isWeb) && 'web',
+        req.fallbacks && 'fallbacks',
+        req.tools?.some((t) => t.strict) && 'strict',
+      ].filter(Boolean);
       if (!(e instanceof Anthropic.BadRequestError) || !optional.length) throw e;
       const bare = { ...req };
-      delete bare.tools;
+      const tools = (req.tools || []).filter((t) => !isWeb(t)).map(({ strict, ...t }) => t);
+      if (tools.length) bare.tools = tools;
+      else delete bare.tools;
       delete bare.fallbacks;
       delete bare.betas;
-      const res = await this.client.beta.messages.create(bare);
+      const res = await send(bare);
+      // Aynı turun sonraki istekleri de (araç sonucu, pause_turn) özelliksiz gitsin.
+      for (const k of ['tools', 'fallbacks', 'betas']) delete req[k];
+      Object.assign(req, bare);
       for (const f of optional) this.disabled.add(f);
       console.warn(`[claude] API şu özellikleri reddetti, kapatıldı: ${optional.join(', ')} — ${e.message}`);
       return res;
     }
   }
 
-  async chat({ system, messages, effort, web }) {
+  // Bir sohbet turu. runTool(name, input) istemci araçlarını çalıştırır.
+  // Tur içinde yanıt içeriği (düşünme blokları dahil) aynen geri gönderilir;
+  // tur bitince yalnızca son metin geçmişe girer.
+  async chat({ system, messages, effort, web, tools = [], runTool }) {
     const model = this.cfg.model;
     const req = this.request(model, {
-      system, messages, effort, web, maxTokens: this.cfg.maxTokens, cache: this.cfg.promptCache,
+      system, messages, effort, web, tools, maxTokens: this.cfg.maxTokens, cache: this.cfg.promptCache,
     });
     const usage = emptyUsage();
     const sources = new Map();
     let text = '';
     let res;
     let promptTokens = 0;
-    // pause_turn: sunucu tarafı araç döngüsü durakladı; aynı turu kaldığı yerden sürdür.
-    for (let i = 0; i < 4; i++) {
-      res = await this.create(req);
+    for (let i = 0; i < 8; i++) {
+      res = await this.create(req, { stream: true });
       addUsage(usage, usageOf(res, model));
       if (i === 0) {
         const u = res.usage || {};
@@ -154,8 +173,23 @@ export class Claude {
         text += b.text;
         for (const c of b.citations || []) if (c.url && !sources.has(c.url)) sources.set(c.url, c.title || c.url);
       }
-      if (res.stop_reason !== 'pause_turn') break;
       req.messages = [...req.messages, { role: 'assistant', content: res.content }];
+      if (res.stop_reason === 'tool_use' && runTool) {
+        // Araç öncesi metin ön sözdür; kullanıcıya yalnızca sonuç gider.
+        text = '';
+        const calls = res.content.filter((b) => b.type === 'tool_use');
+        const results = await Promise.all(calls.map(async (c) => {
+          try {
+            return { type: 'tool_result', tool_use_id: c.id, content: String(await runTool(c.name, c.input || {})) };
+          } catch (e) {
+            return { type: 'tool_result', tool_use_id: c.id, content: e.message, is_error: true };
+          }
+        }));
+        req.messages = [...req.messages, { role: 'user', content: results }];
+        continue;
+      }
+      // pause_turn: sunucu tarafı araç döngüsü durakladı; aynı turu kaldığı yerden sürdür.
+      if (res.stop_reason !== 'pause_turn') break;
     }
     return {
       refused: false,

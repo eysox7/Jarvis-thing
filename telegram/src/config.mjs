@@ -43,7 +43,7 @@ export function readConfig(env = process.env) {
     model,
     memoryModel: env.MEMORY_MODEL?.trim() || model,
     effort: (env.BOT_EFFORT || 'low').trim().toLowerCase(),
-    maxTokens: int(env.MAX_TOKENS, 16000),
+    maxTokens: int(env.MAX_TOKENS, 64000),
     webSearch: bool(env.WEB_SEARCH, true),
     webSearchMaxUses: int(env.WEB_SEARCH_MAX_USES, 3),
     fallbacks: bool(env.FALLBACKS, true),
@@ -56,6 +56,7 @@ export function readConfig(env = process.env) {
     memoryMaxItems: int(env.MEMORY_MAX_ITEMS, 40),
     hardMaxTurns: int(env.HARD_MAX_TURNS, 40),
     mergeWindowMs: int(env.MERGE_WINDOW_MS, 1500),
+    reminders: bool(env.REMINDERS, true),
 
     // Sesli mesaj → yazı (isteğe bağlı, OpenAI-uyumlu /audio/transcriptions)
     stt: {

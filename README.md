@@ -32,8 +32,8 @@ Tarayıcıda açılır, ana ekrana eklenince yerli uygulama gibi çalışır.
 
 Dışarıdayken Claude'la Telegram'dan konuşmak için: **[telegram/](telegram/README.md)**.
 Sürekli açık bir makinede çalışan küçük bir Node.js servisi; yalnızca senin hesabına cevap verir,
-metin, ses, fotoğraf ve PDF alır, uzayan sohbeti kompakt hafızaya damıtarak token harcamasını
-düşük tutar.
+metin, ses, fotoğraf ve PDF alır, hatırlatma kurar, uzayan sohbeti kompakt hafızaya damıtarak
+token harcamasını düşük tutar.
 
 Botun davranışı **[.claude/skills/verimli-sohbet](.claude/skills/verimli-sohbet/SKILL.md)**
 skill'inden gelir: mesajdan yalnızca işe yarayanı (istek, karar, kısıt, isim/sayı/tarih) al,

@@ -103,22 +103,52 @@ export function apiMessage({ text = 'Tamam.', stop_reason = 'end_turn', usage = 
   };
 }
 
-// chat(body) ve distill(body) yanıt üretir; { status, json } dönerse HTTP hatası verir.
+// Gerçek API'nin akış biçimi: message_start, blok başına start/delta/stop, message_delta, message_stop.
+function writeSSE(res, msg) {
+  res.writeHead(200, { 'content-type': 'text/event-stream' });
+  const ev = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`);
+  const { content, stop_reason, usage, ...rest } = msg;
+  ev('message_start', { message: { ...rest, content: [], stop_reason: null, usage: { ...usage, output_tokens: 1 } } });
+  content.forEach((b, index) => {
+    if (b.type === 'text') {
+      const { text, ...head } = b;
+      ev('content_block_start', { index, content_block: { ...head, text: '' } });
+      ev('content_block_delta', { index, delta: { type: 'text_delta', text } });
+    } else if (b.type === 'tool_use') {
+      ev('content_block_start', { index, content_block: { ...b, input: {} } });
+      ev('content_block_delta', { index, delta: { type: 'input_json_delta', partial_json: JSON.stringify(b.input) } });
+    } else if (b.type === 'thinking') {
+      ev('content_block_start', { index, content_block: { ...b, signature: '' } });
+      ev('content_block_delta', { index, delta: { type: 'signature_delta', signature: b.signature } });
+    } else {
+      ev('content_block_start', { index, content_block: b });
+    }
+    ev('content_block_stop', { index });
+  });
+  ev('message_delta', { delta: { stop_reason, stop_sequence: null }, usage });
+  ev('message_stop', {});
+  res.end();
+}
+
+// chat(body, n) ve distill(body, n) yanıt üretir (n: kaçıncı istek); { status, json } dönerse HTTP hatası verir.
 export async function fakeClaude() {
   const state = {
     requests: [],
     chat: () => ({ text: 'Tamam.' }),
     distill: () => ({ text: '<hafiza>\n- Kullanıcı test ediyor\n</hafiza>\n<ozet>\nTest sürüyor.\n</ozet>' }),
   };
-  const srv = await mockServer(async (req, body) => {
+  const srv = await mockServer(async (req, body, res) => {
     if (req.url.startsWith('/v1/models/')) {
       return { json: { id: 'claude-opus-5-5', type: 'model', display_name: 'Claude Opus 5.5' } };
     }
     const kind = typeof body.system === 'string' ? 'distill' : 'chat';
     state.requests.push({ kind, body, headers: req.headers, url: req.url });
-    const r = state[kind](body);
+    const r = state[kind](body, state.requests.filter((x) => x.kind === kind).length);
     if (r.status) return r;
-    return { json: apiMessage(r) };
+    const msg = apiMessage(r);
+    if (!body.stream) return { json: msg };
+    writeSSE(res, msg);
+    return null;
   });
   return {
     ...srv,

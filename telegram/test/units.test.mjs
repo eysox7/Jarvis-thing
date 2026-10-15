@@ -98,3 +98,46 @@ test('yapılandırma: varsayılanlar, doğrulama, .env okuma', async () => {
   loadEnvFile(file, env);
   assert.deepEqual(env, { A: '1', B: 'iki kelime', C: '3', D: 'ortam' });
 });
+
+test('hatırlatma zamanı: yerel saat ↔ epoch, yaz saati, geçersiz tarih', async () => {
+  const { parseLocal, formatLocal, nextOccurrence } = await import('../src/reminders.mjs');
+  const ist = 'Europe/Istanbul';
+  const t = parseLocal('2026-10-16 15:00', ist);
+  assert.equal(t, Date.UTC(2026, 9, 16, 12, 0));
+  assert.equal(formatLocal(t, ist), '2026-10-16 Cum 15:00');
+  // Berlin'de 29 Mart 2026 02:00'de saat ileri alınır: 03:30 yerel = 01:30 UTC.
+  assert.equal(parseLocal('2026-03-29 03:30', 'Europe/Berlin'), Date.UTC(2026, 2, 29, 1, 30));
+  assert.throws(() => parseLocal('2026-02-30 10:00', ist), /Geçersiz/);
+  assert.throws(() => parseLocal('yarın 3', ist), /biçiminde/);
+
+  const fri = parseLocal('2026-10-16 09:00', ist);
+  assert.equal(nextOccurrence(fri, 'yok', ist), null);
+  assert.equal(formatLocal(nextOccurrence(fri, 'her_gun', ist), ist), '2026-10-17 Cmt 09:00');
+  assert.equal(formatLocal(nextOccurrence(fri, 'hafta_ici', ist), ist), '2026-10-19 Pzt 09:00');
+  assert.equal(formatLocal(nextOccurrence(fri, 'her_hafta', ist), ist), '2026-10-23 Cum 09:00');
+  // Bot kapalıyken kaçırılanlar atlanır: ilk gelecek zamana gider.
+  const after = parseLocal('2026-10-20 12:00', ist);
+  assert.equal(formatLocal(nextOccurrence(fri, 'her_gun', ist, after), ist), '2026-10-21 Çar 09:00');
+});
+
+test('hatırlatma ekleme/iptal kuralları', async () => {
+  const { addReminder, cancelReminder, listReminders } = await import('../src/reminders.mjs');
+  const ist = 'Europe/Istanbul';
+  const now = Date.UTC(2026, 9, 15, 12, 0); // 15:00 yerel
+  const s = {};
+  assert.throws(() => addReminder(s, { zaman: '2026-10-15 14:00', metin: 'x', tekrar: 'yok' }, ist, now), /geçmişte/);
+  assert.throws(() => addReminder(s, { zaman: '2026-10-15 16:00', metin: '  ', tekrar: 'yok' }, ist, now), /boş/);
+  const a = addReminder(s, { zaman: '2026-10-16 09:00', metin: 'Fatura\n öde', tekrar: 'her_gun' }, ist, now);
+  const b = addReminder(s, { zaman: '2026-10-15 18:00', metin: 'Ara', tekrar: 'saçma' }, ist, now);
+  assert.deepEqual([a.id, b.id, b.repeat, a.text], [1, 2, 'yok', 'Fatura öde']);
+  assert.equal(listReminders(s, ist), '#2 · 2026-10-15 Per 18:00 — Ara\n#1 · 2026-10-16 Cum 09:00 (her gün) — Fatura öde');
+  cancelReminder(s, 2);
+  assert.throws(() => cancelReminder(s, 2), /yok/);
+  assert.equal(s.reminders.length, 1);
+});
+
+test('Markdown: adresteki _ ve * biçim sanılmaz, bağlantı metnindeki kod korunur', () => {
+  assert.equal(toTelegramHTML('bak https://a.com/_x_/y*z* sonra'), 'bak https://a.com/_x_/y*z* sonra');
+  assert.equal(toTelegramHTML('(https://a.com/x).'), '(https://a.com/x).');
+  assert.equal(toTelegramHTML('[`kod`](https://a.com/a_b_)'), '<a href="https://a.com/a_b_"><code>kod</code></a>');
+});
