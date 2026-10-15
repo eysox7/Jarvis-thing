@@ -3,7 +3,7 @@
 //
 // Kayıp (AlphaZero makalesindeki gibi):  L = (z - v)² − πᵀ log p + c‖θ‖²
 
-import { rng } from './sim.js';
+import { rng } from './rng.js';
 
 export class Net {
   constructor({ input, hidden = [128, 64], actions, seed = 1 } = {}) {

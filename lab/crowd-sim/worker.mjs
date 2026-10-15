@@ -1,6 +1,6 @@
 // Self-play / arena oyunlarını ayrı iş parçacığında oynatır (cli.mjs çağırır).
 import { parentPort, workerData } from 'node:worker_threads';
-import { Net } from './nn.js';
+import { Net } from '../core/nn.js';
 import { playGame } from './alphazero.js';
 
 const { netJSON, seeds, pool, nAgents, sims, explore } = workerData;

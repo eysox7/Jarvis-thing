@@ -49,11 +49,11 @@ MatrAIx bilgileri (raw.githubusercontent üzerinden okundu; HF erişimi proxy'de
 
 ## YENİ HEDEF (17:06'dan itibaren): Karar Laboratuvarı — `lab/decision-lab/`
 Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem + arayüz.
-- [ ] A. Ortak çekirdek: `lab/core/` (nn.js, mcts.js, rng) — crowd-sim de buradan kullanır
-- [ ] B. Nüfus modeli: MatrAIx YAML içe aktarma, sentetik örnek nüfus, segmentler
-- [ ] C. Senaryo modeli + şablonlar (ürün lansmanı, politika reformu)
-- [ ] D. Hızlı tepki motoru: boyut→tercih ağırlıkları, lojistik seçim, sosyal yayılım (zaman adımlı)
-- [ ] E. AlphaZero ortamı: zaman adımlı kararlar, açık hedef fonksiyonları (pazarlama: benimseme+memnuniyet−terk; politika: destek + en düşük segment − kutuplaşma)
+- [x] A. Ortak çekirdek: `lab/core/` (nn.js, mcts.js, rng) — crowd-sim de buradan kullanır
+- [x] B. Nüfus modeli: MatrAIx YAML içe aktarma, sentetik örnek nüfus, segmentler
+- [x] C. Senaryo modeli + şablonlar (ürün lansmanı, politika reformu)
+- [x] D. Hızlı tepki motoru: boyut→tercih ağırlıkları, lojistik seçim, sosyal yayılım (zaman adımlı)
+- [x] E. AlphaZero ortamı: zaman adımlı kararlar, açık hedef fonksiyonları (pazarlama: benimseme+memnuniyet−terk; politika: destek + en düşük segment − kutuplaşma)
 - [ ] F. LLM persona motoru (NEXUS API bağlantılarını kullanır) + kalibrasyon
 - [ ] G. Arayüz: Nüfus / Senaryo / Tahmin / Strateji / Doğrulama sekmeleri (mobil uyumlu, NEXUS tarzı)
 - [ ] H. MatrAIx dışa aktarma (senaryo → anket görevi, sonuç → kalibrasyon)
@@ -77,6 +77,8 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 | 1c | 17:08 | Kullanıcı sordu: "eski modeli sildim" ne demek → açıklandı (sadece ağırlık dosyası, git'te `e6da6c9`'da duruyor). `index.html` görselleştirme yazıldı, headless Chromium'da çalıştığı görüldü. Bulgu: run1 policy'si yine anons yağdırıyor (16/17 eylem müdahale, tekdüze öncel + 16 sim yetersiz). run1 `models/run1/`'e taşındı (silinmedi). Düzeltme: "bekle" eylemine başlangıç önceliği (bias 2.5), sim 16→32. Arena kıyası: müdahalesiz 76.2, kural 60.7, run1 68.1 | Yeni eğitim (30 iter, ~25 dk) |
 
 | 1d | 17:06 | **YÖN DEĞİŞİKLİĞİ (kullanıcı):** konser/tahliye değil; insanların kararları — pazarlama ve siyasi/kamu politikası kararları. Arayüz + sistem istendi. Konser eğitimi durduruldu, `lab/crowd-sim/` olduğu gibi bırakıldı. Yeni iş: `lab/decision-lab/` (aşağıdaki yeni yol haritası). Sınır: politika tasarımı + tepki tahmini evet; seçmen segmentine göre ikna/mikrohedefleme optimizasyonu hayır (kullanıcıya söylendi) | decision-lab çekirdeği |
+
+| 1e | 17:20 | `lab/core/` (nn, mcts, rng; crowd-sim de buradan). `decision-lab/`: population.js (MatrAIx YAML ayrıştırıcı, 10 eğilim + eşleme tablosu, sentetik nüfus, segmentler), scenarios.js (2 şablon: araç giriş ücreti / fitness uygulaması), model.js (fayda + aylık dinamik + açık hedef fonksiyonu + tasarım evresi), az.js. Bulgu: AlphaZero "düşük ücretle başla, son ay 120 TL'ye çık" (yem-ve-değiştir) buldu → etkinlik dönem ortalaması yapıldı. Sonuç (politika): taban 0.446, en iyi statik 0.575, AlphaZero 0.682; en düşük segment desteği 0.21→0.68 | G. arayüz |
 
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

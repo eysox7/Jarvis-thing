@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } fr
 import { cpus } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Net } from './nn.js';
+import { Net } from '../core/nn.js';
 import * as env from './env.js';
 import { Replay, trainNet, ruleBaseline } from './alphazero.js';
 import { poolFromPersonas, poolFromCalibration } from './personas.js';

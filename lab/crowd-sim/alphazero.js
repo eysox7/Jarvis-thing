@@ -4,7 +4,7 @@
 // oyun sonucu (z) value başının hedefidir. Arama ağı iyileştirir, iyi ağ aramayı iyileştirir.
 
 import * as env from './env.js';
-import { Node, search, pick, normalize } from './mcts.js';
+import { Node, search, pick, normalize } from '../core/mcts.js';
 import { rng } from './sim.js';
 import * as S from './sim.js';
 
