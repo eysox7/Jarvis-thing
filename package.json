@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 8080",
-    "test": "bash tests/run.sh"
+    "test": "bash tests/run.sh",
+    "telegram": "npm --prefix telegram start",
+    "skill:zip": "cd .claude/skills && zip -qr ../../verimli-sohbet.zip verimli-sohbet"
   },
   "devDependencies": {
     "playwright": "^1.56.0"

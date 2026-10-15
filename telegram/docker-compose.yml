@@ -1,0 +1,15 @@
+services:
+  nexus-telegram:
+    build:
+      context: ..
+      dockerfile: telegram/Dockerfile
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      SKILL_DIR: /app/skill
+    volumes:
+      - nexus-data:/data
+    restart: unless-stopped
+
+volumes:
+  nexus-data: {}

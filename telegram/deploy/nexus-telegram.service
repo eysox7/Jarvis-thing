@@ -1,0 +1,23 @@
+# systemd birimi: sunucu açıldığında başlar, çökerse yeniden başlar.
+#   1) Aşağıdaki User ve WorkingDirectory satırlarını kendi kullanıcı adın ve yolunla değiştir.
+#   2) sudo cp deploy/nexus-telegram.service /etc/systemd/system/
+#   3) sudo systemctl daemon-reload && sudo systemctl enable --now nexus-telegram
+#   Log:  journalctl -u nexus-telegram -f
+
+[Unit]
+Description=Nexus Telegram botu (Claude)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=KULLANICI
+WorkingDirectory=/home/KULLANICI/Jarvis-thing/telegram
+ExecStart=/usr/bin/env node src/main.mjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

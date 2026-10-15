@@ -28,6 +28,21 @@ Tarayıcıda açılır, ana ekrana eklenince yerli uygulama gibi çalışır.
 - **Çevrimdışı açılır.** Service worker sayesinde uygulama kabuğu önbellekte;
   görevlerin ve notların internetsiz de elinin altında (yalnızca model çağrısı ağ ister).
 
+## Telegram botu ve verimli-sohbet skill'i
+
+Dışarıdayken Claude'la Telegram'dan konuşmak için: **[telegram/](telegram/README.md)**.
+Sürekli açık bir makinede çalışan küçük bir Node.js servisi; yalnızca senin hesabına cevap verir,
+metin, ses, fotoğraf ve PDF alır, uzayan sohbeti kompakt hafızaya damıtarak token harcamasını
+düşük tutar.
+
+Botun davranışı **[.claude/skills/verimli-sohbet](.claude/skills/verimli-sohbet/SKILL.md)**
+skill'inden gelir: mesajdan yalnızca işe yarayanı (istek, karar, kısıt, isim/sayı/tarih) al,
+dolguyu at, kısa ve doğrudan cevap ver, geçmişi hafıza + özete damıt. Aynı skill:
+
+- bu depoda **Claude Code** açıldığında kendiliğinden kullanılabilir,
+- **claude.ai**'ye yüklenebilir: `npm run skill:zip` → `verimli-sohbet.zip` →
+  Ayarlar'daki Skills bölümünden yükle.
+
 ## Kurulum
 
 Hiçbir bağımlılığı yok. Üç seçenek:
