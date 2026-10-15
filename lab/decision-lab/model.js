@@ -359,3 +359,34 @@ export function movesForConfig(ctx, config) {
   moves.push(0);
   return moves;
 }
+
+// ── Planı açıklama (ablasyon) ───────────────────────────────────────────────
+// Her adım tek tek çıkarılıp plan yeniden oynatılır: skorun ne kadar düştüğü o adımın katkısı,
+// segment desteğindeki değişim de adımın kime yaradığıdır. Tasarım adımları için ilgili kol
+// senaryonun başlangıç seçeneğine döndürülür; zamanlı adımlar "bekle" ile değiştirilir.
+export function explainPlan(ctx, moves, start = initialConfig(ctx.scn)) {
+  const full = replay(ctx, moves, start);
+  const init = initialConfig(ctx.scn);
+  const rows = [];
+  const add = (label, when, r) => rows.push({
+    label, when, delta: full.total - r.total,
+    segDelta: full.segs.map((v, k) => v - r.segs[k]),
+  });
+  for (const l of ctx.scn.levers) {
+    if (start[l.id] === init[l.id]) continue;
+    const opt = l.options.find((o) => o.id === start[l.id]);
+    add(`${l.label} → ${opt?.label}`, 'tasarım', replay(ctx, moves, { ...start, [l.id]: init[l.id] }));
+  }
+  let design = true, t = 0;
+  moves.forEach((m, idx) => {
+    const a = ctx.actions[m];
+    if (design) {
+      if (a.type === 'noop') design = false;
+      else add(a.label, 'tasarım', replay(ctx, moves.map((x, j) => (j === idx ? -1 : x)).filter((x) => x !== -1), start));
+      return;
+    }
+    if (a.type !== 'noop') add(a.label, `${t + 1}. ${ctx.scn.unit}`, replay(ctx, moves.map((x, j) => (j === idx ? 0 : x)), start));
+    t++;
+  });
+  return { full, rows };
+}

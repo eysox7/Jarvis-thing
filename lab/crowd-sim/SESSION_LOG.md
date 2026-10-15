@@ -92,5 +92,7 @@ Pazarlama ve kamu politikası kararlarında nüfus tepkisini simüle eden sistem
 
 | 5 | 17:40 | Uyanış #5. İki yeni şablon: emeklilik yaşı reformu (politika), elektrikli otomobil lansmanı (pazarlama). İkisi de geçerli; AZ sağlamlık %100 (emeklilik 0.600→0.685, EV 0.448→0.608) | Sıradaki: "Neden bu plan?" açıklaması (her adımın segmentlere etkisi) |
 
+| 5b | 17:45 | "Neden bu plan?" (model.js `explainPlan`, ablasyon): her adım çıkarılıp yeniden oynatılır; katkı + segment etkisi tablosu Strateji sekmesinde. Emeklilik örneği: en büyük katkı kademeli geçiş (+0.205, 65+ için +43 puan). Headless hatasız | Sıradaki: kendi kullanımı için kısa "nasıl kullanılır" rehberi arayüzde; NEXUS'tan lab'a bağlantı |
+
 ## Kesinti / kota
 - Kalan kotayı içeriden göremiyorum. Bir hata mesajı sıfırlanma saati verirse buraya yazılır ve o saate uyanış kurulur.

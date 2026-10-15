@@ -289,6 +289,13 @@ RENDER.strategy = () => {
       + (az.parts ? `<li><span class="t">sonuç</span><span class="small">${Object.entries(az.parts).map(([k, v]) => `${esc(PART_LABELS[k] || k)} ${v.toFixed(2)}`).join(' · ')}</span></li>` : '');
     bars($('azBars'), c.seg.labels, az.segs, r0.segs);
   }
+  if (az?.moves && !az.running) {
+    const ex = M.explainPlan(c, az.moves, az.start);
+    const cell = (v) => `<td class="num" style="color:${v > 0.03 ? 'var(--ok)' : v < -0.03 ? 'var(--err)' : 'inherit'}">${v > 0 ? '+' : ''}${Math.round(v * 100)}</td>`;
+    $('azWhy').innerHTML = `<tr><th>Ne zaman</th><th>Adım</th><th class="num">Katkı</th>${c.seg.labels.map((l) => `<th class="num">${esc(l)}</th>`).join('')}</tr>`
+      + ex.rows.sort((a, b) => b.delta - a.delta).map((x) => `<tr><td class="muted">${esc(x.when)}</td><td>${esc(x.label)}</td><td class="num"><b>${x.delta >= 0 ? '+' : ''}${x.delta.toFixed(3)}</b></td>${x.segDelta.map(cell).join('')}</tr>`).join('')
+      + (ex.rows.length ? '' : '<tr><td class="muted">Plan, başlangıç tasarımını değiştirmiyor.</td></tr>');
+  }
   $('azToForecast').disabled = !az?.config; $('azToValidate').disabled = !az?.config; $('rbRun').disabled = !az?.moves;
   if (az?.stale && !az.running) $('azStatus').innerHTML = '<span class="warn">Bu plan model kalibre edilmeden önce bulundu; yeniden çalıştır.</span>';
   const h = az?.history || [];

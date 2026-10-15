@@ -167,6 +167,8 @@ details summary{cursor:pointer;color:var(--fg-dim);font-size:13px}
     <div class="card"><ul class="timeline" id="azPlan"><li class="muted">Henüz çalıştırılmadı.</li></ul>
       <div class="row" style="margin-top:10px"><button class="btn" id="azToForecast" disabled>Son tasarımı Tahmin'de aç</button><button class="btn" id="azToValidate" disabled>Planı doğrula →</button></div>
     </div>
+    <h2>Neden bu plan?</h2>
+    <div class="card scroll"><p class="small muted">Her adım plandan tek tek çıkarılıp sonuç yeniden hesaplanır. Katkı: o adım olmasaydı skor ne kadar düşerdi. Segment sütunları: adımın o segmentin desteğine/benimsemesine etkisi (puan).</p><table id="azWhy"><tr><td class="muted">Eğitim bitince hesaplanır.</td></tr></table></div>
     <h2>Segmentlere göre</h2>
     <div class="card"><div class="bars" id="azBars"></div><p class="small muted">Sarı çizgi: başlangıç tasarımı, eylemsiz.</p></div>
     <h2>Sağlamlık testi</h2>
