@@ -363,14 +363,18 @@ $('vAsk').onclick = async () => {
   $('vAsk').textContent = 'Durdur';
   S.llmRows = [];
   let done = 0, failed = 0;
-  const queue = idx.slice();
+  // Panel açıksa her persona her model ailesine ayrı sorulur; değilse yedekli zincir.
+  const panel = $('vPanel').checked ? L.panelProfiles() : [];
+  const profiles = panel.length > 1 ? panel : [null];
+  const queue = idx.flatMap((i) => profiles.map((profile) => ({ i, profile })));
+  const total = queue.length;
   const workerFn = async () => {
     while (queue.length && !askAbort.signal.aborted) {
-      const i = queue.shift();
+      const { i, profile } = queue.shift();
       const p = S.personas[i];
       try {
-        const ans = await L.askPersona(p, S.scenario, choice.config, { signal: askAbort.signal });
-        S.llmRows.push({ i, seg: c.seg.index[i], name: p.name, score: ans.score, reason: ans.reason, llm: L.LIKERT_P[ans.score], model: modelProb(c, choice.config, i), cfg: choice.id });
+        const ans = await L.askPersona(p, S.scenario, choice.config, { signal: askAbort.signal, profile });
+        S.llmRows.push({ i, seg: c.seg.index[i], name: p.name, score: ans.score, reason: ans.reason, llm: L.LIKERT_P[ans.score], model: modelProb(c, choice.config, i), cfg: choice.id, src: profile ? L.profileLabel(profile) : 'otomatik' });
       } catch (e) {
         if (e.name === 'AbortError') break;
         failed++;
@@ -378,7 +382,7 @@ $('vAsk').onclick = async () => {
         if (/bağlantı yok|API/.test(e.message) && !S.llmRows.length) { queue.length = 0; break; }
       }
       done++;
-      $('vStatus').textContent = `${done}/${idx.length} persona soruldu${failed ? `, ${failed} hata` : ''}…`;
+      $('vStatus').textContent = `${done}/${total} soru${profiles.length > 1 ? ` (${idx.length} persona × ${profiles.length} model)` : ''}${failed ? `, ${failed} hata` : ''}…`;
       renderLlm();
     }
   };
@@ -395,20 +399,29 @@ function renderLlm() {
   $('vCalib').disabled = !rows.length;
   $('vSum').disabled = !rows.some((x) => x.reason && !x.reason.startsWith('(MatrAIx)'));
   if (!rows.length) { $('vTable').innerHTML = ''; $('vAnswers').innerHTML = ''; return; }
-  $('vTable').innerHTML = '<tr><th>Segment</th><th class="num">n</th><th class="num">LLM</th><th class="num">Model</th><th class="num">Fark</th></tr>'
+  const pc = L.panelConsensus(rows, c.seg.labels.length);
+  const multi = pc.srcs.length > 1;
+  $('vTable').innerHTML = `<tr><th>Segment</th><th class="num">n</th>${multi ? pc.srcs.map((s) => `<th class="num" title="${esc(s)}">${esc(s.split(' (')[0])}</th>`).join('') + '<th class="num">Açıklık</th>' : ''}<th class="num">LLM ort.</th><th class="num">Model</th><th class="num">Fark</th></tr>`
     + c.seg.labels.map((l, k) => {
       const r = rows.filter((x) => x.seg === k);
       if (!r.length) return '';
       const a = r.reduce((s, x) => s + x.llm, 0) / r.length, m = r.reduce((s, x) => s + x.model, 0) / r.length;
-      const g = a - m;
-      return `<tr><td>${esc(l)}</td><td class="num">${r.length}</td><td class="num">${pct(a)}</td><td class="num">${pct(m)}</td><td class="num ${Math.abs(g) > 0.2 ? 'warn' : ''}">${g > 0 ? '+' : ''}${Math.round(g * 100)}</td></tr>`;
-    }).join('');
-  $('vAnswers').innerHTML = rows.map((x) => `<div class="answer"><div class="who">${esc(x.name)} · ${esc(c.seg.labels[x.seg])} · puan ${x.score}/5 · model ${pct(x.model)}</div>${esc(x.reason)}</div>`).join('');
+      const g = a - m, sg = pc.segs[k];
+      const panelCells = multi ? sg.per.map((v) => `<td class="num">${v == null ? '–' : pct(v)}</td>`).join('')
+        + `<td class="num ${sg.ok ? '' : 'warn'}" title="${sg.ok ? 'Modeller tutarlı' : 'Modeller anlaşamıyor: bu segment kalibrasyona alınmaz'}">${Math.round(sg.spread * 100)}${sg.ok ? '' : ' ⚠'}</td>` : '';
+      return `<tr><td>${esc(l)}</td><td class="num">${r.length}</td>${panelCells}<td class="num">${pct(a)}</td><td class="num">${pct(m)}</td><td class="num ${Math.abs(g) > 0.2 ? 'warn' : ''}">${g > 0 ? '+' : ''}${Math.round(g * 100)}</td></tr>`;
+    }).join('')
+    + (multi ? `<tr><td colspan="99" class="small muted">Açıklık: modellerin segment ortalamaları arasındaki en büyük fark (puan). ${Math.round(pc.threshold * 100)} puanı aşan segmentlerde modeller anlaşamıyor; bu segmentler kalibrasyona alınmaz.</td></tr>` : '');
+  $('vAnswers').innerHTML = rows.map((x) => `<div class="answer"><div class="who">${esc(x.name)} · ${esc(c.seg.labels[x.seg])}${multi ? ` · ${esc(x.src)}` : ''} · puan ${x.score}/5 · model ${pct(x.model)}</div>${esc(x.reason)}</div>`).join('');
 }
 
 $('vCalib').onclick = () => {
   const c = ctx();
-  const fitted = L.fitSegBias(S.llmRows, c.seg.labels.length, Array.from(c.segBias));
+  // Panelde modellerin anlaşamadığı segmentler dışarıda; her persona için modellerin ortalaması.
+  const pc = L.panelConsensus(S.llmRows, c.seg.labels.length);
+  const usable = L.averageBySubject(S.llmRows).filter((r) => pc.segs[r.seg].ok);
+  const skipped = c.seg.labels.filter((_, k) => pc.segs[k].n && !pc.segs[k].ok);
+  const fitted = L.fitSegBias(usable, c.seg.labels.length, Array.from(c.segBias));
   S.calib[calibKey()] = Object.fromEntries(c.seg.labels.map((l, k) => [l, fitted[k]]));
   invalidate({ keepAz: true, keepAnswers: true });
   if (S.az) S.az.stale = true;
@@ -417,7 +430,8 @@ $('vCalib').onclick = () => {
   const cfgOf = Object.fromEntries(configChoices().map((x) => [x.id, x.config]));
   for (const r of S.llmRows) if (cfgOf[r.cfg]) r.model = modelProb(nc, cfgOf[r.cfg], r.i);
   save();
-  $('vStatus').textContent = 'Model kalibre edildi; tablodaki "Model" sütunu güncellendi. Strateji sekmesinde AlphaZero\'yu yeniden çalıştırman önerilir.';
+  $('vStatus').textContent = 'Model kalibre edildi; tablodaki "Model" sütunu güncellendi. Strateji sekmesinde AlphaZero\'yu yeniden çalıştırman önerilir.'
+    + (skipped.length ? ` Modellerin anlaşamadığı için atlanan segmentler: ${skipped.join(', ')}.` : '');
   renderLlm();
 };
 $('vSum').onclick = async () => {
@@ -480,6 +494,9 @@ RENDER.validate = () => {
   const conns = L.connections();
   $('llmConn').innerHTML = conns.length
     ? `<span class="ok">Bağlantı:</span> ${conns.map((p) => esc(`${p.name || p.provider} (${p.model})`)).join(' → ')}`
+      + (L.panelProfiles().length > 1
+        ? `<br><span class="ok">Panel:</span> ${L.panelProfiles().map((p) => esc(L.profileLabel(p))).join(' · ')}`
+        : '<br><span class="muted">Panel için farklı sağlayıcılardan en az iki bağlantı gerekir (ör. Gemini + Groq).</span>')
     : '<span class="warn">Kayıtlı API bağlantısı yok.</span> <a href="../../index.html">N.E.X.U.S.</a> → API sekmesinden bir bağlantı ekle (ör. ücretsiz Gemini veya Groq).';
   const choices = configChoices();
   const prev = $('vCfg').value;

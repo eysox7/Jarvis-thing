@@ -4,7 +4,7 @@
 // Bağlantılar N.E.X.U.S.'un kayıtlı API profilleridir (aynı tarayıcı, aynı localStorage).
 
 import * as store from '../../js/store.js';
-import { chatWithFallback } from '../../js/providers.js';
+import { chat, chatWithFallback } from '../../js/providers.js';
 import { describeConfig } from './scenarios.js';
 
 export const LIKERT_P = { 1: 0.05, 2: 0.25, 3: 0.5, 4: 0.75, 5: 0.95 };
@@ -35,10 +35,27 @@ export function questionFor(scn, config) {
   return `${scn.title}\n${scn.summary}\n\nAyrıntılar:\n${describeConfig(scn, config)}\n\n${scn.question} (${scale})`;
 }
 
-export async function askPersona(persona, scn, config, { signal } = {}) {
-  const profiles = connections();
+// Çapraz model paneli: farklı model ailelerinden en fazla 3 bağlantı. Aynı sağlayıcıdan iki model
+// birbirinin hatasını tekrarlama eğiliminde olduğu için sağlayıcı başına bir bağlantı alınır.
+export function panelProfiles(max = 3) {
+  const seen = new Set(), out = [];
+  for (const p of connections()) {
+    const fam = p.provider || p.kind || p.baseUrl;
+    if (seen.has(fam)) continue;
+    seen.add(fam);
+    out.push(p);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+export const profileLabel = (p) => `${p.name || p.provider} (${p.model})`;
+
+// profile verilirse yalnızca o bağlantı kullanılır (panel); verilmezse sıralı yedekli zincir.
+export async function askPersona(persona, scn, config, { signal, profile = null } = {}) {
+  const profiles = profile ? [profile] : connections();
   if (!profiles.length) throw new Error('Kayıtlı API bağlantısı yok. N.E.X.U.S. → API sekmesinden ekle.');
-  const out = await chatWithFallback(profiles, {
+  const call = profile ? (_, o) => chat(profile, o) : chatWithFallback;
+  const out = await call(profiles, {
     system: SYSTEM(persona),
     messages: [{ role: 'user', content: questionFor(scn, config) }],
     temperature: 0.7,
@@ -114,4 +131,33 @@ export async function summarizeReasons(scn, rows, labels, { signal } = {}) {
     temperature: 0.3, maxTokens: 4096, signal, proxy: store.settings()?.proxy,
   });
   return out.text;
+}
+
+// Panel tutarlılığı: her segmentte her modelin ortalama olasılığı ve modeller arası açıklık.
+// Açıklık eşiği aşan segmentlerde modeller "bu insanlar ne yapar" konusunda anlaşamıyor demektir;
+// o segment kalibrasyona alınmaz (tek bir modelin önyargısını modele işlememek için).
+export function panelConsensus(rows, K, threshold = 0.25) {
+  const srcs = [...new Set(rows.map((r) => r.src || 'otomatik'))];
+  const segs = Array.from({ length: K }, (_, k) => {
+    const per = srcs.map((s) => {
+      const r = rows.filter((x) => x.seg === k && (x.src || 'otomatik') === s);
+      return r.length ? r.reduce((a, x) => a + x.llm, 0) / r.length : null;
+    });
+    const vals = per.filter((v) => v != null);
+    const spread = vals.length > 1 ? Math.max(...vals) - Math.min(...vals) : 0;
+    return { per, spread, n: rows.filter((x) => x.seg === k).length, ok: vals.length > 0 && spread <= threshold };
+  });
+  return { srcs, segs, threshold };
+}
+
+// Aynı personanın farklı modellerden aldığı cevapların ortalaması (kalibrasyon girdisi).
+export function averageBySubject(rows) {
+  const m = new Map();
+  for (const r of rows) {
+    const key = `${r.i}|${r.cfg}`;
+    if (!m.has(key)) m.set(key, { ...r, llmSum: 0, cnt: 0 });
+    const a = m.get(key);
+    a.llmSum += r.llm; a.cnt++;
+  }
+  return [...m.values()].map((a) => ({ ...a, llm: a.llmSum / a.cnt }));
 }
