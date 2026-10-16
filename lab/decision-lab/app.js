@@ -7,6 +7,7 @@ import * as X from './matraix.js';
 import * as ED from './editor.js';
 import { rng } from '../core/rng.js';
 import { buildReport } from './report.js';
+import { setupPlanTest } from './plantest.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -515,6 +516,10 @@ RENDER.validate = () => {
   if (choices.some((c) => c.id === prev)) $('vCfg').value = prev;
   renderLlm();
 };
+
+// ── Plan testi ──────────────────────────────────────────────────────────────
+const planTest = setupPlanTest({ $, esc, pct, f3, S, ctx, save, bars, spark, kpis, metricName, PART_LABELS, azPersonas, calibration });
+RENDER.plantest = () => { header(); planTest.render(); };
 
 // ── Başlat ──────────────────────────────────────────────────────────────────
 // Rehber ilk ziyarette açık gelir; sonra kullanıcının bıraktığı gibi kalır.

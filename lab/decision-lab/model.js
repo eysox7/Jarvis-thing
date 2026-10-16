@@ -479,3 +479,55 @@ export function crowdDiagnostics(ctx, config) {
     drift: drift.map((d, k) => (cnt[k] ? d / cnt[k] : 0)),
   };
 }
+
+// ── Kullanıcı planı testi ───────────────────────────────────────────────────
+// Kullanıcının yazdığı plan: { start: tasarım (kol → seçenek), steps: [eylem indeksi, adım başına] }.
+// Uygulanamayan adımlar (bütçe yetmiyor, eylem bekleme süresinde, kol zaten o seçenekte)
+// "bekle" ile değiştirilir ve raporlanır; plan sessizce değiştirilmez.
+export function planMoves(plan) {
+  return [0, ...plan.steps];   // 0: tasarımı onayla, sonra adım adım eylemler
+}
+
+export function testPlan(ctx, plan) {
+  const s = initialState(ctx, plan.start, { design: true });
+  apply(ctx, s, 0);
+  const skipped = [];
+  plan.steps.forEach((a, t) => {
+    if (isTerminal(ctx, s)) return;
+    const ok = legalMask(ctx, s)[a];
+    if (!ok) skipped.push({ t, label: ctx.actions[a]?.label ?? '?', why: whyIllegal(ctx, s, a) });
+    apply(ctx, s, ok ? a : 0);
+  });
+  while (!isTerminal(ctx, s)) apply(ctx, s, 0);
+  const result = score(ctx, s);
+  // Kitle dinamiği: aynı plan sosyal etki kapalıyken de oynatılır.
+  const alone = (() => {
+    const c0 = { ...ctx, socialScale: 0 };
+    const s0 = initialState(c0, plan.start, { design: true });
+    for (const m of planMoves(plan)) { if (isTerminal(c0, s0)) break; apply(c0, s0, legalMask(c0, s0)[m] ? m : 0); }
+    while (!isTerminal(c0, s0)) apply(c0, s0, 0);
+    return s0.x;
+  })();
+  const r = corr(s.x, alone);
+  const low = s.x.filter((v) => v < 0.35).length / ctx.n, high = s.x.filter((v) => v > 0.65).length / ctx.n;
+  return {
+    ...result, state: s, skipped,
+    crowd: {
+      herd: Math.max(0, Math.min(1, 1 - r * r)),
+      echo: Math.max(0, corr(s.x, neighborMeans(ctx, s.x)) - corr(alone, neighborMeans(ctx, alone))),
+      split: 2 * Math.min(low, high),
+    },
+  };
+}
+
+function whyIllegal(ctx, s, a) {
+  const act = ctx.actions[a];
+  if (!act) return 'bilinmeyen eylem';
+  if (act.type === 'set') return 'bu karar zaten bu seçenekte';
+  if (act.type === 'event') {
+    const ev = ctx.scn.events.find((e) => e.id === act.event);
+    if (s.cooldown[act.event] > s.t) return `aynı eylem ${EVENT_COOLDOWN} ${ctx.scn.unit} içinde tekrarlanamaz`;
+    if (s.budget < ev.cost) return `bütçe yetmiyor (kalan ${s.budget.toFixed(1)}, gereken ${ev.cost})`;
+  }
+  return 'uygulanamadı';
+}

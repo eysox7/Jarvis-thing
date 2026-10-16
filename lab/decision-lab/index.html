@@ -81,6 +81,7 @@ details summary{cursor:pointer;color:var(--fg-dim);font-size:13px}
     <button data-tab="population">Nüfus</button>
     <button data-tab="forecast">Tahmin</button>
     <button data-tab="strategy">Strateji</button>
+    <button data-tab="plantest">Plan testi</button>
     <button data-tab="validate">Doğrulama</button>
   </nav>
 </header>
@@ -92,6 +93,7 @@ details summary{cursor:pointer;color:var(--fg-dim);font-size:13px}
         <li><b>Senaryo:</b> bir şablon yükle ya da boş senaryo aç. Kararları, seçenekleri ve her seçeneğin kimde nasıl karşılanacağını yaz. Hedef ağırlıklarıyla neyi en iyilemek istediğini belirle.</li>
         <li><b>Nüfus:</b> MatrAIx persona dosyalarını içe aktar (yoksa sentetik örnek nüfus kullanılır). Sonuçları görmek istediğin segment boyutunu seç (yaş, bölge, gelir…).</li>
         <li><b>Tahmin:</b> seçenekleri tıkla; her segmentin tepkisini ve nedenini anında gör.</li>
+        <li><b>Plan testi:</b> kendi stratejini yaz ve test et; AlphaZero'nun planıyla karşılaştır.</li>
         <li><b>Strateji:</b> AlphaZero'yu başlat (~25 sn). Plana, "Neden bu plan?" tablosuna ve sağlamlık testine bak. Sağlamlık düşükse planı ciddiye alma.</li>
         <li><b>Doğrulama:</b> N.E.X.U.S.'ta bir API bağlantın varsa örnek personaları LLM'e sor, modeli kalibre et. Büyük ölçüm için MatrAIx anket görevini indir.</li>
       </ol>
@@ -201,6 +203,47 @@ details summary{cursor:pointer;color:var(--fg-dim);font-size:13px}
     </div>
     <h2>Eğitim</h2>
     <div class="card"><svg class="spark" id="azSpark" viewBox="0 0 600 120" preserveAspectRatio="none"></svg><div class="scroll"><table id="azHist"></table></div></div>
+  </section>
+
+  <!-- ── Plan testi ── -->
+  <section id="plantest">
+    <h2>Kendi planını test et</h2>
+    <div class="card">
+      <p class="small muted">Stratejiyi sen yaz, sistem test etsin. Önce kararların başlangıç tasarımını seç, sonra her <span class="unit">ay</span> için bir eylem belirle. Eylemler tüm nüfusa uygulanır. Yeni bir eylem ya da seçenek gerekiyorsa Senaryo sekmesinden ekle.</p>
+      <div class="row">
+        <div class="grow"><label class="f">Plan</label><select id="ptSel"></select></div>
+        <button class="btn" id="ptNew">+ Yeni plan</button>
+        <button class="btn" id="ptAz" disabled>AlphaZero planını kopyala</button>
+        <button class="btn danger" id="ptDel">Sil</button>
+      </div>
+    </div>
+    <div id="ptEditor">
+      <div class="card">
+        <div class="row"><div class="grow"><label class="f">Plan adı</label><input type="text" id="ptName"></div></div>
+        <p id="ptFix" class="small warn"></p>
+        <h2>Başlangıç tasarımı</h2>
+        <div class="row" id="ptDesign"></div>
+        <h2>Zaman çizelgesi</h2>
+        <div id="ptSteps"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="ptRun">Test et</button>
+          <button class="btn" id="ptClear">Zaman çizelgesini temizle</button>
+          <button class="btn" id="ptCompare">Tüm planları karşılaştır</button>
+        </div>
+      </div>
+      <div class="card scroll"><table id="ptCmp"></table></div>
+    </div>
+    <div id="ptResults" style="display:none">
+      <h2>Sonuç</h2>
+      <div class="kpis" id="ptKpis"></div>
+      <div id="ptSkipped"></div>
+      <h2>Segmentlere göre</h2>
+      <div class="card"><div class="bars" id="ptBars"></div><p class="small muted">Sarı çizgi: başlangıç tasarımı, eylemsiz.</p></div>
+      <h2>Zaman içinde</h2>
+      <div class="card"><svg class="spark" id="ptSpark" viewBox="0 0 600 120" preserveAspectRatio="none"></svg></div>
+      <h2>Hangi adım ne kazandırdı?</h2>
+      <div class="card scroll"><table id="ptWhy"></table></div>
+    </div>
   </section>
 
   <!-- ── Doğrulama ── -->
