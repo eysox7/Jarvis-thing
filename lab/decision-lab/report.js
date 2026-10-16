@@ -35,6 +35,14 @@ export function buildReport(S, ctx, robust = null) {
   const cal = Array.from(ctx.segBias).some((b) => b !== 0);
   out.push(cal ? 'Model, LLM/MatrAIx cevaplarıyla segment düzeyinde **kalibre edildi**.' : 'Model **kalibre edilmedi** (seçenek etkileri varsayımdır).');
 
+  const cd = M.crowdDiagnostics(ctx, initialConfig(scn));
+  out.push('## Kitle dinamiği (başlangıç tasarımı)');
+  out.push(table(['Gösterge', 'Değer'], [
+    ['Kitleleşme (çevreden gelen karar payı)', cd.herd.toFixed(2)],
+    [`Yankı odası (ek benzeşme; ağ homofilisi ${cd.homophily.toFixed(2)})`, cd.echo.toFixed(2)],
+    ['Kutuplaşma (iki kampa ayrılma)', cd.split.toFixed(2)],
+  ]));
+
   out.push('## Hedef fonksiyonu');
   out.push(table(['Bileşen', 'Ağırlık'], Object.entries(scn.objective).map(([k, v]) => [PART[k] || k, v.toFixed(2)])));
 

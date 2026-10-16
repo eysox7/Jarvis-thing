@@ -242,6 +242,17 @@ RENDER.forecast = () => {
   bars($('fcBars'), c.seg.labels, r.segs, r0.segs);
   spark($('fcSpark'), [{ label: 'seçili', data: r.state.series }, { label: 'başlangıç', data: r0.state.series }]);
 
+  const cd = M.crowdDiagnostics(c, S.fcConfig);
+  const level = (v, lo, hi) => (v >= hi ? '<span class="err">yüksek</span>' : v >= lo ? '<span class="warn">orta</span>' : '<span class="ok">düşük</span>');
+  $('fcCrowd').innerHTML = [
+    [cd.herd, 'Kitleleşme', level(cd.herd, 0.2, 0.5)],
+    [cd.echo, `Yankı odası (ağ homofilisi ${cd.homophily.toFixed(2)})`, level(cd.echo, 0.05, 0.15)],
+    [cd.split, 'Kutuplaşma', level(cd.split, 0.2, 0.5)],
+  ].map(([v, l, lv]) => `<div class="kpi"><b>${v.toFixed(2)}</b><span>${esc(l)} · ${lv}</span></div>`).join('');
+  $('fcDrift').innerHTML = `<tr><th>Segment</th><th class="num">Çevrenin etkisi (puan)</th></tr>`
+    + c.seg.labels.map((l, k) => `<tr><td>${esc(l)}</td><td class="num">${cd.drift[k] > 0 ? '+' : ''}${(cd.drift[k] * 100).toFixed(1)}</td></tr>`).join('')
+    + `<tr><td colspan="2" class="small muted">Sosyal etki olmasaydı ${metricName().toLowerCase()} oranı bu kadar farklı olurdu (+: çevre destek yönüne çekiyor).</td></tr>`;
+
   // Neden: segment başına her kararın (seçili seçeneğin) ortalama fayda katkısı.
   const K = c.seg.labels.length;
   const rows = c.seg.labels.map((lab, k) => {

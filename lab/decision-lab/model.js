@@ -10,6 +10,7 @@
 
 import { traitsOf, segmentBy, TRAIT_KEYS } from './population.js';
 import { initialConfig } from './scenarios.js';
+import { rng } from '../core/rng.js';
 export { initialConfig };
 
 const sig = (x) => 1 / (1 + Math.exp(-x));
@@ -51,7 +52,53 @@ export function createContext(scn, personas, { segmentDim = 'age_bracket', calib
   // Kalibrasyon segment ADINA göre eşlenir: nüfus değişince segment sırası değişebilir.
   if (calibration?.byLabel) seg.labels.forEach((l, k) => { segBias[k] = calibration.byLabel[l] || 0; });
 
-  return { scn, personas, n, w, wsum, T, seg, contrib, actions, segBias, calibration };
+  const net = buildNetwork(T, n);
+  // socialScale: sosyal etkinin gücü (1 = normal). 0 yapılınca "herkes yalnızca kendi eğilimiyle
+  // karar verseydi" karşı-olgusu elde edilir; kitleleşme endeksi bununla hesaplanır.
+  return { scn, personas, n, w, wsum, T, seg, contrib, actions, segBias, calibration, net, socialScale: 1 };
+}
+
+// ── Sosyal ağ ───────────────────────────────────────────────────────────────
+// Benzerlik eğilimli (homofilik) ağ: her persona için rastgele adaylar arasından değerleri en
+// yakın k kişi komşu seçilir, bağlar iki yönlüdür. İnsanlar çoğunlukla kendine benzeyenlerle
+// konuşur; ağdaki etki de bu yüzden yankı odaları oluşturabilir. Deterministiktir.
+const NET_TRAITS = ['novelty', 'trust', 'habit', 'price', 'fairness', 'environment', 'security'];
+export function buildNetwork(T, n, k = 8) {
+  const adj = Array.from({ length: n }, () => new Set());
+  if (n > 1) {
+    const r = rng(n * 7919 + 13);
+    const kk = Math.min(k, n - 1);
+    for (let i = 0; i < n; i++) {
+      const cand = [];
+      for (let c = 0; c < kk * 4; c++) {
+        const j = Math.floor(r() * n);
+        if (j === i) continue;
+        let d = 0;
+        for (const t of NET_TRAITS) d += (T[t][i] - T[t][j]) ** 2;
+        cand.push([d, j]);
+      }
+      cand.sort((a, b) => a[0] - b[0]);
+      for (const [, j] of cand.slice(0, Math.ceil(kk / 2))) { adj[i].add(j); adj[j].add(i); }
+    }
+  }
+  const start = new Int32Array(n + 1);
+  for (let i = 0; i < n; i++) start[i + 1] = start[i] + adj[i].size;
+  const idx = new Int32Array(start[n]);
+  for (let i = 0; i < n; i++) idx.set([...adj[i]], start[i]);
+  return { start, idx };
+}
+
+export function neighborMeans(ctx, arr) {
+  const { start, idx } = ctx.net;
+  const out = new Float64Array(ctx.n);
+  for (let i = 0; i < ctx.n; i++) {
+    const a = start[i], b = start[i + 1];
+    if (a === b) { out[i] = arr[i]; continue; }
+    let s = 0;
+    for (let e = a; e < b; e++) s += arr[idx[e]];
+    out[i] = s / (b - a);
+  }
+  return out;
 }
 
 // ── Durum ───────────────────────────────────────────────────────────────────
@@ -159,11 +206,14 @@ function mean(ctx, arr) {
 function stepPolicy(ctx, s, fx) {
   const { T, n } = ctx;
   const seg = segMeans(ctx, s.x);
+  const nb = neighborMeans(ctx, s.x);
   for (let i = 0; i < n; i++) {
     s.aw[i] += (1 - s.aw[i]) * Math.min(1, 0.03 + fx.information);
     const informed = sig(1.5 * utility(ctx, s, i, fx));
     let target = s.aw[i] * informed + (1 - s.aw[i]) * prior(T, i);
-    target += 0.5 * pos(T.social[i]) * (seg[ctx.seg.index[i]] - target);
+    // Çevre etkisi: ağdaki komşular (çoğu) + kendi segmentinin genel havası.
+    const around = 0.7 * nb[i] + 0.3 * seg[ctx.seg.index[i]];
+    target += ctx.socialScale * 0.5 * pos(T.social[i]) * (around - target);
     s.x[i] += (target - s.x[i]) * 0.35 * (1 - 0.4 * pos(T.habit[i]));
   }
   const m = mean(ctx, s.x);
@@ -177,11 +227,13 @@ function stepPolicy(ctx, s, fx) {
 function stepMarketing(ctx, s, fx) {
   const { T, n } = ctx;
   const seg = segMeans(ctx, s.x);
+  const nb = neighborMeans(ctx, s.x);
   const all = mean(ctx, s.x);
   let churnSum = 0;
   for (let i = 0; i < n; i++) {
     const u = utility(ctx, s, i, fx);
-    const wom = 0.6 * seg[ctx.seg.index[i]] + 0.4 * all;
+    // Ağızdan ağıza: komşulardaki kullanıcı oranı (çoğu), segment ve genel bilinirlik.
+    const wom = ctx.socialScale * (0.5 * nb[i] + 0.3 * seg[ctx.seg.index[i]] + 0.2 * all);
     const gain = 0.04 + fx.awareness + 0.3 * wom * (0.5 + 0.5 * pos(T.social[i]));
     s.aw[i] += (1 - s.aw[i]) * Math.min(1, gain);
     const adopt = s.aw[i] * (1 - s.x[i]) * sig(1.5 * u) * 0.3 * (1 - 0.4 * pos(T.habit[i]));
@@ -390,4 +442,40 @@ export function explainPlan(ctx, moves, start = initialConfig(ctx.scn)) {
     t++;
   });
   return { full, rows };
+}
+
+// ── Kitle dinamiği göstergeleri (yalnızca risk izleme) ──────────────────────
+// herd (kitleleşme): kararların bireysel eğilimlerle açıklanamayan payı. Aynı senaryo bir de
+//   sosyal etki kapalıyken oynatılır; iki sonuç arasındaki ilişki zayıfladıkça insanlar kendi
+//   eğilimlerinden çok çevrelerine göre karar veriyor demektir. 1 - korelasyon².
+// echo (yankı odası): etkileşimin yarattığı EK benzeşme. Ağ zaten benzer insanları bağladığı için
+//   komşular etkisiz de birbirine benzer (homofili); burada yalnızca etkinin eklediği kısım ölçülür.
+// split (kutuplaşma): nüfusun iki karşıt kampa ayrılma derecesi (0: tek yönlü, 1: yarı yarıya).
+// drift: segment başına, sosyal etkinin ortalama sürüklemesi (puan; + destek yönüne).
+function corr(a, b) {
+  const n = a.length;
+  let ma = 0, mb = 0;
+  for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+  ma /= n; mb /= n;
+  let sab = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < n; i++) { const da = a[i] - ma, db = b[i] - mb; sab += da * db; saa += da * da; sbb += db * db; }
+  return saa && sbb ? sab / Math.sqrt(saa * sbb) : 1;
+}
+
+export function crowdDiagnostics(ctx, config) {
+  const withSocial = forecast(ctx, config).state.x;
+  const alone = forecast({ ...ctx, socialScale: 0 }, config).state.x;
+  const r = corr(withSocial, alone);
+  const low = withSocial.filter((v) => v < 0.35).length / ctx.n;
+  const high = withSocial.filter((v) => v > 0.65).length / ctx.n;
+  const K = ctx.seg.labels.length;
+  const drift = new Array(K).fill(0), cnt = new Array(K).fill(0);
+  for (let i = 0; i < ctx.n; i++) { const k = ctx.seg.index[i]; drift[k] += withSocial[i] - alone[i]; cnt[k]++; }
+  return {
+    herd: Math.max(0, Math.min(1, 1 - r * r)),
+    echo: Math.max(0, corr(withSocial, neighborMeans(ctx, withSocial)) - corr(alone, neighborMeans(ctx, alone))),
+    homophily: corr(alone, neighborMeans(ctx, alone)),
+    split: 2 * Math.min(low, high),
+    drift: drift.map((d, k) => (cnt[k] ? d / cnt[k] : 0)),
+  };
 }
