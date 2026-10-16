@@ -145,6 +145,53 @@ export const TEMPLATES = [
     objective: { impact: 0.4, support: 0.35, minSegment: 0.25, polarization: 0.3 },
   },
   {
+    id: 'flood-warning',
+    domain: 'policy',
+    title: 'Kriz iletişimi: sel uyarısı ve tahliye',
+    summary: 'Önümüzdeki saatlerde dere taşkını beklenen mahallelerde halkın zamanında ve paniğe kapılmadan bölgeyi terk etmesi için uyarı ve tahliye iletişimi. Herkese aynı doğru bilgi verilir; tasarlanan şey mesajın içeriği, kaynağı, kanalı ve sağlanan destektir.',
+    question: 'Bu uyarıya uyup bölgeyi zamanında terk eder misiniz?',
+    unit: 'saat', horizon: 12, budget: 25,
+    levers: [
+      {
+        id: 'message', label: 'Mesajın içeriği', initial: 'generic',
+        options: [
+          { id: 'generic', label: 'Genel uyarı: "Sel riski var, dikkatli olun"', impact: 0.5, cost: 0, effect: { base: -0.3, traits: { trust: 0.5, habit: -0.4 } } },
+          { id: 'specific', label: 'Mahalleye özel risk + tahliye rotası + toplanma noktası', impact: 0.9, cost: 0, effect: { base: 0.3, traits: { time: 0.3, security: 0.4 } } },
+          { id: 'concrete', label: 'Somut etki: "Sokağınızda su 1,5 metreye çıkabilir" + rota', impact: 1.0, cost: 0, effect: { base: 0.25, traits: { security: 0.6, habit: -0.2, trust: 0.2 } } },
+        ],
+      },
+      {
+        id: 'source', label: 'Kaynak', initial: 'gov',
+        options: [
+          { id: 'gov', label: 'Valilik / AFAD resmi açıklaması', impact: 1.0, cost: 0, effect: { base: 0, traits: { trust: 0.8 } } },
+          { id: 'local', label: 'Muhtar ve yerel gönüllüler', impact: 0.8, cost: 0.5, effect: { base: 0.1, traits: { social: 0.5, trust: -0.4 } } },
+          { id: 'both', label: 'Resmi açıklama + yerel kanaldan aynı mesaj', impact: 1.0, cost: 1, effect: { base: 0.2, traits: { trust: 0.4, social: 0.3 } } },
+        ],
+      },
+      {
+        id: 'channel', label: 'Kanal', initial: 'tv',
+        options: [
+          { id: 'tv', label: 'TV ve radyo', impact: 0.6, cost: 0, effect: { base: 0, traits: { habit: 0.4, novelty: -0.2 } } },
+          { id: 'cell', label: 'Tüm telefonlara hücre yayını (cell broadcast)', impact: 0.9, cost: 0.5, effect: { base: 0.2, traits: { novelty: 0.2, time: 0.2 } } },
+          { id: 'multi', label: 'Hücre yayını + TV/radyo + mahalle anonsu', impact: 1.0, cost: 1.5, effect: { base: 0.3, traits: { habit: 0.2 } } },
+        ],
+      },
+      {
+        id: 'support', label: 'Tahliye desteği', initial: 'none',
+        options: [
+          { id: 'none', label: 'Ek destek yok', impact: 0.6, cost: 0, effect: { base: -0.3, traits: { price: -0.6, security: -0.2 } } },
+          { id: 'transport', label: 'Ücretsiz ulaşım ve geçici barınma', impact: 1.0, cost: 2, effect: { base: 0.3, traits: { price: 0.6, time: 0.2, security: 0.2 } } },
+        ],
+      },
+    ],
+    events: [
+      { id: 'live', label: 'Canlı su seviyesi haritası ve tahmin güncellemesi', kind: 'information', strength: 0.3, cost: 2 },
+      { id: 'expert', label: 'Bağımsız hidroloji uzmanının açıklaması', kind: 'evidence', strength: 0.3, cost: 1 },
+      { id: 'door', label: 'Kapı kapı bilgilendirme ve yardım ihtiyacı tespiti', kind: 'consultation', strength: 0.35, cost: 3 },
+    ],
+    objective: { impact: 0.35, support: 0.4, minSegment: 0.35, polarization: 0.2 },
+  },
+  {
     id: 'ev-launch',
     domain: 'marketing',
     title: 'Elektrikli otomobil lansmanı',

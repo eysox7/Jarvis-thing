@@ -30,11 +30,11 @@ Nüfus (MatrAIx personaları)        Senaryo (kararlar, seçenekler, eylemler, h
 
 | Sekme | Ne yapar |
 |---|---|
-| **Senaryo** | Şablon seç (politika: araç giriş ücreti, emeklilik yaşı reformu; pazarlama: fitness uygulaması, elektrikli otomobil lansmanı) ya da formla boş senaryodan başla ya da JSON ile kendi senaryonu yaz. Hedef fonksiyonu ağırlıklarını ayarla. |
+| **Senaryo** | Şablon seç (politika: araç giriş ücreti, emeklilik yaşı reformu, kriz iletişimi — sel uyarısı ve tahliye; pazarlama: fitness uygulaması, elektrikli otomobil lansmanı) ya da formla boş senaryodan başla ya da JSON ile kendi senaryonu yaz. Hedef fonksiyonu ağırlıklarını ayarla. |
 | **Nüfus** | Pakette gelen 80 MatrAIx personasını yükle, kendi MatrAIx persona YAML/JSON dosyalarını içe aktar ya da sentetik örnek nüfus kullan. Segment boyutunu seç; segmentlerin eğilim profillerini ve boyut→eğilim eşleme tablosunu gör. |
-| **Tahmin** | Kararları seç; genel ve segment bazında destek/benimseme, zaman serisi ve "neden?" tablosu (her kararın her segmentteki etkisi). |
+| **Tahmin** | Kararları seç; genel ve segment bazında destek/benimseme, zaman serisi, "neden?" tablosu ve kitle dinamiği risk göstergeleri (kitleleşme, yankı odası, kutuplaşma). Sosyal etki, değerleri benzer kişileri bağlayan bir ağ üzerinden yayılır. |
 | **Strateji** | AlphaZero'yu çalıştır. Başlangıç tasarımı, tüm statik tasarımların en iyisi (kaba kuvvet) ve AlphaZero planı yan yana. Plan zaman çizelgesi olarak. **Neden bu plan?:** her adım tek tek çıkarılıp katkısı ve hangi segmente yaradığı ölçülür. **Rapor:** sonuçlar tek tıkla Markdown rapor olarak indirilir ([örnek](ornek-rapor.md)). **Sağlamlık testi:** planlar, seçenek etkileri rastgele bozulmuş onlarca alternatif dünyada yeniden oynatılır; plan yalnızca modelin tam doğru olduğu dünyada iyiyse güvenme. |
-| **Doğrulama** | Örnek personaları bir LLM'e kendi kimlikleriyle sor; cevapları modelle karşılaştır, gerekçeleri segment bazında özetlet, modeli kalibre et. MatrAIx anket görevini indir, sonuç klasörünü yükle. |
+| **Doğrulama** | Örnek personaları bir LLM'e kendi kimlikleriyle sor; cevapları modelle karşılaştır (farklı sağlayıcılardan modellerle **çapraz panel**: modeller anlaşamazsa o segment kalibrasyona alınmaz), gerekçeleri segment bazında özetlet, modeli kalibre et. MatrAIx anket görevini indir, sonuç klasörünü yükle. |
 
 ### AlphaZero nereden başlar?
 
