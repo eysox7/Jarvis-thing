@@ -31,11 +31,14 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
 - [x] **6. Anonim paylaşım** — Söz bırakırken "anonim" seçeneği; balonda ve konuşmalarda ad
       yerine "Anonim kulak". Sahibi konuşmada "Kimliğimi göster" ile adını açar (karşı tarafa
       canlı bildirim). Anonim yazar, kimliği açılmadan söz üzerinden engellenebilir. Şema v3.
+- [x] **7. Keşif motivasyonu** — Haftalık keşif serisi, bu hafta açılan mekânlar, şehir başına
+      keşif çubukları, 9 rozet (ilk adım, kâşif, haritacı, şehirlerarası, ilk söz, anlatıcı,
+      tanık, bağlantı, seri). Rozet kazandıran eylemler (check-in, söz, 👂, mesaj) yanıtında
+      `newBadges` döner, arayüz kutlar. Alt sayfa modal olmaktan çıktı: sekme çubuğu açık
+      sayfanın altında kullanılabilir.
 
 ## Sıradakiler
 
-- [ ] **7. Keşif motivasyonu** — Rozetler (ilk mekân, 5 mekân, 3 şehir…), haftalık keşif serisi,
-      şehir keşif yüzdesi, profilde ilerleme çubuğu.
 - [ ] **8. Yakındaki sözler dürtmesi** — "250 m ötede 4 kilitli söz var" kartı; keşif modunda
       yaklaştıkça ipucu.
 - [ ] **9. Moderasyon** — TR/EN küfür/hakaret filtresi, telefon/e-posta/plaka gibi kişisel veri

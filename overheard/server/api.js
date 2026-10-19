@@ -75,7 +75,12 @@ export function registerApi(router, { db, config, events, rateLimit }) {
 
   router.get('/api/me', (ctx) => {
     if (!ctx.user) return { user: null };
-    return { user: publicUser(ctx.user), stats: domain.profileStats(db, ctx.user), unread: domain.unreadCount(db, ctx.user) };
+    return {
+      user: publicUser(ctx.user),
+      stats: domain.profileStats(db, ctx.user),
+      unread: domain.unreadCount(db, ctx.user),
+      progress: domain.progress(db, ctx.user),
+    };
   });
 
   // --- Harita ve mekânlar ---
@@ -85,7 +90,8 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireUser(ctx);
     limit(`checkin:${user.id}`, 120, 3600000);
     const coords = domain.readCoords(await readJson(ctx.req));
-    return domain.checkIn(db, config, user, coords);
+    const { result, newBadges } = domain.withBadges(db, user, () => domain.checkIn(db, config, user, coords));
+    return { ...result, newBadges };
   });
 
   router.get('/api/me/places', (ctx) => ({ places: domain.myPlaces(db, requireUser(ctx)) }));
@@ -95,7 +101,8 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireUser(ctx);
     const body = await readJson(ctx.req);
     limit(`post:${user.id}`, 10, 3600000);
-    return { overheard: domain.createOverheard(db, config, user, body) };
+    const { result, newBadges } = domain.withBadges(db, user, () => domain.createOverheard(db, config, user, body));
+    return { overheard: result, newBadges };
   });
 
   router.get('/api/overheards/:id', (ctx) => ({ overheard: domain.getOverheard(db, config, ctx.user, ctx.params.id) }));
@@ -109,7 +116,8 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireUser(ctx);
     limit(`react:${user.id}`, 300, 3600000);
     const body = await readJson(ctx.req);
-    return { overheard: domain.toggleReaction(db, config, user, ctx.params.id, String(body.kind || '')) };
+    const { result, newBadges } = domain.withBadges(db, user, () => domain.toggleReaction(db, config, user, ctx.params.id, String(body.kind || '')));
+    return { overheard: result, newBadges };
   });
 
   router.post('/api/overheards/:id/report', async (ctx) => {
@@ -121,7 +129,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   });
 
   // --- Mesajlar ---
-  const deliver = (result) => {
+  const deliver = ({ result, newBadges }) => {
     events.publish(result.recipientId, 'dm', {
       conversationId: result.conversationId,
       from: result.senderName,
@@ -129,14 +137,14 @@ export function registerApi(router, { db, config, events, rateLimit }) {
       createdAt: result.message.createdAt,
     });
     const { id, body, createdAt } = result.message;
-    return { conversationId: result.conversationId, message: { id, body, createdAt, fromMe: true } };
+    return { conversationId: result.conversationId, message: { id, body, createdAt, fromMe: true }, newBadges };
   };
 
   router.post('/api/overheards/:id/messages', async (ctx) => {
     const user = requireUser(ctx);
     limit(`message:${user.id}`, 60, 3600000);
     const body = await readJson(ctx.req);
-    return deliver(domain.messageAboutOverheard(db, user, ctx.params.id, body.body, body.to));
+    return deliver(domain.withBadges(db, user, () => domain.messageAboutOverheard(db, user, ctx.params.id, body.body, body.to)));
   });
 
   router.get('/api/conversations', (ctx) => ({ conversations: domain.listConversations(db, requireUser(ctx)) }));
@@ -147,7 +155,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireUser(ctx);
     limit(`message:${user.id}`, 60, 3600000);
     const body = await readJson(ctx.req);
-    return deliver(domain.sendMessage(db, user, ctx.params.id, body.body));
+    return deliver(domain.withBadges(db, user, () => domain.sendMessage(db, user, ctx.params.id, body.body)));
   });
 
   router.post('/api/conversations/:id/reveal', (ctx) => {

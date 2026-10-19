@@ -199,6 +199,12 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await u.page.locator('[data-nav="places"]').click();
       await sheet(u.page).locator('.list-item:not(.is-locked)', { hasText: 'Kadıköy İskelesi' }).waitFor();
       await sheet(u.page).locator('.list-item.is-locked').first().waitFor();
+      // İlk check-in rozet kazandırır; profilde seri, şehir ilerlemesi ve rozet görünür.
+      await u.page.locator('.toast', { hasText: 'Yeni rozet: İlk adım' }).waitFor();
+      await u.page.locator('[data-nav="profile"]').click();
+      await sheet(u.page).locator('.badge-card.is-earned', { hasText: 'İlk adım' }).waitFor();
+      await sheet(u.page).locator('.streak', { hasText: '1 haftalık seri' }).waitFor();
+      await sheet(u.page).locator('.progress-row', { hasText: 'İstanbul' }).waitFor();
       assert.deepEqual(u.errors, []);
       await u.context.close();
     });

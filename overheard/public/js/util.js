@@ -65,4 +65,9 @@ export function truncate(text, max) {
 // Kullanıcı adı ya da (anonimse) "Anonim kulak".
 export const displayName = (handle) => (handle ? `@${handle}` : t('anon.name'));
 
+export const BADGE_EMOJI = {
+  first_step: '👣', explorer: '🧭', cartographer: '🗺️', two_cities: '✈️', first_drop: '🎈',
+  storyteller: '📚', witness: '👂', connector: '🤝', streak: '🔥',
+};
+
 export const REACTION_EMOJI = { lol: '😂', wow: '😮', same: '👂', heart: '❤️' };

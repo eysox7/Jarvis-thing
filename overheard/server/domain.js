@@ -528,3 +528,73 @@ export function unreadCount(db, user) {
     WHERE (c.owner_id = :me AND c.last_at > c.owner_read_at OR c.starter_id = :me AND c.last_at > c.starter_read_at)
       AND (SELECT sender_id FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) != :me`).get({ me: user.id }).n;
 }
+
+// --- Keşif ilerlemesi ve rozetler -----------------------------------------
+
+const WEEK_MS = 7 * 86400000;
+// 1970-01-05 (Pazartesi) 00:00 UTC: haftalar pazartesi başlar.
+const WEEK_EPOCH = 4 * 86400000;
+
+export const BADGES = [
+  { id: 'first_step', metric: 'places', of: 1 },
+  { id: 'explorer', metric: 'places', of: 5 },
+  { id: 'cartographer', metric: 'places', of: 20 },
+  { id: 'two_cities', metric: 'cities', of: 2 },
+  { id: 'first_drop', metric: 'overheards', of: 1 },
+  { id: 'storyteller', metric: 'overheards', of: 10 },
+  { id: 'witness', metric: 'witnessed', of: 1 },
+  { id: 'connector', metric: 'conversations', of: 1 },
+  { id: 'streak', metric: 'streak', of: 3 },
+];
+
+// Üst üste kaç haftadır en az bir mekânda bulunuldu (bu hafta henüz yoksa geçen haftadan sayılır).
+function weeklyStreak(db, userId, now = Date.now()) {
+  const weeks = new Set(db.prepare('SELECT DISTINCT CAST((at - ?) / ? AS INTEGER) AS w FROM checkins WHERE user_id = ?')
+    .all(WEEK_EPOCH, WEEK_MS, userId).map((r) => r.w));
+  let week = Math.floor((now - WEEK_EPOCH) / WEEK_MS);
+  if (!weeks.has(week)) week -= 1;
+  let streak = 0;
+  while (weeks.has(week)) {
+    streak += 1;
+    week -= 1;
+  }
+  return streak;
+}
+
+function metrics(db, user) {
+  const one = (sql, ...args) => db.prepare(sql).get(user.id, ...args).n;
+  return {
+    ...profileStats(db, user),
+    witnessed: one("SELECT COUNT(*) AS n FROM reactions WHERE user_id = ? AND kind = 'same'"),
+    conversations: db.prepare('SELECT COUNT(*) AS n FROM conversations WHERE owner_id = ? OR starter_id = ?').get(user.id, user.id).n,
+    streak: weeklyStreak(db, user.id),
+    weekPlaces: one(`SELECT COUNT(*) AS n FROM (SELECT place_id, MIN(at) AS first FROM checkins WHERE user_id = ? GROUP BY place_id) WHERE first >= ?`, Date.now() - WEEK_MS),
+  };
+}
+
+export function earnedBadges(db, user) {
+  const m = metrics(db, user);
+  return new Set(BADGES.filter((b) => m[b.metric] >= b.of).map((b) => b.id));
+}
+
+export function progress(db, user) {
+  const m = metrics(db, user);
+  const cities = db.prepare(`
+    SELECT p.city_id AS cityId, COUNT(*) AS total,
+           SUM(EXISTS (SELECT 1 FROM checkins c WHERE c.user_id = ? AND c.place_id = p.id)) AS visited
+    FROM places p GROUP BY p.city_id`).all(user.id)
+    .map((c) => ({ cityId: c.cityId, total: c.total, visited: c.visited }));
+  return {
+    metrics: m,
+    cities,
+    badges: BADGES.map((b) => ({ id: b.id, earned: m[b.metric] >= b.of, n: Math.min(m[b.metric], b.of), of: b.of })),
+  };
+}
+
+// Bir eylemden önce ve sonra rozetleri karşılaştırıp yeni kazanılanları döndürür.
+export function withBadges(db, user, fn) {
+  const before = earnedBadges(db, user);
+  const result = fn();
+  const newBadges = [...earnedBadges(db, user)].filter((id) => !before.has(id));
+  return { result, newBadges };
+}

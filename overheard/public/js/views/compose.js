@@ -76,9 +76,10 @@ export async function openCompose(app) {
         if (choice?.placeId) payload.placeId = choice.placeId;
         else payload.newPlaceName = choice?.newPlaceName.value || '';
         try {
-          const { overheard } = await api.post(payload);
+          const { overheard, newBadges } = await api.post(payload);
           closeSheet();
           toast(t('toast.posted'), { tone: 'success' });
+          app.celebrate(newBadges);
           await app.refresh();
           app.openOverheard(overheard);
         } catch (err) {

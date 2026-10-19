@@ -1,4 +1,4 @@
-import { h } from '../util.js';
+import { h, BADGE_EMOJI } from '../util.js';
 import { t, getLang, setLang, languages } from '../i18n.js';
 import { api } from '../api.js';
 import { openSheet, closeSheet } from '../ui.js';
@@ -9,6 +9,35 @@ function howItWorks() {
   return h('div', { class: 'stack' },
     h('h3', { class: 'section-title' }, t('profile.how')),
     h('ol', { class: 'how' }, h('li', {}, t('profile.how1')), h('li', {}, t('profile.how2')), h('li', {}, t('profile.how3'))));
+}
+
+// Seri, şehir keşif çubukları ve rozetler: dışarı çıkmak için küçük sebepler.
+function progressSection(progress, state) {
+  const { metrics } = progress;
+  const cityName = new Map(state.config.cities.map((c) => [c.id, c.name]));
+  const cities = progress.cities
+    .filter((c) => cityName.has(c.cityId))
+    .sort((a, b) => b.visited / b.total - a.visited / a.total)
+    .map((c) => {
+      const pct = Math.round((100 * c.visited) / c.total);
+      return h('div', { class: 'progress-row' },
+        h('div', { class: 'row-between small' }, h('span', {}, cityName.get(c.cityId)), h('span', { class: 'muted' }, `${c.visited}/${c.total}`)),
+        h('div', { class: 'progress', role: 'progressbar', 'aria-valuenow': pct, 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-label': cityName.get(c.cityId) },
+          h('span', { style: { width: `${pct}%` } })));
+    });
+  const badges = progress.badges.map((b) => h('div', { class: `badge-card${b.earned ? ' is-earned' : ''}`, title: t(`badge.${b.id}.how`) },
+    h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, BADGE_EMOJI[b.id] || '🏅'),
+    h('span', { class: 'badge-name' }, t(`badge.${b.id}`)),
+    h('span', { class: 'badge-how' }, b.earned ? t(`badge.${b.id}.how`) : `${b.n}/${b.of} · ${t(`badge.${b.id}.how`)}`)));
+
+  return h('div', { class: 'stack' },
+    h('div', { class: 'streak' },
+      h('span', { class: 'streak-main' }, metrics.streak ? t('profile.streak', { n: metrics.streak }) : t('profile.noStreak')),
+      metrics.weekPlaces ? h('span', { class: 'muted small' }, t('profile.weekPlaces', { n: metrics.weekPlaces })) : null),
+    h('h3', { class: 'section-title' }, t('profile.cityProgress')),
+    h('div', { class: 'stack progress-list' }, cities),
+    h('h3', { class: 'section-title' }, `${t('profile.badges')} · ${progress.badges.filter((b) => b.earned).length}/${progress.badges.length}`),
+    h('div', { class: 'badge-grid' }, badges));
 }
 
 export async function openProfile(app) {
@@ -33,8 +62,9 @@ export async function openProfile(app) {
   let account;
   if (state.user) {
     let stats = state.stats;
+    let progress = null;
     try {
-      stats = (await api.me()).stats;
+      ({ stats, progress } = await api.me());
     } catch {
       // Eldeki istatistiklerle devam et.
     }
@@ -47,7 +77,8 @@ export async function openProfile(app) {
         stat(stats?.places, t('profile.places')),
         stat(stats?.cities, t('profile.cities')),
         stat(stats?.overheards, t('profile.overheards')),
-        stat(stats?.reactionsReceived, t('profile.reactions'))));
+        stat(stats?.reactionsReceived, t('profile.reactions'))),
+      progress ? progressSection(progress, state) : null);
   } else {
     account = h('div', { class: 'stack' },
       h('p', { class: 'muted' }, t('auth.why')),

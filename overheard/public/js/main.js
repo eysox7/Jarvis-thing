@@ -132,7 +132,8 @@ const app = {
   async react(o, kind) {
     if (!state.user) return app.openAuth();
     try {
-      const { overheard } = await api.react(o.id, kind);
+      const { overheard, newBadges } = await api.react(o.id, kind);
+      app.celebrate(newBadges);
       replaceOverheard(overheard);
       if (map.openId() === overheard.id) map.replaceOpen(bubbleContent(overheard, app));
       else app.openOverheard(overheard);
@@ -197,6 +198,7 @@ const app = {
     if (result.city && result.city !== state.city.id) await app.selectCity(result.city, { keepView: true });
     else if (unlocked.length) await app.refresh();
     for (const p of unlocked) toast(t('toast.unlocked', { place: p.name }), { tone: 'success', timeout: 6000 });
+    app.celebrate(result.newBadges);
     if (!silent && !unlocked.length) {
       if (result.places.length) toast(t('toast.checkedIn', { places: result.places.map((p) => p.name).join(', ') }));
       else toast(result.city ? t('toast.noPlacesHere') : t('toast.outsidePilot'));
@@ -226,6 +228,11 @@ const app = {
   },
 
   relabel: () => renderChrome(),
+
+  // Sunucu yeni rozet bildirdiyse kutla.
+  celebrate(newBadges = []) {
+    for (const id of newBadges) toast(t('toast.badge', { name: t(`badge.${id}`) }), { tone: 'success', timeout: 6000 });
+  },
 };
 
 async function refreshMe() {

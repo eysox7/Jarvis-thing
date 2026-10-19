@@ -34,6 +34,8 @@ insanları yürümeye hem de tanışmaya teşvik eder.
   konuşmada açıp açmamak sana kalır.
 - **Söz üzerinden mesajlaşma.** Her konuşma bir söze bağlıdır; sohbet başlığında sözün kendisi ve
   ortak mekânlarınız durur. Mesajlar canlı (Server-Sent Events) gelir.
+- **Keşif motivasyonu.** Haftalık seri, şehir başına keşif yüzdesi ve rozetler (ilk adım, kâşif,
+  haritacı, şehirlerarası, tanık, bağlantı…). Her yeni mekân bir adım daha.
 - **Güvenlik.** Şikâyet (eşikte otomatik gizleme), engelleme, hız sınırları, CSP, Origin denetimi,
   özetlenmiş oturum belirteçleri, scrypt ile parola. Yazanın gerçek konumu saklanmaz/gösterilmez;
   balonlar mekân dairesi içinde sabit ama rastgele bir noktada durur.

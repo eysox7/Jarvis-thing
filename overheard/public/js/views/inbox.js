@@ -83,7 +83,8 @@ export async function openConversation(app, id) {
   const box = composer({
     placeholder: t('chat.placeholder'),
     onSend: async (text) => {
-      const { message } = await api.reply(id, text);
+      const { message, newBadges } = await api.reply(id, text);
+      app.celebrate(newBadges);
       list.append(messageBubble(message));
       list.scrollTop = list.scrollHeight;
     },
@@ -131,7 +132,8 @@ export function openNewMessage(app, o, to) {
   const box = composer({
     placeholder: t('chat.placeholder'),
     onSend: async (text) => {
-      const { conversationId } = await api.messageAbout(o.id, text, toWitness ? recipient : undefined);
+      const { conversationId, newBadges } = await api.messageAbout(o.id, text, toWitness ? recipient : undefined);
+      app.celebrate(newBadges);
       await openConversation(app, conversationId);
     },
   });
