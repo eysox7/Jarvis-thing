@@ -144,7 +144,7 @@ export function createMap(el, handlers) {
   el.addEventListener('touchend', () => clearTimeout(pressTimer), { passive: true });
 
   let current = null;
-  function popup(latlng, content, className = 'oh-popup') {
+  function popup(latlng, content, className = 'oh-popup', overheardId = null) {
     current = L.popup({
       className,
       maxWidth: 330,
@@ -153,6 +153,7 @@ export function createMap(el, handlers) {
       autoPanPaddingTopLeft: [16, 130],
       autoPanPaddingBottomRight: [16, 110],
     }).setLatLng(latlng).setContent(content).openOn(map);
+    current.overheardId = overheardId;
     return current;
   }
 
@@ -170,7 +171,7 @@ export function createMap(el, handlers) {
 
     // Sözü büyük bir konuşma balonu olarak açar; gerekirse önce yakınlaşır.
     openOverheard(o, content) {
-      const show = () => popup([o.lat, o.lng], content);
+      const show = () => popup([o.lat, o.lng], content, 'oh-popup', o.id);
       if (map.getZoom() < DETAIL_ZOOM || !map.getBounds().contains([o.lat, o.lng])) {
         map.once('moveend', show);
         map.flyTo([o.lat, o.lng], Math.max(map.getZoom(), 16), { duration: 0.6 });
@@ -183,9 +184,15 @@ export function createMap(el, handlers) {
       return popup(latlng, content, 'oh-popup oh-popup-small');
     },
 
-    // Açık balonun içeriğini (ör. kilit açılınca) yerinde günceller.
+    // Açık büyük balondaki sözün kimliği (yoksa null).
+    openId() {
+      return current && map.hasLayer(current) ? current.overheardId : null;
+    },
+
+    // Açık balonu yeni içerikle (ör. kilit açılınca) aynı yerde yeniden açar; boyut değişse de
+    // ekrana sığacak şekilde yeniden kaydırılır.
     updateOpen(content) {
-      if (current && map.hasLayer(current)) current.setContent(content);
+      if (current && map.hasLayer(current)) popup(current.getLatLng(), content, current.options.className, current.overheardId);
     },
 
     closePopup() {

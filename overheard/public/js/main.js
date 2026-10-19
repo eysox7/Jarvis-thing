@@ -30,7 +30,6 @@ let map;
 let events = null;
 let watchId = null;
 let lastCheckIn = null;
-let openBubbleId = null;
 
 const storage = {
   get(key) {
@@ -103,7 +102,8 @@ const app = {
     try {
       state.data = await api.cityMap(state.city.id);
       map.render(state.data);
-      const open = openBubbleId && state.data.overheards.find((o) => o.id === openBubbleId);
+      const openId = map.openId();
+      const open = openId && state.data.overheards.find((o) => o.id === openId);
       if (open) map.updateOpen(bubbleContent(open, app));
     } catch (err) {
       toast(errorText(err), { tone: 'error' });
@@ -126,7 +126,6 @@ const app = {
   },
 
   openOverheard(o) {
-    openBubbleId = o.id;
     map.openOverheard(o, bubbleContent(o, app));
   },
 
@@ -379,7 +378,6 @@ async function boot() {
     onPlaceClick: (p) => map.flyTo(p.lat, p.lng, 16),
     onLongPress,
   });
-  map.leaflet.on('popupclose', () => { openBubbleId = null; });
   map.setCity(state.city);
 
   bindNav();
@@ -400,4 +398,4 @@ boot().catch((err) => {
 });
 
 // Testlerin ve hata ayıklamanın uygulama durumuna erişebilmesi için.
-window.overheard = { app, get openBubbleId() { return openBubbleId; } };
+window.overheard = { app, get openBubbleId() { return map?.openId() ?? null; } };
