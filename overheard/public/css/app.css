@@ -662,6 +662,29 @@ textarea { resize: vertical; min-height: 44px; }
 .city-card.is-active { border-color: var(--accent); background: var(--accent-soft); }
 .city-name { font-weight: 700; }
 
+/* Yakındaki kilitli mekân kartı */
+.nudge {
+  position: fixed;
+  left: 12px; right: 64px;
+  /* "Duydum" düğmesi sekme çubuğundan yukarı taştığı için biraz daha yukarıda. */
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 40px);
+  z-index: 950;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 6px 8px 12px;
+  border-radius: 18px;
+  background: var(--paper);
+  border: 1.5px dashed var(--locked);
+  box-shadow: var(--shadow);
+  animation: toast-in 0.25s ease both;
+}
+.nudge[hidden] { display: none; }
+.nudge-icon { font-size: 20px; }
+.nudge-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; border: none; background: none; padding: 0; text-align: left; }
+.nudge-title { font-weight: 700; font-size: 14px; }
+.nudge-sub { font-size: 12.5px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nudge-go { flex: none; padding: 8px 12px; font-size: 13px; }
+body.has-nudge .toasts { bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 116px); }
+
 /* Bildirimler */
 .toasts {
   position: fixed;

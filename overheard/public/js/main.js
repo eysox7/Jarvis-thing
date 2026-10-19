@@ -9,6 +9,7 @@ import { openCompose } from './views/compose.js';
 import { openPlaces } from './views/places.js';
 import { openInbox, openConversation, openNewMessage, handleIncoming } from './views/inbox.js';
 import { openProfile } from './views/profile.js';
+import { createNudge } from './views/nudge.js';
 
 const CITY_KEY = 'oh_city';
 const HINT_KEY = 'oh_demo_hint_seen';
@@ -24,9 +25,11 @@ const state = {
   city: null,
   data: null,
   position: null,
+  exploring: false,
 };
 
 let map;
+let nudge;
 let events = null;
 let watchId = null;
 let lastCheckIn = null;
@@ -43,6 +46,7 @@ const storage = {
 function setPosition(pos) {
   state.position = { ...pos, at: Date.now() };
   map.showMe(state.position);
+  nudge.update();
 }
 
 function locateOnce() {
@@ -102,6 +106,7 @@ const app = {
     try {
       state.data = await api.cityMap(state.city.id);
       map.render(state.data);
+      nudge.update();
       const openId = map.openId();
       const open = openId && state.data.overheards.find((o) => o.id === openId);
       if (open) map.updateOpen(bubbleContent(open, app));
@@ -271,6 +276,7 @@ function connectEvents() {
 
 // --- Keşif modu: yürüdükçe otomatik check-in ---
 function stopExplore() {
+  state.exploring = false;
   if (watchId == null) return;
   navigator.geolocation.clearWatch(watchId);
   watchId = null;
@@ -300,6 +306,7 @@ function toggleExplore() {
     },
     { enableHighAccuracy: true, maximumAge: 10000 },
   );
+  state.exploring = true;
   toast(t('map.exploreOn'), { tone: 'success' });
   renderChrome();
 }
@@ -393,6 +400,7 @@ async function boot() {
     onProviderFallback: () => toast(t('toast.mapFallback')),
   }, config);
   map.setCity(state.city);
+  nudge = createNudge(app);
 
   bindNav();
   renderChrome();

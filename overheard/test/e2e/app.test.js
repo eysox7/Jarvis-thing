@@ -209,6 +209,28 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await u.context.close();
     });
 
+    test('yakındaki kilitli mekân kartı ve keşif modunda "sıcak" ipucu', async () => {
+      const start = { latitude: 40.985, longitude: 29.033, accuracy: 12 };
+      const u = await newUser(browser, srv.base, start);
+      await loginAsGuest(u.page);
+      await u.page.locator('#btn-locate').click();
+      const nudge = u.page.locator('#nudge');
+      await nudge.getByText('kilitli söz seni bekliyor').waitFor();
+      await nudge.getByText('Bahariye Caddesi').waitFor();
+
+      // Keşif modu: Bahariye'ye yaklaştıkça ipucu gelir (300 m eşiği).
+      await u.page.locator('#btn-explore').click();
+      await u.page.locator('.toast', { hasText: 'Keşif modu açık' }).waitFor();
+      await u.context.setGeolocation({ latitude: 40.9862, longitude: 29.0305, accuracy: 12 });
+      await u.page.locator('.toast', { hasText: 'Sıcak! Bahariye Caddesi' }).waitFor();
+
+      // Kartı kapatınca sıradaki kilitli mekân gösterilir.
+      await nudge.getByRole('button', { name: 'Kapat' }).click();
+      await nudge.filter({ hasNotText: 'Bahariye Caddesi' }).getByText('kilitli söz seni bekliyor').waitFor();
+      assert.deepEqual(u.errors, []);
+      await u.context.close();
+    });
+
     test('İngilizce arayüze geçiş', async () => {
       const u = await newUser(browser, srv.base, KADIKOY);
       await u.page.locator('[data-nav="profile"]').click();

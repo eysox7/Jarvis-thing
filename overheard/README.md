@@ -23,6 +23,8 @@ insanları yürümeye hem de tanışmaya teşvik eder.
   ne kadar uzakta olduğun ve Google Maps'te **yürüyerek yol tarifi** vardır.
 - **Check-in ve keşif modu.** "Konumum" düğmesi bulunduğun mekânlarda check-in yapar; keşif modu
   açıkken yürüdükçe otomatik check-in yapılır ve mekânların kilidi açılır.
+- **Seni bekleyen sözler.** Haritanın altındaki kart en yakın kilitli mekânı ve orada kaç sözün
+  beklediğini gösterir; keşif modunda yaklaştıkça "Sıcak!" ipuçları gelir.
 - **Söz bırakma.** Yalnızca o mekândayken. Yakında kayıtlı mekân yoksa yeriyle birlikte yeni
   mekânı sen açarsın.
 - **Aynı anda oradaydınız.** Söz bırakıldığında sen de oradaysan balonda "Sen de oradaydın!"

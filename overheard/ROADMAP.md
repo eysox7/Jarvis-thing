@@ -36,11 +36,12 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
       tanık, bağlantı, seri). Rozet kazandıran eylemler (check-in, söz, 👂, mesaj) yanıtında
       `newBadges` döner, arayüz kutlar. Alt sayfa modal olmaktan çıktı: sekme çubuğu açık
       sayfanın altında kullanılabilir.
+- [x] **8. Yakındaki sözler dürtmesi** — Haritada kalıcı kart: "4 kilitli söz seni bekliyor ·
+      650 m · Moda Sahili" + yol tarifi; kapatılınca sıradaki mekân. Keşif modunda kilitli bir
+      mekâna 300 m ve 100 m yaklaşınca "Sıcak!" ipucu.
 
 ## Sıradakiler
 
-- [ ] **8. Yakındaki sözler dürtmesi** — "250 m ötede 4 kilitli söz var" kartı; keşif modunda
-      yaklaştıkça ipucu.
 - [ ] **9. Moderasyon** — TR/EN küfür/hakaret filtresi, telefon/e-posta/plaka gibi kişisel veri
       maskesi, yönetici uçları (gizlenen sözleri gözden geçirme).
 - [ ] **10. Dağıtım** — Dockerfile, `/healthz`, üretim ayarları rehberi (HTTPS, güvenli çerez,
