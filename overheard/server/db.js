@@ -130,6 +130,10 @@ export const MIGRATIONS = [
   ALTER TABLE overheards ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE conversations ADD COLUMN author_revealed INTEGER NOT NULL DEFAULT 0;
   `,
+  // v4: Moderasyon: yasaklanan kullanıcılar yazamaz.
+  `
+  ALTER TABLE users ADD COLUMN banned_at INTEGER;
+  `,
 ];
 
 export function openDb(path) {

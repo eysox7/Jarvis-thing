@@ -636,6 +636,9 @@ textarea { resize: vertical; min-height: 44px; }
 .composer { display: flex; gap: 8px; align-items: flex-end; }
 .composer textarea { flex: 1; min-height: 44px; max-height: 140px; resize: none; }
 
+/* Moderasyon */
+.admin-item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 15px; }
+
 /* Profil */
 .profile-head { display: flex; align-items: center; gap: 14px; }
 .profile-handle { margin: 0; font-size: 19px; font-weight: 750; }

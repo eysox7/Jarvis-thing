@@ -79,6 +79,7 @@ export async function openCompose(app) {
           const { overheard, newBadges } = await api.post(payload);
           closeSheet();
           toast(t('toast.posted'), { tone: 'success' });
+          if (overheard.masked?.length) toast(t('toast.masked'));
           app.celebrate(newBadges);
           await app.refresh();
           app.openOverheard(overheard);

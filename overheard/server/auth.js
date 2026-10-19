@@ -36,7 +36,7 @@ export function createSession(db, userId, days) {
 export function sessionUser(db, token) {
   if (!token) return null;
   const row = db.prepare(`
-    SELECT u.id, u.handle, u.is_guest, u.created_at, s.expires_at
+    SELECT u.id, u.handle, u.is_guest, u.created_at, u.banned_at, s.expires_at
     FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = ?`).get(tokenHash(token));
   if (!row) return null;
@@ -44,7 +44,7 @@ export function sessionUser(db, token) {
     destroySession(db, token);
     return null;
   }
-  return { id: row.id, handle: row.handle, isGuest: Boolean(row.is_guest), createdAt: row.created_at };
+  return { id: row.id, handle: row.handle, isGuest: Boolean(row.is_guest), createdAt: row.created_at, banned: row.banned_at != null };
 }
 
 export function destroySession(db, token) {

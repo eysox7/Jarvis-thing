@@ -1,5 +1,5 @@
 // Uygulama kabuğunu önbelleğe alır; API ve harita karoları her zaman ağdan gelir.
-const CACHE = 'overheard-shell-v3';
+const CACHE = 'overheard-shell-v4';
 const SHELL = [
   '/',
   '/css/app.css',
@@ -14,6 +14,7 @@ const SHELL = [
   '/js/maps/google.js',
   '/js/ui.js',
   '/js/util.js',
+  '/js/views/admin.js',
   '/js/views/auth.js',
   '/js/views/bubble.js',
   '/js/views/compose.js',

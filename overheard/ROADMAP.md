@@ -39,11 +39,14 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
 - [x] **8. Yakındaki sözler dürtmesi** — Haritada kalıcı kart: "4 kilitli söz seni bekliyor ·
       650 m · Moda Sahili" + yol tarifi; kapatılınca sıradaki mekân. Keşif modunda kilitli bir
       mekâna 300 m ve 100 m yaklaşınca "Sıcak!" ipucu.
+- [x] **9. Moderasyon** — Sözlerde ve mekân adlarında telefon, e-posta, bağlantı, TR plakası ve
+      @kişi maskesi; küfür ilk harfi kalacak biçimde maskelenir (leetspeak/uzatma dahil);
+      nefret söylemi reddedilir (mesajlarda da). `OVERHEARD_ADMINS` ile moderatörler: şikâyet
+      edilen/gizlenen sözleri görme, geri yükleme, silme, yazarı yasaklama (yasaklı okur ama
+      yazamaz). Şema v4.
 
 ## Sıradakiler
 
-- [ ] **9. Moderasyon** — TR/EN küfür/hakaret filtresi, telefon/e-posta/plaka gibi kişisel veri
-      maskesi, yönetici uçları (gizlenen sözleri gözden geçirme).
 - [ ] **10. Dağıtım** — Dockerfile, `/healthz`, üretim ayarları rehberi (HTTPS, güvenli çerez,
       ters vekil), yedekleme notları.
 - [ ] **11. Konum sahteciliğine karşı** — İmkânsız seyahat (hız) denetimi, düşük doğruluklu

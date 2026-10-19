@@ -25,6 +25,8 @@ export function loadConfig(overrides = {}) {
     // Hız sınırlarının çarpanı (testlerde büyütülür).
     rateLimitScale: Number(env.OVERHEARD_RATE_SCALE) || 1,
     googleMapsKey: env.GOOGLE_MAPS_API_KEY || '',
+    // Moderasyon paneline erişebilecek kullanıcı adları (virgülle ayrılmış).
+    admins: (env.OVERHEARD_ADMINS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
     ...overrides,
   };
 }

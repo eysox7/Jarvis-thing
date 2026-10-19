@@ -38,6 +38,9 @@ insanları yürümeye hem de tanışmaya teşvik eder.
   ortak mekânlarınız durur. Mesajlar canlı (Server-Sent Events) gelir.
 - **Keşif motivasyonu.** Haftalık seri, şehir başına keşif yüzdesi ve rozetler (ilk adım, kâşif,
   haritacı, şehirlerarası, tanık, bağlantı…). Her yeni mekân bir adım daha.
+- **Moderasyon.** Sözlerde telefon, e-posta, bağlantı, plaka ve @kişi otomatik gizlenir; küfür
+  maskelenir, nefret söylemi reddedilir. Moderatör paneli: gizlenen sözleri gözden geçirme, geri
+  yükleme, silme, yasaklama.
 - **Güvenlik.** Şikâyet (eşikte otomatik gizleme), engelleme, hız sınırları, CSP, Origin denetimi,
   özetlenmiş oturum belirteçleri, scrypt ile parola. Yazanın gerçek konumu saklanmaz/gösterilmez;
   balonlar mekân dairesi içinde sabit ama rastgele bir noktada durur.
@@ -92,6 +95,7 @@ Ortam değişkenleri:
 | `OVERHEARD_DEMO` | `1` | Demo modu: örnek sözler, misafir hesabı, haritaya uzun basınca ışınlanma. Üretimde `0`. |
 | `OVERHEARD_SECURE_COOKIES` | `0` | HTTPS arkasında `1` yap |
 | `GOOGLE_MAPS_API_KEY` | — | Tanımlıysa harita Google Maps ile çizilir (yoksa OpenStreetMap) |
+| `OVERHEARD_ADMINS` | — | Moderasyon paneline erişecek kullanıcı adları, virgülle (`ayse,mert`) |
 
 ### Demo modunda deneme
 
@@ -112,6 +116,7 @@ overheard/
     domain.js       kurallar: ortak mekân, check-in, sözler, mesajlaşma
     db.js           SQLite şeması ve göçler (PRAGMA user_version)
     auth.js         scrypt parolalar, oturumlar
+    moderation.js   kişisel veri ve küfür maskesi, nefret söylemi reddi
     events.js       Server-Sent Events (canlı mesaj)
     geo.js          mesafe, sınır kutusu, balon yerleşimi
     data/           pilot şehirler, mekânlar, demo sözleri
@@ -148,6 +153,7 @@ ayrıntıları gönderilmez. Tepki vermek, şikâyet etmek ve mesaj atmak da ayn
 | `GET /api/conversations` · `GET /api/conversations/:id` · `POST …/messages` | |
 | `POST /api/conversations/:id/reveal` | Anonim söz sahibi kimliğini açar |
 | `POST /api/overheards/:id/block-author` · `POST /api/users/:handle/block` | Engelleme |
+| `GET /api/admin/reports` · `POST …/overheards/:id/restore` · `DELETE …/overheards/:id` · `POST …/users/:handle/ban` | Moderasyon (yalnızca `OVERHEARD_ADMINS`) |
 | `GET /api/events` | SSE akışı (`dm`, `reveal` olayları) |
 
 ## Bilinen sınırlar

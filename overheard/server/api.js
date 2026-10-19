@@ -16,12 +16,32 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     return ctx.user;
   };
 
+  // Yazma işlemleri: yasaklı kullanıcı okuyabilir ama yazamaz.
+  const requireActive = (ctx) => {
+    const user = requireUser(ctx);
+    if (user.banned) throw new HttpError(403, 'banned');
+    return user;
+  };
+
+  const isAdmin = (user) => Boolean(user) && config.admins.includes(user.handle.toLowerCase());
+
+  const requireAdmin = (ctx) => {
+    const user = requireUser(ctx);
+    if (!isAdmin(user)) throw new HttpError(403, 'admin_only');
+    return user;
+  };
+
   const startSession = (ctx, userId) => {
     const token = createSession(db, userId, config.sessionDays);
     ctx.setCookie(serializeCookie(SESSION_COOKIE, token, { maxAge: config.sessionDays * 86400, secure: config.secureCookies }));
   };
 
-  const publicUser = (user) => ({ handle: user.handle, isGuest: Boolean(user.isGuest ?? user.is_guest) });
+  const publicUser = (user) => ({
+    handle: user.handle,
+    isGuest: Boolean(user.isGuest ?? user.is_guest),
+    isAdmin: isAdmin(user),
+    banned: Boolean(user.banned ?? user.banned_at),
+  });
 
   // --- Yapılandırma ---
   router.get('/api/config', () => ({
@@ -98,7 +118,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
 
   // --- Sözler ---
   router.post('/api/overheards', async (ctx) => {
-    const user = requireUser(ctx);
+    const user = requireActive(ctx);
     const body = await readJson(ctx.req);
     limit(`post:${user.id}`, 10, 3600000);
     const { result, newBadges } = domain.withBadges(db, user, () => domain.createOverheard(db, config, user, body));
@@ -113,7 +133,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   });
 
   router.post('/api/overheards/:id/reactions', async (ctx) => {
-    const user = requireUser(ctx);
+    const user = requireActive(ctx);
     limit(`react:${user.id}`, 300, 3600000);
     const body = await readJson(ctx.req);
     const { result, newBadges } = domain.withBadges(db, user, () => domain.toggleReaction(db, config, user, ctx.params.id, String(body.kind || '')));
@@ -121,7 +141,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   });
 
   router.post('/api/overheards/:id/report', async (ctx) => {
-    const user = requireUser(ctx);
+    const user = requireActive(ctx);
     limit(`report:${user.id}`, 30, 3600000);
     const body = await readJson(ctx.req);
     domain.reportOverheard(db, config, user, ctx.params.id, body.reason);
@@ -141,7 +161,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   };
 
   router.post('/api/overheards/:id/messages', async (ctx) => {
-    const user = requireUser(ctx);
+    const user = requireActive(ctx);
     limit(`message:${user.id}`, 60, 3600000);
     const body = await readJson(ctx.req);
     return deliver(domain.withBadges(db, user, () => domain.messageAboutOverheard(db, user, ctx.params.id, body.body, body.to)));
@@ -152,7 +172,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   router.get('/api/conversations/:id', (ctx) => ({ conversation: domain.getConversation(db, requireUser(ctx), ctx.params.id) }));
 
   router.post('/api/conversations/:id/messages', async (ctx) => {
-    const user = requireUser(ctx);
+    const user = requireActive(ctx);
     limit(`message:${user.id}`, 60, 3600000);
     const body = await readJson(ctx.req);
     return deliver(domain.withBadges(db, user, () => domain.sendMessage(db, user, ctx.params.id, body.body)));
@@ -172,6 +192,32 @@ export function registerApi(router, { db, config, events, rateLimit }) {
 
   router.post('/api/users/:handle/block', (ctx) => {
     domain.blockUser(db, requireUser(ctx), ctx.params.handle);
+    return { ok: true };
+  });
+
+  // --- Moderasyon paneli (OVERHEARD_ADMINS) ---
+  router.get('/api/admin/reports', (ctx) => {
+    requireAdmin(ctx);
+    return { overheards: domain.reportedOverheards(db) };
+  });
+
+  router.post('/api/admin/overheards/:id/restore', (ctx) => {
+    requireAdmin(ctx);
+    domain.restoreOverheard(db, ctx.params.id);
+    return { ok: true };
+  });
+
+  router.delete('/api/admin/overheards/:id', (ctx) => {
+    requireAdmin(ctx);
+    domain.removeOverheard(db, ctx.params.id);
+    return { ok: true };
+  });
+
+  router.post('/api/admin/users/:handle/ban', async (ctx) => {
+    const admin = requireAdmin(ctx);
+    const body = await readJson(ctx.req);
+    if (ctx.params.handle.toLowerCase() === admin.handle.toLowerCase()) throw new HttpError(400, 'cannot_ban_self');
+    domain.setBanned(db, ctx.params.handle, body.banned !== false);
     return { ok: true };
   });
 

@@ -241,6 +241,40 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
     });
   });
 
+  describe('Moderasyon paneli', () => {
+    let srv;
+    before(async () => { srv = await startTestServer({ demo: true, admins: ['moderator'] }); });
+    after(async () => { await srv.close(); });
+
+    test('moderatör gizlenen sözü panelde görür ve geri yükler', async () => {
+      // Bir demo sözünü şikâyetlerle gizlenmiş hâle getir.
+      const target = srv.db.prepare("SELECT id, text FROM overheards WHERE place_id = 'ist-moda-sahil' LIMIT 1").get();
+      const users = srv.db.prepare('SELECT id FROM users LIMIT 3').all();
+      for (const u of users) srv.db.prepare("INSERT INTO reports (overheard_id, user_id, reason, created_at) VALUES (?, ?, 'spam', ?)").run(target.id, u.id, Date.now());
+      srv.db.prepare('UPDATE overheards SET hidden = 1 WHERE id = ?').run(target.id);
+
+      const u = await newUser(browser, srv.base, KADIKOY);
+      await u.page.locator('[data-nav="profile"]').click();
+      await sheet(u.page).getByRole('button', { name: 'Giriş yap' }).click();
+      await sheet(u.page).getByRole('tab', { name: 'Kayıt ol' }).click();
+      await sheet(u.page).locator('input[name="handle"]').fill('moderator');
+      await sheet(u.page).locator('input[name="password"]').fill('cok-gizli-parola');
+      await sheet(u.page).locator('form').getByRole('button', { name: 'Kayıt ol' }).click();
+      await u.page.waitForFunction(() => window.overheard.app.state.user?.isAdmin);
+
+      await u.page.locator('[data-nav="profile"]').click();
+      await sheet(u.page).getByRole('button', { name: /Moderasyon paneli/ }).click();
+      const item = sheet(u.page).locator('.admin-item', { hasText: target.text });
+      await item.getByText('Gizlendi').waitFor();
+      await item.getByRole('button', { name: 'Geri yükle' }).click();
+      await u.page.locator('.toast', { hasText: 'Söz geri yüklendi' }).waitFor();
+      await sheet(u.page).getByText('Bekleyen şikâyet yok').waitFor();
+      assert.equal(srv.db.prepare('SELECT hidden FROM overheards WHERE id = ?').get(target.id).hidden, 0);
+      assert.deepEqual(u.errors, []);
+      await u.context.close();
+    });
+  });
+
   describe('Google Maps', () => {
     let srv;
     before(async () => { srv = await startTestServer({ demo: true, googleMapsKey: 'test-key' }); });

@@ -2,6 +2,7 @@ import { h, BADGE_EMOJI } from '../util.js';
 import { t, getLang, setLang, languages } from '../i18n.js';
 import { api } from '../api.js';
 import { openSheet, closeSheet } from '../ui.js';
+import { openAdmin } from './admin.js';
 
 const LANG_NAMES = { tr: 'Türkçe', en: 'English' };
 
@@ -72,7 +73,11 @@ export async function openProfile(app) {
     account = h('div', { class: 'stack' },
       h('div', { class: 'profile-head' },
         h('span', { class: 'avatar avatar-lg', 'aria-hidden': 'true' }, state.user.handle.slice(0, 1).toUpperCase()),
-        h('div', {}, h('p', { class: 'profile-handle' }, `@${state.user.handle}`), state.user.isGuest ? h('p', { class: 'muted small' }, t('profile.guestNote')) : null)),
+        h('div', {},
+          h('p', { class: 'profile-handle' }, `@${state.user.handle}`),
+          state.user.isGuest ? h('p', { class: 'muted small' }, t('profile.guestNote')) : null,
+          state.user.banned ? h('p', { class: 'form-error' }, t('profile.bannedNote')) : null)),
+      state.user.isAdmin ? h('button', { class: 'btn btn-block', type: 'button', onclick: () => openAdmin(app) }, `🛡️ ${t('admin.open')}`) : null,
       h('div', { class: 'stats' },
         stat(stats?.places, t('profile.places')),
         stat(stats?.cities, t('profile.cities')),

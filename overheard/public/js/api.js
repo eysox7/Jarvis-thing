@@ -51,4 +51,8 @@ export const api = {
   block: (handle) => request('POST', `/api/users/${enc(handle)}/block`, {}),
   blockAuthor: (id) => request('POST', `/api/overheards/${enc(id)}/block-author`, {}),
   reveal: (id) => request('POST', `/api/conversations/${enc(id)}/reveal`, {}),
+  adminReports: () => request('GET', '/api/admin/reports'),
+  adminRestore: (id) => request('POST', `/api/admin/overheards/${enc(id)}/restore`, {}),
+  adminDelete: (id) => request('DELETE', `/api/admin/overheards/${enc(id)}`),
+  adminBan: (handle, banned) => request('POST', `/api/admin/users/${enc(handle)}/ban`, { banned }),
 };

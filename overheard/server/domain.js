@@ -7,6 +7,7 @@ import { newId } from './auth.js';
 import { HttpError } from './http.js';
 import { boundingBox, distanceM, isValidCoord, scatterInPlace } from './geo.js';
 import { CITIES, CITY_BY_ID } from './data/cities.js';
+import { moderatePublicText, moderatePrivateText } from './moderation.js';
 
 export const REACTIONS = ['lol', 'wow', 'same', 'heart'];
 export const LIMITS = { textMin: 3, textMax: 280, placeNameMin: 2, placeNameMax: 60, messageMax: 1000 };
@@ -250,10 +251,12 @@ function requireReadable(db, viewer, row) {
 }
 
 export function createOverheard(db, config, user, body) {
-  const text = cleanText(body.text);
-  const length = [...text].length;
-  if (length < LIMITS.textMin) throw new HttpError(400, 'text_too_short');
-  if (length > LIMITS.textMax) throw new HttpError(400, 'text_too_long');
+  const raw = cleanText(body.text);
+  if ([...raw].length < LIMITS.textMin) throw new HttpError(400, 'text_too_short');
+  if ([...raw].length > LIMITS.textMax) throw new HttpError(400, 'text_too_long');
+  // Nefret söylemi reddedilir; telefon, e-posta, plaka, @kişi ve küfür maskelenir.
+  const { text, masked } = moderatePublicText(raw);
+  if ([...text].length > LIMITS.textMax) throw new HttpError(400, 'text_too_long');
   const coords = readCoords(body);
   const now = Date.now();
 
@@ -268,7 +271,7 @@ export function createOverheard(db, config, user, body) {
         throw new HttpError(403, 'not_at_place', { distance: Math.round(distanceM(coords.lat, coords.lng, target.lat, target.lng)) });
       }
     } else if (body.newPlaceName !== undefined) {
-      const name = cleanText(body.newPlaceName);
+      const name = moderatePublicText(cleanText(body.newPlaceName)).text;
       if ([...name].length < LIMITS.placeNameMin || [...name].length > LIMITS.placeNameMax) throw new HttpError(400, 'bad_place_name');
       if (containing.length) throw new HttpError(409, 'place_exists', { place: serializePlace(containing[0]) });
       const city = cityAt(coords.lat, coords.lng);
@@ -287,7 +290,7 @@ export function createOverheard(db, config, user, body) {
     db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)').run(user.id, place.id, now);
     db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous) VALUES (?, ?, ?, ?, ?, ?)')
       .run(id, user.id, place.id, text, now, body.anonymous ? 1 : 0);
-    return getOverheard(db, config, user, id);
+    return { ...getOverheard(db, config, user, id), masked };
   });
 }
 
@@ -378,7 +381,7 @@ function cleanMessage(body) {
   const text = cleanText(body, { multiline: true });
   if (!text) throw new HttpError(400, 'message_empty');
   if ([...text].length > LIMITS.messageMax) throw new HttpError(400, 'message_too_long');
-  return text;
+  return moderatePrivateText(text);
 }
 
 function insertMessage(db, conversationId, senderId, body, now) {
@@ -597,4 +600,48 @@ export function withBadges(db, user, fn) {
   const result = fn();
   const newBadges = [...earnedBadges(db, user)].filter((id) => !before.has(id));
   return { result, newBadges };
+}
+
+// --- Moderasyon paneli ----------------------------------------------------
+
+export function reportedOverheards(db) {
+  return db.prepare(`
+    SELECT o.id, o.text, o.created_at, o.hidden, o.anonymous, u.handle, u.banned_at, p.name AS place_name,
+           COUNT(r.user_id) AS reports, GROUP_CONCAT(DISTINCT r.reason) AS reasons
+    FROM overheards o
+    JOIN users u ON u.id = o.user_id
+    JOIN places p ON p.id = o.place_id
+    LEFT JOIN reports r ON r.overheard_id = o.id
+    GROUP BY o.id
+    HAVING reports > 0 OR o.hidden = 1
+    ORDER BY o.hidden DESC, reports DESC, o.created_at DESC
+    LIMIT 100`).all()
+    .map((r) => ({
+      id: r.id,
+      text: r.text,
+      createdAt: r.created_at,
+      hidden: Boolean(r.hidden),
+      anonymous: Boolean(r.anonymous),
+      author: r.handle,
+      authorBanned: r.banned_at != null,
+      placeName: r.place_name,
+      reports: r.reports,
+      reasons: r.reasons ? r.reasons.split(',') : [],
+    }));
+}
+
+export function restoreOverheard(db, id) {
+  const { changes } = db.prepare('UPDATE overheards SET hidden = 0 WHERE id = ?').run(id);
+  if (!changes) throw new HttpError(404, 'overheard_not_found');
+  db.prepare('DELETE FROM reports WHERE overheard_id = ?').run(id);
+}
+
+export function removeOverheard(db, id) {
+  const { changes } = db.prepare('DELETE FROM overheards WHERE id = ?').run(id);
+  if (!changes) throw new HttpError(404, 'overheard_not_found');
+}
+
+export function setBanned(db, handle, banned) {
+  const { changes } = db.prepare('UPDATE users SET banned_at = ? WHERE handle = ?').run(banned ? Date.now() : null, String(handle));
+  if (!changes) throw new HttpError(404, 'user_not_found');
 }
