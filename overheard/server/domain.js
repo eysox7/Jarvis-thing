@@ -88,7 +88,7 @@ export function checkIn(db, config, user, coords) {
 // --- Sözler ---------------------------------------------------------------
 
 const OVERHEARD_SELECT = `
-  SELECT o.id, o.user_id, o.place_id, o.text, o.created_at, o.hidden,
+  SELECT o.id, o.user_id, o.place_id, o.text, o.created_at, o.hidden, o.anonymous,
          u.handle, p.name AS place_name, p.city_id, p.lat AS place_lat, p.lng AS place_lng, p.radius_m
   FROM overheards o
   JOIN users u ON u.id = o.user_id
@@ -183,7 +183,9 @@ function serializeOverheard(row, ctx) {
     ...base,
     locked: false,
     text: row.text,
-    author: row.handle,
+    // Anonim sözlerde yazarın adı yalnızca kendisine gösterilir.
+    author: row.anonymous && !mine ? null : row.handle,
+    anonymous: Boolean(row.anonymous),
     mine,
     reactions,
     myReactions,
@@ -283,8 +285,8 @@ export function createOverheard(db, config, user, body) {
 
     const id = newId();
     db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)').run(user.id, place.id, now);
-    db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(id, user.id, place.id, text, now);
+    db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, user.id, place.id, text, now, body.anonymous ? 1 : 0);
     return getOverheard(db, config, user, id);
   });
 }
@@ -351,6 +353,14 @@ export function profileStats(db, user) {
   };
 }
 
+// Sözün sahibini, (anonimse) kimliğini açığa çıkarmadan engeller.
+export function blockAuthorOf(db, user, overheardId) {
+  const row = db.prepare('SELECT user_id FROM overheards WHERE id = ?').get(overheardId);
+  if (!row) throw new HttpError(404, 'overheard_not_found');
+  if (row.user_id === user.id) throw new HttpError(400, 'cannot_block_self');
+  db.prepare('INSERT OR IGNORE INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, ?)').run(user.id, row.user_id, Date.now());
+}
+
 export function blockUser(db, user, handle) {
   const target = db.prepare('SELECT id FROM users WHERE handle = ?').get(String(handle));
   if (!target) throw new HttpError(404, 'user_not_found');
@@ -413,8 +423,20 @@ export function messageAboutOverheard(db, user, overheardId, rawBody, to) {
     const message = insertMessage(db, conv.id, user.id, body, now);
     const readColumn = conv.owner_id === user.id ? 'owner_read_at' : 'starter_read_at';
     db.prepare(`UPDATE conversations SET last_at = ?, ${readColumn} = ? WHERE id = ?`).run(now, now, conv.id);
-    return { conversationId: conv.id, recipientId, message };
+    return { conversationId: conv.id, recipientId, message, senderName: senderName(db, conv, user.id, user.handle) };
   });
+}
+
+// Konuşmadaki kişi anonim sözün henüz kimliğini açmamış sahibi mi?
+const hiddenAuthor = (conv, overheard, userId) => userId === overheard.user_id && Boolean(overheard.anonymous) && !conv.author_revealed;
+
+function conversationOverheard(db, conv) {
+  return db.prepare('SELECT o.id, o.user_id, o.anonymous, o.text, o.created_at, p.name AS place_name FROM overheards o JOIN places p ON p.id = o.place_id WHERE o.id = ?').get(conv.overheard_id);
+}
+
+// Gönderenin, alıcıya görünen adı (anonim ve gizliyse null).
+function senderName(db, conv, senderId, handle) {
+  return hiddenAuthor(conv, conversationOverheard(db, conv), senderId) ? null : handle;
 }
 
 function loadConversation(db, user, id) {
@@ -433,13 +455,13 @@ export function sendMessage(db, user, conversationId, rawBody) {
   return transaction(db, () => {
     const message = insertMessage(db, conv.id, user.id, body, now);
     db.prepare(`UPDATE conversations SET last_at = ?, ${readColumn} = ? WHERE id = ?`).run(now, now, conv.id);
-    return { conversationId: conv.id, recipientId: otherId, message };
+    return { conversationId: conv.id, recipientId: otherId, message, senderName: senderName(db, conv, user.id, user.handle) };
   });
 }
 
 export function listConversations(db, user) {
   return db.prepare(`
-    SELECT c.*, o.text AS overheard_text, p.name AS place_name,
+    SELECT c.*, o.text AS overheard_text, o.user_id AS author_id, o.anonymous, p.name AS place_name,
            ou.handle AS owner_handle, su.handle AS starter_handle,
            (SELECT body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_body,
            (SELECT sender_id FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_sender
@@ -452,12 +474,14 @@ export function listConversations(db, user) {
     ORDER BY c.last_at DESC LIMIT 100`).all(user.id, user.id)
     .map((c) => {
       const amOwner = c.owner_id === user.id;
+      const otherId = amOwner ? c.starter_id : c.owner_id;
+      const hidden = hiddenAuthor(c, { user_id: c.author_id, anonymous: c.anonymous }, otherId);
       return {
         id: c.id,
         overheardId: c.overheard_id,
         overheardText: c.overheard_text,
         placeName: c.place_name,
-        with: amOwner ? c.starter_handle : c.owner_handle,
+        with: hidden ? null : amOwner ? c.starter_handle : c.owner_handle,
         role: amOwner ? 'owner' : 'starter',
         kind: c.kind,
         lastAt: c.last_at,
@@ -474,7 +498,7 @@ export function getConversation(db, user, id) {
   const otherId = amOwner ? conv.starter_id : conv.owner_id;
   db.prepare(`UPDATE conversations SET ${amOwner ? 'owner_read_at' : 'starter_read_at'} = ? WHERE id = ?`).run(Date.now(), id);
   const other = db.prepare('SELECT handle FROM users WHERE id = ?').get(otherId);
-  const overheard = db.prepare(`SELECT o.id, o.text, o.created_at, p.name AS place_name FROM overheards o JOIN places p ON p.id = o.place_id WHERE o.id = ?`).get(conv.overheard_id);
+  const overheard = conversationOverheard(db, conv);
   const messages = db.prepare(`
     SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 200) ORDER BY id`).all(id)
     .map((m) => ({ id: m.id, body: m.body, createdAt: m.created_at, fromMe: m.sender_id === user.id }));
@@ -482,11 +506,20 @@ export function getConversation(db, user, id) {
     id: conv.id,
     role: amOwner ? 'owner' : 'starter',
     kind: conv.kind,
-    with: other.handle,
+    with: hiddenAuthor(conv, overheard, otherId) ? null : other.handle,
     overheard: { id: overheard.id, text: overheard.text, placeName: overheard.place_name, createdAt: overheard.created_at },
     mutualPlaces: mutualPlaces(db, user.id, otherId),
+    // Anonim sözün sahibi bu konuşmada kimliğini açabilir.
+    canReveal: hiddenAuthor(conv, overheard, user.id),
     messages,
   };
+}
+
+export function revealIdentity(db, user, id) {
+  const conv = loadConversation(db, user, id);
+  if (!hiddenAuthor(conv, conversationOverheard(db, conv), user.id)) throw new HttpError(400, 'nothing_to_reveal');
+  db.prepare('UPDATE conversations SET author_revealed = 1 WHERE id = ?').run(id);
+  return { recipientId: conv.owner_id === user.id ? conv.starter_id : conv.owner_id };
 }
 
 export function unreadCount(db, user) {

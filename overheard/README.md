@@ -30,6 +30,8 @@ insanları yürümeye hem de tanışmaya teşvik eder.
 - **"Ben de duydum" tanıkları.** 👂 yalnızca söz söylendiği sırada orada olanlara açıktır;
   basanlar balonda tanık olarak listelenir. Söz sahibi ve tanıklar birbirine yazabilir: aynı anı
   paylaşan yabancılar arasında doğal bir tanışma.
+- **Anonim paylaşım.** İstersen adın görünmez ("Anonim kulak"); biri sana yazarsa kimliğini o
+  konuşmada açıp açmamak sana kalır.
 - **Söz üzerinden mesajlaşma.** Her konuşma bir söze bağlıdır; sohbet başlığında sözün kendisi ve
   ortak mekânlarınız durur. Mesajlar canlı (Server-Sent Events) gelir.
 - **Güvenlik.** Şikâyet (eşikte otomatik gizleme), engelleme, hız sınırları, CSP, Origin denetimi,
@@ -140,8 +142,9 @@ ayrıntıları gönderilmez. Tepki vermek, şikâyet etmek ve mesaj atmak da ayn
 | `POST /api/overheards/:id/reactions` · `report` | `kind: same` yalnızca o sırada orada olanlara |
 | `POST /api/overheards/:id/messages` | `{body, to?}`: sahibine ya da (`to`) bir tanığa yazar |
 | `GET /api/conversations` · `GET /api/conversations/:id` · `POST …/messages` | |
-| `POST /api/users/:handle/block` | |
-| `GET /api/events` | SSE akışı (`dm` olayları) |
+| `POST /api/conversations/:id/reveal` | Anonim söz sahibi kimliğini açar |
+| `POST /api/overheards/:id/block-author` · `POST /api/users/:handle/block` | Engelleme |
+| `GET /api/events` | SSE akışı (`dm`, `reveal` olayları) |
 
 ## Bilinen sınırlar
 

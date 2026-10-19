@@ -49,4 +49,6 @@ export const api = {
   conversation: (id) => request('GET', `/api/conversations/${enc(id)}`),
   reply: (id, body) => request('POST', `/api/conversations/${enc(id)}/messages`, { body }),
   block: (handle) => request('POST', `/api/users/${enc(handle)}/block`, {}),
+  blockAuthor: (id) => request('POST', `/api/overheards/${enc(id)}/block-author`, {}),
+  reveal: (id) => request('POST', `/api/conversations/${enc(id)}/reveal`, {}),
 };

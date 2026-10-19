@@ -152,6 +152,45 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await b.context.close();
     });
 
+    test('anonim söz: ad gizli, sohbette sahibi kimliğini açar', async () => {
+      const a = await newUser(browser, srv.base, KADIKOY);
+      const b = await newUser(browser, srv.base, KADIKOY);
+      await loginAsGuest(a.page);
+      const authorHandle = await a.page.evaluate(() => window.overheard.app.state.user.handle);
+      await a.page.locator('[data-nav="post"]').click();
+      await sheet(a.page).locator('textarea[name="text"]').fill('Biri telefonda: "Ben aslında çok sakin biriyim, bağırmıyorum!"');
+      await sheet(a.page).getByText('Kadıköy İskelesi').waitFor();
+      await sheet(a.page).locator('input[name="anonymous"]').check();
+      await sheet(a.page).getByRole('button', { name: /Bırak/ }).click();
+      await a.page.locator('.leaflet-popup', { hasText: 'Senin sözün (anonim)' }).waitFor();
+      const id = await a.page.evaluate(() => window.overheard.openBubbleId);
+
+      await loginAsGuest(b.page);
+      await b.page.locator('#btn-locate').click();
+      await b.page.locator('.toast', { hasText: 'açıldı' }).first().waitFor();
+      await b.page.evaluate((oid) => {
+        const o = window.overheard.app.state.data.overheards.find((x) => x.id === oid);
+        window.overheard.app.openOverheard(o);
+      }, id);
+      await b.page.locator('.leaflet-popup .bubble-author', { hasText: 'Anonim kulak' }).last().waitFor();
+      assert.ok(!(await b.page.content()).includes(authorHandle), 'anonim yazarın adı sayfada olmamalı');
+      await b.page.locator('.leaflet-popup').last().getByRole('button', { name: /Mesaj at/ }).click();
+      await sheet(b.page).locator('textarea').fill('Sakin olduğun belliydi :)');
+      await sheet(b.page).locator('textarea').press('Enter');
+      await sheet(b.page).locator('.sheet-title', { hasText: 'Anonim kulak' }).waitFor();
+
+      await a.page.locator('.toast', { hasText: 'Sakin olduğun' }).getByRole('button').click();
+      await sheet(a.page).getByRole('button', { name: 'Kimliğimi göster' }).click();
+      await sheet(a.page).getByRole('button', { name: 'Kimliğimi göster' }).waitFor({ state: 'detached' });
+      await b.page.locator('.toast', { hasText: 'kimliğini açtı' }).waitFor();
+      await sheet(b.page).locator('.sheet-title', { hasText: authorHandle }).waitFor();
+
+      assert.deepEqual(a.errors, []);
+      assert.deepEqual(b.errors, []);
+      await a.context.close();
+      await b.context.close();
+    });
+
     test('Mekânlarım kilidi açılan ve bekleyen mekânları listeler', async () => {
       const u = await newUser(browser, srv.base, KADIKOY);
       await loginAsGuest(u.page);
@@ -186,6 +225,8 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await u.page.locator('.oh-gmarker .oh-place', { hasText: 'Kadıköy İskelesi' }).waitFor();
       await loginAsGuest(u.page);
       await zoomTo(u.page, 40.9925, 29.0236);
+      // Harita boşta ('idle') kalıp balonları yeniden çizene kadar bekle.
+      await u.page.waitForTimeout(300);
       const locked = u.page.locator('.oh-gmarker .oh-bubble.is-locked').first();
       await locked.waitFor();
       await locked.click();

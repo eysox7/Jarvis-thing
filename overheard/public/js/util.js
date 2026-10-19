@@ -62,4 +62,7 @@ export function truncate(text, max) {
   return chars.length > max ? `${chars.slice(0, max - 1).join('').trimEnd()}…` : text;
 }
 
+// Kullanıcı adı ya da (anonimse) "Anonim kulak".
+export const displayName = (handle) => (handle ? `@${handle}` : t('anon.name'));
+
 export const REACTION_EMOJI = { lol: '😂', wow: '😮', same: '👂', heart: '❤️' };

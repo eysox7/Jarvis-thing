@@ -121,10 +121,10 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   });
 
   // --- Mesajlar ---
-  const deliver = (result, sender) => {
+  const deliver = (result) => {
     events.publish(result.recipientId, 'dm', {
       conversationId: result.conversationId,
-      from: sender.handle,
+      from: result.senderName,
       body: result.message.body,
       createdAt: result.message.createdAt,
     });
@@ -136,7 +136,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireUser(ctx);
     limit(`message:${user.id}`, 60, 3600000);
     const body = await readJson(ctx.req);
-    return deliver(domain.messageAboutOverheard(db, user, ctx.params.id, body.body, body.to), user);
+    return deliver(domain.messageAboutOverheard(db, user, ctx.params.id, body.body, body.to));
   });
 
   router.get('/api/conversations', (ctx) => ({ conversations: domain.listConversations(db, requireUser(ctx)) }));
@@ -147,7 +147,19 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireUser(ctx);
     limit(`message:${user.id}`, 60, 3600000);
     const body = await readJson(ctx.req);
-    return deliver(domain.sendMessage(db, user, ctx.params.id, body.body), user);
+    return deliver(domain.sendMessage(db, user, ctx.params.id, body.body));
+  });
+
+  router.post('/api/conversations/:id/reveal', (ctx) => {
+    const user = requireUser(ctx);
+    const { recipientId } = domain.revealIdentity(db, user, ctx.params.id);
+    events.publish(recipientId, 'reveal', { conversationId: ctx.params.id, handle: user.handle });
+    return { conversation: domain.getConversation(db, user, ctx.params.id) };
+  });
+
+  router.post('/api/overheards/:id/block-author', (ctx) => {
+    domain.blockAuthorOf(db, requireUser(ctx), ctx.params.id);
+    return { ok: true };
   });
 
   router.post('/api/users/:handle/block', (ctx) => {

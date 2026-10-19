@@ -1,8 +1,8 @@
 import { api } from './api.js';
 import { t, errorText } from './i18n.js';
-import { h, clear, distanceM, truncate } from './util.js';
+import { h, clear, distanceM, truncate, displayName } from './util.js';
 import { createMap } from './map.js';
-import { toast, closeSheet } from './ui.js';
+import { toast, closeSheet, sheetKey } from './ui.js';
 import { bubbleContent } from './views/bubble.js';
 import { openAuth } from './views/auth.js';
 import { openCompose } from './views/compose.js';
@@ -156,9 +156,9 @@ const app = {
 
   async blockAuthor(o) {
     if (!state.user) return app.openAuth();
-    if (!window.confirm(t('bubble.confirmBlock', { handle: o.author }))) return;
+    if (!window.confirm(t('bubble.confirmBlock', { handle: displayName(o.author) }))) return;
     try {
-      await api.block(o.author);
+      await api.blockAuthor(o.id);
       map.closePopup();
       toast(t('toast.blocked'));
       await app.refresh();
@@ -244,12 +244,17 @@ function connectEvents() {
   events = null;
   if (!state.user) return;
   events = new EventSource('/api/events');
+  events.addEventListener('reveal', (e) => {
+    const data = JSON.parse(e.data);
+    toast(t('toast.revealed', { handle: `@${data.handle}` }));
+    if (sheetKey() === `chat:${data.conversationId}`) openConversation(app, data.conversationId);
+  });
   events.addEventListener('dm', async (e) => {
     const data = JSON.parse(e.data);
     if (await handleIncoming(app, data)) return;
     state.unread += 1;
     renderBadge();
-    toast(t('toast.message', { from: data.from, body: truncate(data.body, 60) }), {
+    toast(t('toast.message', { from: displayName(data.from), body: truncate(data.body, 60) }), {
       action: t('nav.inbox'),
       onAction: () => openConversation(app, data.conversationId),
       timeout: 7000,

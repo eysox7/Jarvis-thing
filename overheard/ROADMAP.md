@@ -28,11 +28,12 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
       sırada (±2 saat) o mekânda check-in'i olan basabilir. Tanıklar balonda listelenir; söz
       sahibi ve tanıklar birbirine yazabilir. Konuşmalar iki kişi arasında söz başına tek
       (kim başlatırsa başlatsın); şema v2 göçü (mesajlar korunarak tablo yeniden kurulur).
+- [x] **6. Anonim paylaşım** — Söz bırakırken "anonim" seçeneği; balonda ve konuşmalarda ad
+      yerine "Anonim kulak". Sahibi konuşmada "Kimliğimi göster" ile adını açar (karşı tarafa
+      canlı bildirim). Anonim yazar, kimliği açılmadan söz üzerinden engellenebilir. Şema v3.
 
 ## Sıradakiler
 
-- [ ] **6. Anonim paylaşım** — Söz bırakırken "anonim" seçeneği; balonda kullanıcı adı yerine
-      "anonim kulak", mesajlaşmada kimlik söz sahibi isterse açılır.
 - [ ] **7. Keşif motivasyonu** — Rozetler (ilk mekân, 5 mekân, 3 şehir…), haftalık keşif serisi,
       şehir keşif yüzdesi, profilde ilerleme çubuğu.
 - [ ] **8. Yakındaki sözler dürtmesi** — "250 m ötede 4 kilitli söz var" kartı; keşif modunda

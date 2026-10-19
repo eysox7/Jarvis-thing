@@ -125,6 +125,11 @@ export const MIGRATIONS = [
   CREATE INDEX conversations_owner ON conversations(owner_id, last_at);
   CREATE INDEX conversations_starter ON conversations(starter_id, last_at);
   `,
+  // v3: Anonim paylaşım. Anonim sözün sahibi, bir konuşmada kimliğini isterse açar.
+  `
+  ALTER TABLE overheards ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE conversations ADD COLUMN author_revealed INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 export function openDb(path) {

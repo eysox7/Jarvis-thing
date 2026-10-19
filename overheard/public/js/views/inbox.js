@@ -1,4 +1,4 @@
-import { h, clear, timeAgo, truncate } from '../util.js';
+import { h, clear, timeAgo, truncate, displayName } from '../util.js';
 import { t, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { openSheet, sheetKey, formError, busy } from '../ui.js';
@@ -19,9 +19,9 @@ export async function openInbox(app) {
     }
     body.append(h('ul', { class: 'list' }, conversations.map((c) => h('li', {},
       h('button', { class: `list-item${c.unread ? ' is-unread' : ''}`, type: 'button', onclick: () => openConversation(app, c.id) },
-        h('span', { class: 'avatar', 'aria-hidden': 'true' }, c.with.slice(0, 1).toUpperCase()),
+        h('span', { class: 'avatar', 'aria-hidden': 'true' }, c.with ? c.with.slice(0, 1).toUpperCase() : '🎭'),
         h('span', { class: 'list-main' },
-          h('span', { class: 'list-title' }, `@${c.with}`, h('span', { class: 'list-time' }, timeAgo(c.lastAt))),
+          h('span', { class: 'list-title' }, displayName(c.with), h('span', { class: 'list-time' }, timeAgo(c.lastAt))),
           h('span', { class: 'list-quote' }, `“${truncate(c.overheardText, 60)}” · ${c.placeName}`),
           h('span', { class: 'list-sub' }, (c.lastFromMe ? t('inbox.you') : '') + truncate(c.lastMessage || '', 70))),
         c.unread ? h('span', { class: 'dot', 'aria-label': '•' }) : null)))));
@@ -77,7 +77,7 @@ export async function openConversation(app, id) {
     return;
   }
   app.refreshUnread();
-  document.querySelector('#sheet .sheet-title').textContent = `@${conv.with}`;
+  document.querySelector('#sheet .sheet-title').textContent = displayName(conv.with);
 
   const list = h('div', { class: 'msg-list', 'aria-live': 'polite' }, conv.messages.map(messageBubble));
   const box = composer({
@@ -98,7 +98,19 @@ export async function openConversation(app, id) {
           h('span', { class: 'muted small' }, `${t('chat.mutual')}: `),
           conv.mutualPlaces.map((p) => h('span', { class: 'chip' }, `📍 ${p.name}`)))
         : null,
-      h('p', { class: 'muted small' }, chatHint(conv))),
+      h('p', { class: 'muted small' }, chatHint(conv)),
+      conv.canReveal
+        ? h('div', { class: 'row-between' },
+          h('span', { class: 'muted small' }, `🎭 ${t('chat.revealHint')}`),
+          h('button', {
+            class: 'btn btn-ghost',
+            type: 'button',
+            onclick: (e) => busy(e.currentTarget, async () => {
+              await api.reveal(id);
+              await openConversation(app, id);
+            }),
+          }, t('chat.reveal')))
+        : null),
     list,
     box.el);
   list.scrollTop = list.scrollHeight;
@@ -114,8 +126,8 @@ function chatHint(conv) {
 // İki kişi arasında bu söz için konuşma zaten varsa ona eklenir.
 export function openNewMessage(app, o, to) {
   if (!app.state.user) return app.openAuth(() => openNewMessage(app, o, to));
-  const recipient = to || o.author;
-  const toWitness = recipient !== o.author;
+  const toWitness = Boolean(to) && to !== o.author;
+  const recipient = toWitness ? to : o.author;
   const box = composer({
     placeholder: t('chat.placeholder'),
     onSend: async (text) => {
@@ -125,7 +137,7 @@ export function openNewMessage(app, o, to) {
   });
   openSheet({
     key: 'new-message',
-    title: `@${recipient}`,
+    title: displayName(recipient),
     body: h('div', { class: 'chat' },
       h('div', { class: 'chat-context' },
         h('p', { class: 'chat-about' }, t('chat.about')),

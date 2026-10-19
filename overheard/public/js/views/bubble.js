@@ -1,4 +1,4 @@
-import { h, timeAgo, distanceM, formatDistance, REACTION_EMOJI } from '../util.js';
+import { h, timeAgo, distanceM, formatDistance, displayName, REACTION_EMOJI } from '../util.js';
 import { t } from '../i18n.js';
 
 const directionsUrl = (o) => `https://www.google.com/maps/dir/?api=1&destination=${o.lat},${o.lng}&travelmode=walking`;
@@ -62,7 +62,7 @@ function openCard(o, app) {
   return h('div', { class: 'bubble-card' },
     h('blockquote', { class: 'bubble-quote' }, o.text),
     h('div', { class: 'bubble-meta' },
-      h('span', { class: 'bubble-author' }, o.mine ? t('bubble.mine') : `@${o.author}`),
+      h('span', { class: 'bubble-author' }, o.mine ? t(o.anonymous ? 'bubble.mineAnon' : 'bubble.mine') : displayName(o.author)),
       h('span', { 'aria-hidden': 'true' }, ' · '),
       h('span', {}, o.placeName),
       h('span', { 'aria-hidden': 'true' }, ' · '),

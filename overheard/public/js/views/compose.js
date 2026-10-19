@@ -17,6 +17,7 @@ export async function openCompose(app) {
   });
   const where = h('div', { class: 'where' }, h('p', { class: 'muted' }, t('compose.locating')));
   const submit = h('button', { class: 'btn btn-primary btn-block', type: 'submit', disabled: true }, `🎈 ${t('compose.submit')}`);
+  const anonymous = h('input', { type: 'checkbox', name: 'anonymous' });
 
   let position = null;
   let choice = null; // { placeId } | { newPlaceName: input }
@@ -71,7 +72,7 @@ export async function openCompose(app) {
       e.preventDefault();
       error.hide();
       busy(submit, async () => {
-        const payload = { text: text.value, lat: position.lat, lng: position.lng, accuracy: position.accuracy };
+        const payload = { text: text.value, lat: position.lat, lng: position.lng, accuracy: position.accuracy, anonymous: anonymous.checked };
         if (choice?.placeId) payload.placeId = choice.placeId;
         else payload.newPlaceName = choice?.newPlaceName.value || '';
         try {
@@ -94,6 +95,7 @@ export async function openCompose(app) {
   h('div', { class: 'quote-input' }, h('span', { class: 'quote-mark', 'aria-hidden': 'true' }, '“'), text),
   h('div', { class: 'row-between' }, h('span', { class: 'muted small' }, t('compose.rules')), counter),
   where,
+  h('label', { class: 'check' }, anonymous, h('span', {}, `🎭 ${t('compose.anonymous')}`)),
   error.el,
   submit);
 
