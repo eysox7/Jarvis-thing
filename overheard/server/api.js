@@ -87,6 +87,23 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     return { user: publicUser({ handle, isGuest: true }) };
   });
 
+  // Misafir hesabı kalıcı hesaba dönüşür: açılan mekânlar, sözler ve konuşmalar korunur.
+  router.post('/api/auth/upgrade', async (ctx) => {
+    const user = requireUser(ctx);
+    if (!user.isGuest) throw new HttpError(400, 'not_guest');
+    limit(`register:${clientIp(ctx.req, config.trustProxy)}`, 10, 3600000);
+    const body = await readJson(ctx.req);
+    const handle = String(body.handle || '').trim();
+    const password = String(body.password || '');
+    if (!HANDLE_RE.test(handle)) throw new HttpError(400, 'bad_handle');
+    if (password.length < 8 || password.length > 200) throw new HttpError(400, 'bad_password');
+    const taken = db.prepare('SELECT id FROM users WHERE handle = ?').get(handle);
+    if (taken && taken.id !== user.id) throw new HttpError(409, 'handle_taken');
+    const passHash = await hashPassword(password);
+    db.prepare('UPDATE users SET handle = ?, pass_hash = ?, is_guest = 0 WHERE id = ?').run(handle, passHash, user.id);
+    return { user: publicUser({ handle, isGuest: false, banned: user.banned }) };
+  });
+
   router.post('/api/auth/logout', (ctx) => {
     if (ctx.token) destroySession(db, ctx.token);
     ctx.setCookie(serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure: config.secureCookies }));

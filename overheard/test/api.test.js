@@ -303,3 +303,24 @@ describe('Yedekleme', () => {
     }
   });
 });
+
+describe('Misafir hesabını kalıcı yapma', () => {
+  test('misafir kullanıcı adı ve parola belirleyince ilerlemesi korunur', async () => {
+    const srv = await startTestServer({ demo: true });
+    const guest = client(srv.base);
+    await guest.post('/api/auth/guest');
+    await guest.post('/api/checkins', SPOTS.kadikoyIskele);
+    const taken = client(srv.base);
+    await taken.register('alinmis_ad');
+    assert.equal((await guest.post('/api/auth/upgrade', { handle: 'alinmis_ad', password: 'gizli-parola-123' })).data.error, 'handle_taken');
+    const up = await guest.post('/api/auth/upgrade', { handle: 'kalici_kulak', password: 'gizli-parola-123' });
+    assert.equal(up.status, 200, JSON.stringify(up.data));
+    assert.deepEqual([up.data.user.handle, up.data.user.isGuest], ['kalici_kulak', false]);
+    assert.equal((await guest.get('/api/me')).data.stats.places, 1);
+    assert.equal((await guest.post('/api/auth/upgrade', { handle: 'baska', password: 'gizli-parola-123' })).data.error, 'not_guest');
+    // Yeni parolayla giriş yapılabilir.
+    const again = client(srv.base);
+    assert.equal((await again.post('/api/auth/login', { handle: 'kalici_kulak', password: 'gizli-parola-123' })).status, 200);
+    await srv.close();
+  });
+});

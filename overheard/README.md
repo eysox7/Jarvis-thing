@@ -22,7 +22,8 @@ insanları yürümeye hem de tanışmaya teşvik eder.
   hiç gelmez (yalnızca uzunluğu), yani tarayıcıyı kurcalayarak da okunamaz. Balonda mekânın adı,
   ne kadar uzakta olduğun ve Google Maps'te **yürüyerek yol tarifi** vardır.
 - **Check-in ve keşif modu.** "Konumum" düğmesi bulunduğun mekânlarda check-in yapar; keşif modu
-  açıkken yürüdükçe otomatik check-in yapılır ve mekânların kilidi açılır.
+  açıkken yürüdükçe otomatik check-in yapılır ve mekânların kilidi açılır. Konum izni verdiysen
+  uygulamayı açmak bile bulunduğun mekânın kilidini açar.
 - **Seni bekleyen sözler.** Haritanın altındaki kart en yakın kilitli mekânı ve orada kaç sözün
   beklediğini gösterir; keşif modunda yaklaştıkça "Sıcak!" ipuçları gelir.
 - **Söz bırakma.** Yalnızca o mekândayken. Yakında kayıtlı mekân yoksa yeriyle birlikte yeni
@@ -173,7 +174,7 @@ ayrıntıları gönderilmez. Tepki vermek, şikâyet etmek ve mesaj atmak da ayn
 | Uç | Açıklama |
 | --- | --- |
 | `GET /api/config` | Pilot şehirler, sınırlar, demo modu |
-| `POST /api/auth/register` · `login` · `guest` · `logout` | Hesap |
+| `POST /api/auth/register` · `login` · `guest` · `upgrade` · `logout` | Hesap (`upgrade`: misafiri kalıcı hesaba çevirir) |
 | `GET /api/me` | Kullanıcı, istatistikler, okunmamış mesaj sayısı |
 | `GET /api/cities/:id/map` | Şehrin mekânları (söz sayılarıyla) ve en yeni 300 sözü (görüntüleyene göre kilitli/açık) |
 | `GET /api/overheards?bbox=minLng,minLat,maxLng,maxLat` | Görünür alandaki sözler (en fazla 300; alan ≤ 0,6°) |

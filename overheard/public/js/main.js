@@ -433,6 +433,26 @@ function bindNav() {
   document.getElementById('btn-explore').addEventListener('click', toggleExplore);
 }
 
+// Konum izni daha önce verildiyse açılışta sessizce konum alıp check-in yap: uygulamayı açmak,
+// bulunduğun mekânın kilidini açmaya yetsin.
+async function autoLocate() {
+  if (!state.user || !navigator.permissions?.query || !('geolocation' in navigator)) return;
+  try {
+    const status = await navigator.permissions.query({ name: 'geolocation' });
+    if (status.state !== 'granted') return;
+  } catch {
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (p) => {
+      setPosition({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy });
+      app.checkIn(state.position, { silent: true }).catch(() => {});
+    },
+    () => {},
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+  );
+}
+
 async function boot() {
   const [config, me] = await Promise.all([api.config(), api.me().catch(() => ({ user: null }))]);
   state.config = config;
@@ -460,6 +480,7 @@ async function boot() {
   connectEvents();
   await app.refresh();
   document.body.classList.add('is-ready');
+  autoLocate();
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('/sw.js').catch(() => {});

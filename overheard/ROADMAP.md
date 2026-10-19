@@ -62,6 +62,13 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
 
 Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
 
+## Kalite turlarında yapılanlar
+
+- Geniş ekran düzeni (bant, kart, sekme çubuğu ortalı), alt sayfada odak yönetimi.
+- Misafir hesabını kalıcı hesaba çevirme (`/api/auth/upgrade`): ilerleme korunur.
+- Konum izni verilmişse açılışta sessiz konum + check-in.
+- Dil anahtarları TR/EN eşit (192/192), ESLint temel kurallarla temiz.
+
 ## Kalite turları (tüm adımlar bitince)
 
 Erişilebilirlik denetimi, mobil Safari uyumluluğu, performans profili, hata mesajları, kopya

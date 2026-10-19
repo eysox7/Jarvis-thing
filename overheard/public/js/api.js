@@ -35,6 +35,7 @@ export const api = {
   register: (handle, password) => request('POST', '/api/auth/register', { handle, password }),
   login: (handle, password) => request('POST', '/api/auth/login', { handle, password }),
   guest: () => request('POST', '/api/auth/guest', {}),
+  upgrade: (handle, password) => request('POST', '/api/auth/upgrade', { handle, password }),
   logout: () => request('POST', '/api/auth/logout', {}),
   cityMap: (cityId) => request('GET', `/api/cities/${enc(cityId)}/map`),
   overheardsInBox: (bbox) => request('GET', `/api/overheards?bbox=${bbox.map((n) => n.toFixed(5)).join(',')}`),

@@ -1,7 +1,7 @@
 import { h, BADGE_EMOJI } from '../util.js';
-import { t, getLang, setLang, languages } from '../i18n.js';
+import { t, getLang, setLang, languages, errorText } from '../i18n.js';
 import { api } from '../api.js';
-import { openSheet, closeSheet } from '../ui.js';
+import { openSheet, closeSheet, field, formError, busy, toast } from '../ui.js';
 import { openAdmin } from './admin.js';
 
 const LANG_NAMES = { tr: 'Türkçe', en: 'English' };
@@ -41,6 +41,37 @@ function progressSection(progress, state) {
     h('div', { class: 'badge-grid' }, badges));
 }
 
+// Misafir hesabını kullanıcı adı + parola ile kalıcı hesaba çevirir.
+function upgradeForm(app) {
+  const error = formError();
+  const handle = h('input', { name: 'handle', autocomplete: 'username', autocapitalize: 'none', spellcheck: 'false', required: true, minlength: 3, maxlength: 20 });
+  const password = h('input', { name: 'password', type: 'password', autocomplete: 'new-password', required: true, minlength: 8 });
+  const submit = h('button', { class: 'btn btn-primary btn-block', type: 'submit' }, t('profile.upgrade'));
+  return h('form', {
+    class: 'stack upgrade',
+    onsubmit: (e) => {
+      e.preventDefault();
+      error.hide();
+      busy(submit, async () => {
+        try {
+          const { user } = await api.upgrade(handle.value.trim(), password.value);
+          await app.setUser(user);
+          toast(t('profile.upgradeDone'), { tone: 'success' });
+          openProfile(app);
+        } catch (err) {
+          error.show(errorText(err));
+        }
+      });
+    },
+  },
+  h('h3', { class: 'section-title' }, `💾 ${t('profile.upgrade')}`),
+  h('p', { class: 'muted small' }, t('profile.upgradeHint')),
+  field(t('auth.handle'), handle),
+  field(t('auth.password'), password),
+  error.el,
+  submit);
+}
+
 export async function openProfile(app) {
   const { state } = app;
   const langSelect = h('select', {
@@ -78,6 +109,7 @@ export async function openProfile(app) {
           state.user.isGuest ? h('p', { class: 'muted small' }, t('profile.guestNote')) : null,
           state.user.banned ? h('p', { class: 'form-error' }, t('profile.bannedNote')) : null)),
       state.user.isAdmin ? h('button', { class: 'btn btn-block', type: 'button', onclick: () => openAdmin(app) }, `🛡️ ${t('admin.open')}`) : null,
+      state.user.isGuest ? upgradeForm(app) : null,
       h('div', { class: 'stats' },
         stat(stats?.places, t('profile.places')),
         stat(stats?.cities, t('profile.cities')),

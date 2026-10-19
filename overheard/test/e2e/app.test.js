@@ -231,6 +231,25 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await u.context.close();
     });
 
+    test('misafir hesabını kalıcı yapar ve açılışta konumla otomatik check-in olur', async () => {
+      const u = await newUser(browser, srv.base, KADIKOY);
+      await loginAsGuest(u.page);
+      await u.page.locator('[data-nav="profile"]').click();
+      await sheet(u.page).locator('form.upgrade input[name="handle"]').fill('kalici_e2e');
+      await sheet(u.page).locator('form.upgrade input[name="password"]').fill('cok-gizli-parola');
+      await sheet(u.page).locator('form.upgrade').getByRole('button', { name: 'Hesabını kalıcı yap' }).click();
+      await u.page.locator('.toast', { hasText: 'Hesabın artık kalıcı' }).waitFor();
+      await sheet(u.page).locator('.profile-handle', { hasText: '@kalici_e2e' }).waitFor();
+      assert.equal(await sheet(u.page).locator('form.upgrade').count(), 0);
+
+      // Konum izni verilmiş oturumda sayfayı yeniden açınca mekân kendiliğinden açılır.
+      await u.page.reload();
+      await u.page.waitForSelector('body.is-ready');
+      await u.page.locator('.toast', { hasText: 'Kadıköy İskelesi açıldı' }).waitFor();
+      assert.deepEqual(u.errors, []);
+      await u.context.close();
+    });
+
     test('İngilizce arayüze geçiş', async () => {
       const u = await newUser(browser, srv.base, KADIKOY);
       await u.page.locator('[data-nav="profile"]').click();
