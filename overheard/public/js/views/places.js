@@ -37,7 +37,11 @@ export async function openPlaces(app) {
   if (hereNow.length) {
     body.append(
       h('h3', { class: 'section-title' }, `💬 ${t('places.hereNow')}`),
-      h('ul', { class: 'list' }, hereNow.map((p) => placeRow(p, { app, meta: t('places.hereHint', { n: app.state.config.presenceMinutes }) }))));
+      h('ul', { class: 'list' }, hereNow.map((p) => {
+        const people = app.state.data?.places.find((x) => x.id === p.id)?.peopleHere;
+        const meta = [people ? `👥 ${t('place.peopleHere', { n: people })}` : null, t('places.hereHint', { n: app.state.config.presenceMinutes })].filter(Boolean).join(' · ');
+        return placeRow(p, { app, meta });
+      })));
   }
   if (!places.length) body.append(h('p', { class: 'empty' }, `🚶 ${t('places.empty')}`));
   else {

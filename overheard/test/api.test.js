@@ -409,3 +409,25 @@ describe('Bağlantı ve oturum bakımı', () => {
     await srv.close();
   });
 });
+
+describe('Şu an burada', () => {
+  test('mekândaki kişi sayısı isimsiz ve anlık', async () => {
+    const srv = await startTestServer();
+    const a = client(srv.base);
+    const b = client(srv.base);
+    await a.register('burada_a');
+    await b.register('burada_b');
+    const count = async () => (await client(srv.base).get('/api/cities/istanbul/map')).data.places.find((p) => p.id === 'ist-kadikoy-iskele').peopleHere;
+    assert.equal(await count(), 0);
+    await a.post('/api/checkins', SPOTS.kadikoyIskele);
+    await b.post('/api/checkins', SPOTS.kadikoyIskeleEdge);
+    assert.equal(await count(), 2);
+    const map = await client(srv.base).get('/api/cities/istanbul/map');
+    assert.ok(!JSON.stringify(map.data.places).includes('burada_a'), 'kimlik sızmaz');
+    await b.post('/api/checkins', SPOTS.modaSahil);
+    assert.equal(await count(), 1);
+    srv.db.prepare('UPDATE location_reports SET at = at - ?').run(srv.config.presenceTtlMs + 1000);
+    assert.equal(await count(), 0, 'bayat konum sayılmaz');
+    await srv.close();
+  });
+});

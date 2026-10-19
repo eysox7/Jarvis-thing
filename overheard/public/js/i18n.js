@@ -224,6 +224,7 @@ const STRINGS = {
     'profile.deleted': 'Hesabın ve verilerin silindi.',
     'errors.terms_required': 'Devam etmek için kullanım koşullarını ve gizlilik politikasını kabul etmelisin.',
     'location.signal_lost': 'Konum sinyali zayıf; keşif modu sinyal gelince devam edecek.',
+    'place.peopleHere': 'Şu an burada {n} kişi',
   },
   en: {
     'app.tagline': 'Drop what you heard. Local ones can only be read by people who are there right now.',
@@ -450,6 +451,7 @@ const STRINGS = {
     'profile.deleted': 'Your account and data were deleted.',
     'errors.terms_required': 'You need to accept the terms of use and privacy policy to continue.',
     'location.signal_lost': 'Weak location signal; explore mode will continue when it returns.',
+    'place.peopleHere': '{n} people here now',
   },
 };
 

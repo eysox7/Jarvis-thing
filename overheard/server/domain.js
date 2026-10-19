@@ -65,6 +65,26 @@ export function currentPlaceIds(db, config, userId, now = Date.now()) {
   return new Set(placesContaining(db, config, last).filter((p) => checked.get(userId, p.id)).map((p) => p.id));
 }
 
+// Mekânlarda şu an bulunan kişi sayıları (isimsiz): konum bildirimi taze olanlar mekân dairesine göre sayılır.
+export function presenceCounts(db, config, places, now = Date.now()) {
+  const counts = new Map();
+  if (!places.length) return counts;
+  const lats = places.map((p) => p.lat);
+  const lngs = places.map((p) => p.lng);
+  const pad = 0.02;
+  const reports = db.prepare(`
+    SELECT lat, lng, accuracy FROM location_reports
+    WHERE at > ? AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?`)
+    .all(now - config.presenceTtlMs, Math.min(...lats) - pad, Math.max(...lats) + pad, Math.min(...lngs) - pad, Math.max(...lngs) + pad);
+  for (const r of reports) {
+    const bonus = Math.min(r.accuracy || 0, config.maxAccuracyBonusM);
+    for (const p of places) {
+      if (distanceM(r.lat, r.lng, p.lat, p.lng) <= p.radius_m + bonus) counts.set(p.id, (counts.get(p.id) || 0) + 1);
+    }
+  }
+  return counts;
+}
+
 function recordPresence(db, user, coords, now) {
   db.prepare(`INSERT INTO location_reports (user_id, lat, lng, accuracy, at) VALUES (?, ?, ?, ?, ?)
               ON CONFLICT(user_id) DO UPDATE SET lat = excluded.lat, lng = excluded.lng, accuracy = excluded.accuracy, at = excluded.at`)
@@ -310,10 +330,13 @@ export function cityMap(db, config, viewer, cityId) {
     FROM overheards o JOIN places p ON p.id = o.place_id
     WHERE p.city_id = :city AND o.hidden = 0 AND ${NOT_BLOCKED}
     GROUP BY o.place_id`).all(params).map((r) => [r.place_id, r]));
-  const places = db.prepare('SELECT * FROM places WHERE city_id = ? ORDER BY name').all(cityId)
+  const placeRows = db.prepare('SELECT * FROM places WHERE city_id = ? ORDER BY name').all(cityId);
+  const people = presenceCounts(db, config, placeRows);
+  const places = placeRows
     .map((p) => {
       const st = stats.get(p.id);
       return serializePlace(p, {
+        peopleHere: people.get(p.id) || 0,
         visited: ctx.visited.has(p.id),
         here: ctx.here.has(p.id),
         count: st?.n || 0,

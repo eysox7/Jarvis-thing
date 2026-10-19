@@ -291,6 +291,7 @@ button { cursor: pointer; }
   transform: translateX(-50%) rotate(45deg);
   z-index: -1;
 }
+.oh-place-people { flex: none; font-size: 11.5px; font-weight: 700; color: var(--success); }
 .oh-place-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oh-place-count {
   flex: none;
