@@ -13,6 +13,18 @@ okumak istiyorsan yürü, dışarı çık, oraya git.
 Ve sonra o sözün sahibine yazabilirsin: "Ben de oradaydım, o masada mıydın?" Böylece uygulama hem
 insanları yürümeye hem de tanışmaya teşvik eder.
 
+<p>
+  <img src="docs/screenshots/1-sehir.png" width="180" alt="Şehir görünümü: mekân balonları">
+  <img src="docs/screenshots/2-kilitli-balon.png" width="180" alt="Kilitli söz">
+  <img src="docs/screenshots/4-acik-balon.png" width="180" alt="Açılmış söz balonu">
+  <img src="docs/screenshots/3-seni-bekleyen.png" width="180" alt="Seni bekleyen kilitli sözler kartı">
+  <img src="docs/screenshots/5-soz-birak.png" width="180" alt="Söz bırakma">
+  <img src="docs/screenshots/6-rozetler.png" width="180" alt="Rozetler ve şehir keşfi">
+</p>
+
+<sub>Ekran görüntüleri harita karolarına erişimi olmayan bir test ortamında alındı; gerçek kullanımda
+balonların altında sokak haritası görünür.</sub>
+
 ## Neler var
 
 - **Harita ve baloncuklar.** Yakından bakınca tek tek söz balonları, uzaktan bakınca mekân
