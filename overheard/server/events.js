@@ -1,4 +1,7 @@
 // Server-Sent Events: her kullanıcıya açık bağlantıları üzerinden canlı bildirim.
+// Bir kullanıcının aynı anda en fazla bu kadar açık bağlantısı olur; fazlası en eskisini kapatır.
+const MAX_STREAMS_PER_USER = 5;
+
 export function createEventHub() {
   const clients = new Map();
 
@@ -17,7 +20,13 @@ export function createEventHub() {
       });
       res.write('retry: 5000\n\n');
       if (!clients.has(userId)) clients.set(userId, new Set());
-      clients.get(userId).add(res);
+      const set = clients.get(userId);
+      set.add(res);
+      while (set.size > MAX_STREAMS_PER_USER) {
+        const oldest = set.values().next().value;
+        set.delete(oldest);
+        oldest.end();
+      }
       req.on('close', () => {
         const set = clients.get(userId);
         if (!set) return;
@@ -31,6 +40,10 @@ export function createEventHub() {
       if (!set) return;
       const payload = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
       for (const res of set) res.write(payload);
+    },
+
+    count(userId) {
+      return clients.get(userId)?.size || 0;
     },
 
     close() {

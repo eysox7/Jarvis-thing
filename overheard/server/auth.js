@@ -51,4 +51,9 @@ export function destroySession(db, token) {
   db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash(token));
 }
 
+// Süresi dolmuş oturumları siler (sunucu açılışında ve saatte bir).
+export function purgeExpiredSessions(db, now = Date.now()) {
+  return Number(db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now).changes);
+}
+
 export const HANDLE_RE = /^[a-zA-Z0-9_.]{3,20}$/;

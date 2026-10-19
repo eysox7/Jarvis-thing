@@ -18,6 +18,7 @@ export async function startTestServer({ demo = false, ...overrides } = {}) {
     base,
     db,
     config,
+    events: app.events,
     async close() {
       app.close();
       server.closeAllConnections?.();

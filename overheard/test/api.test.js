@@ -324,3 +324,36 @@ describe('Misafir hesabını kalıcı yapma', () => {
     await srv.close();
   });
 });
+
+describe('Bağlantı ve oturum bakımı', () => {
+  test('bir kullanıcının en fazla 5 canlı bağlantısı olur', async () => {
+    const srv = await startTestServer();
+    const c = client(srv.base);
+    await c.register('cok_sekme');
+    const cookie = await (async () => {
+      const r = await fetch(`${srv.base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ handle: 'cok_sekme', password: 'gizli-parola-123' }) });
+      return r.headers.getSetCookie()[0].split(';')[0];
+    })();
+    const controllers = [];
+    for (let i = 0; i < 7; i++) {
+      const ac = new AbortController();
+      controllers.push(ac);
+      const res = await fetch(`${srv.base}/api/events`, { headers: { cookie }, signal: ac.signal });
+      assert.equal(res.status, 200);
+    }
+    const { id } = srv.db.prepare("SELECT id FROM users WHERE handle = 'cok_sekme'").get();
+    assert.equal(srv.events.count(id), 5);
+    controllers.forEach((ac) => ac.abort());
+    await srv.close();
+  });
+
+  test('süresi dolan oturumlar temizlenir', async () => {
+    const { purgeExpiredSessions } = await import('../server/auth.js');
+    const srv = await startTestServer();
+    await client(srv.base).register('eski_oturum');
+    srv.db.prepare('UPDATE sessions SET expires_at = 1').run();
+    assert.ok(purgeExpiredSessions(srv.db) >= 1);
+    assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n, 0);
+    await srv.close();
+  });
+});
