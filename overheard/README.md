@@ -202,6 +202,16 @@ ayrıntıları gönderilmez. Tepki vermek, şikâyet etmek ve mesaj atmak da ayn
 | `GET /api/admin/reports` · `POST …/overheards/:id/restore` · `DELETE …/overheards/:id` · `POST …/users/:handle/ban` | Moderasyon (yalnızca `OVERHEARD_ADMINS`) |
 | `GET /api/events` | SSE akışı (`dm`, `reveal` olayları) |
 
+## Testler
+
+| Komut | Kapsam |
+| --- | --- |
+| `npm test` | 45 API/birim testi: ortak mekân kuralı, check-in, söz, tepki, tanıklar, anonimlik, mesajlaşma, rozetler, moderasyon, konum denetimleri, ölçek, göçler, yedekleme |
+| `npm run test:e2e` | 12 tarayıcı senaryosu (Playwright + Chromium): iki kullanıcıyla uçtan uca akış, tanık ve anonim sohbet, keşif kartı, rozetler, tanıtım, dil değişimi, moderasyon paneli, yoğun bölge, Google Maps uyarlayıcısı (taklit API ile) ve Leaflet'e dönüş |
+
+Testler bellek içi veritabanıyla gerçek bir HTTP sunucusu açar; dış ağa çıkmaz (harita karoları
+ve Google Maps API'si testte taklit edilir).
+
 ## Konum güvenilirliği
 
 Tarayıcıdan gelen konum kriptografik olarak doğrulanamaz. Üretimde (`OVERHEARD_DEMO=0`) şu
