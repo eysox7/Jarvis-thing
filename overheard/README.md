@@ -1,14 +1,20 @@
 # overheard
 
-> Duyduğunu bırak. Yalnızca orada bulunanlar okur.
+> Duyduğunu bırak. Yerel sözleri yalnızca o an orada olanlar okur.
 
 Overheard, insanların sokakta, vapurda, kampüste, kafede **kulak misafiri oldukları sözleri**
 haritaya bıraktığı bir uygulama. Her söz, duyulduğu mekânda bir konuşma balonu olarak durur.
 
-Fark yaratan kural: **Ortak mekân (Mutual Place).** Bir sözü okuyabilmek için o mekânda bizzat
-bulunmuş olman gerekir. Söz sahibi de oradaydı (paylaşmak için orada olmak şart), yani okuyabildiğin
-her söz, yazanla aranızdaki bir ortak mekândan gelir. Haritanın geri kalanı kilitli balonlarla dolu:
-okumak istiyorsan yürü, dışarı çık, oraya git.
+Fark yaratan kural: **iki tür söz var.**
+
+- **Yerel söz** (varsayılan): yalnızca o mekânda **şu an** bulunanlar okur. Bir kez gidip okumak
+  kalıcı erişim vermez; oradan ayrılınca (ya da konumun 30 dakikadır güncellenmediyse) söz yeniden
+  kilitlenir. İstanbul'da bıraktığın yerel sözü Ankara'dan kimse okuyamaz. Overheard'ün yerelliği
+  buradan gelir: okumak istiyorsan yürü, dışarı çık, oraya git.
+- **Herkese açık söz**: herkes, her yerden okur (girişsiz bile).
+
+Söz bırakmak için her iki durumda da o mekânda olmak gerekir. Yerel bir sözü okuduğunda yazanla o an
+aynı yerdesinizdir; bu, tanışmak için en doğal an.
 
 Ve sonra o sözün sahibine yazabilirsin: "Ben de oradaydım, o masada mıydın?" Böylece uygulama hem
 insanları yürümeye hem de tanışmaya teşvik eder.
@@ -30,14 +36,16 @@ balonların altında sokak haritası görünür.</sub>
 - **Harita ve baloncuklar.** Yakından bakınca tek tek söz balonları, uzaktan bakınca mekân
   balonları. Bir balona dokununca büyük bir konuşma balonu olarak açılır. Çakışan balonlar
   küçük noktalara iner.
-- **Kilitli sözler.** Gitmediğin mekânların sözleri bulanık, kilitli balonlardır. Metin sunucudan
-  hiç gelmez (yalnızca uzunluğu), yani tarayıcıyı kurcalayarak da okunamaz. Balonda mekânın adı,
-  ne kadar uzakta olduğun ve Google Maps'te **yürüyerek yol tarifi** vardır.
+- **Kilitli yerel sözler.** Şu an bulunmadığın mekânların yerel sözleri bulanık, kilitli
+  balonlardır. Metin sunucudan hiç gelmez (yalnızca uzunluğu), yani tarayıcıyı kurcalayarak da
+  okunamaz. Balonda mekânın adı, ne kadar uzakta olduğun ve Google Maps'te **yürüyerek yol tarifi**
+  vardır. Herkese açık sözler 🌍 işaretiyle her yerden okunur.
 - **Check-in ve keşif modu.** "Konumum" düğmesi bulunduğun mekânlarda check-in yapar; keşif modu
-  açıkken yürüdükçe otomatik check-in yapılır ve mekânların kilidi açılır. Konum izni verdiysen
-  uygulamayı açmak bile bulunduğun mekânın kilidini açar.
-- **Seni bekleyen sözler.** Haritanın altındaki kart en yakın kilitli mekânı ve orada kaç sözün
-  beklediğini gösterir; keşif modunda yaklaştıkça "Sıcak!" ipuçları gelir.
+  açıkken yürüdükçe otomatik check-in yapılır. Bir mekâna varınca "buradasın, yerel sözler açık",
+  ayrılınca "yerel sözler kilitlendi" bildirimi gelir. Konum izni verdiysen uygulamayı açmak bile
+  bulunduğun mekânın yerel sözlerini açar.
+- **Seni bekleyen sözler.** Haritanın altındaki kart en yakın, yerel sözü olan mekânı ve orada kaç
+  sözün beklediğini gösterir; keşif modunda yaklaştıkça "Sıcak!" ipuçları gelir.
 - **Söz bırakma.** Yalnızca o mekândayken. Yakında kayıtlı mekân yoksa yeriyle birlikte yeni
   mekânı sen açarsın.
 - **Aynı anda oradaydınız.** Söz bırakıldığında sen de oradaysan balonda "Sen de oradaydın!"
@@ -113,10 +121,11 @@ Ortam değişkenleri:
 ### Demo modunda deneme
 
 1. Uygulamayı aç, **Profil → Giriş yap → Hesapsız dene (misafir)**.
-2. Haritada yakınlaş: balonların çoğu 🔒 kilitli.
+2. Haritada yakınlaş: yerel sözler 🔒 kilitli, herkese açık olanlar (🌍) okunur.
 3. Bir kilitli balona dokun → **Buraya ışınlan** (ya da haritada bir yere uzun bas / sağ tıkla).
-4. Mekânın kilidi açılır, sözler okunur hâle gelir. Tepki ver, **Mesaj at**.
-5. Ortadaki **“ Duydum** düğmesiyle kendi sözünü bırak.
+4. O mekândayken yerel sözler açılır. Tepki ver, **Mesaj at**. Başka bir yere ışınlanınca yeniden
+   kilitlenir; başlattığın konuşma ise sürer.
+5. Ortadaki **“ Duydum** düğmesiyle kendi sözünü bırak; yerel mi herkese açık mı olacağını seç.
 
 ## Dağıtım
 
@@ -158,7 +167,7 @@ overheard/
     backup.js       tutarlı veritabanı yedeği (VACUUM INTO)
     app.js          istek işleyici: statik dosyalar, güvenlik başlıkları, API yönlendirme
     api.js          API uçları
-    domain.js       kurallar: ortak mekân, check-in, sözler, mesajlaşma
+    domain.js       kurallar: yerel/herkese açık görünürlük, check-in, sözler, mesajlaşma
     db.js           SQLite şeması ve göçler (PRAGMA user_version)
     auth.js         scrypt parolalar, oturumlar
     moderation.js   kişisel veri ve küfür maskesi, nefret söylemi reddi
@@ -174,12 +183,17 @@ overheard/
 ### Görünürlük kuralı
 
 ```
-okuyabilir(kullanıcı, söz) = kullanıcı sözün sahibi
-                           ∨ kullanıcının söz.mekân'da en az bir check-in'i var
+okuyabilir(kullanıcı, söz) = söz herkese açık
+                           ∨ kullanıcı sözün sahibi
+                           ∨ kullanıcı şu an söz.mekân'da
+şu an mekânda = son konum bildirimi ≤ 30 dk önce ∧ konum mekân dairesinin içinde
+                ∧ kullanıcı orada check-in yapabilmiş
 ```
 
 Kilitli sözler istemciye `{ locked: true, length }` olarak gider; metin, yazar ve tepki
-ayrıntıları gönderilmez. Tepki vermek, şikâyet etmek ve mesaj atmak da aynı kurala tabidir.
+ayrıntıları gönderilmez. Tepki vermek, şikâyet etmek ve yeni konuşma başlatmak da aynı kurala
+tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "Ortak mekân" sayısı
+(ikinizin de uğradığı mekânlar) balonda ve sohbet başlığında sosyal bir ipucu olarak görünür.
 
 ### API özeti
 
@@ -190,9 +204,9 @@ ayrıntıları gönderilmez. Tepki vermek, şikâyet etmek ve mesaj atmak da ayn
 | `GET /api/me` | Kullanıcı, istatistikler, okunmamış mesaj sayısı |
 | `GET /api/cities/:id/map` | Şehrin mekânları (söz sayılarıyla) ve en yeni 300 sözü (görüntüleyene göre kilitli/açık) |
 | `GET /api/overheards?bbox=minLng,minLat,maxLng,maxLat` | Görünür alandaki sözler (en fazla 300; alan ≤ 0,6°) |
-| `POST /api/checkins` | `{lat, lng, accuracy}` → bulunduğun mekânlar, yeni açılanlar |
+| `POST /api/checkins` | `{lat, lng, accuracy}` → şu an bulunduğun mekânlar (`arrived`, `firstVisit`) ve ayrıldıkların (`left`) |
 | `GET /api/me/places` | Kilidini açtığın mekânlar |
-| `POST /api/overheards` | `{text, lat, lng, placeId? , newPlaceName?}` |
+| `POST /api/overheards` | `{text, lat, lng, visibility: local\|public, anonymous?, placeId?, newPlaceName?}` |
 | `GET/DELETE /api/overheards/:id` | |
 | `POST /api/overheards/:id/reactions` · `report` | `kind: same` yalnızca o sırada orada olanlara |
 | `POST /api/overheards/:id/messages` | `{body, to?}`: sahibine ya da (`to`) bir tanığa yazar |
@@ -206,8 +220,8 @@ ayrıntıları gönderilmez. Tepki vermek, şikâyet etmek ve mesaj atmak da ayn
 
 | Komut | Kapsam |
 | --- | --- |
-| `npm test` | 45 API/birim testi: ortak mekân kuralı, check-in, söz, tepki, tanıklar, anonimlik, mesajlaşma, rozetler, moderasyon, konum denetimleri, ölçek, göçler, yedekleme |
-| `npm run test:e2e` | 12 tarayıcı senaryosu (Playwright + Chromium): iki kullanıcıyla uçtan uca akış, tanık ve anonim sohbet, keşif kartı, rozetler, tanıtım, dil değişimi, moderasyon paneli, yoğun bölge, Google Maps uyarlayıcısı (taklit API ile) ve Leaflet'e dönüş |
+| `npm test` | 46 API/birim testi: yerel/herkese açık görünürlük ve anlık mekân kuralı, check-in, söz, tepki, tanıklar, anonimlik, mesajlaşma, rozetler, moderasyon, konum denetimleri, ölçek, göçler, yedekleme |
+| `npm run test:e2e` | 14 tarayıcı senaryosu (Playwright + Chromium): iki kullanıcıyla uçtan uca akış, ayrılınca yeniden kilitlenme ve herkese açık söz, tanık ve anonim sohbet, keşif kartı, rozetler, tanıtım, dil değişimi, moderasyon paneli, yoğun bölge, Google Maps uyarlayıcısı (taklit API ile) ve Leaflet'e dönüş |
 
 Testler bellek içi veritabanıyla gerçek bir HTTP sunucusu açar; dış ağa çıkmaz (harita karoları
 ve Google Maps API'si testte taklit edilir).

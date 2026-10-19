@@ -29,6 +29,8 @@ export function loadConfig(overrides = {}) {
     flagLimitPerDay: 3,
     // Saatte en fazla bu kadar yeni mekân açılabilir (bot/otomasyon frenleme).
     maxUnlocksPerHour: 30,
+    // Son konum bildiriminden bu kadar süre sonra "orada" sayılmaz; yerel sözler yeniden kilitlenir.
+    presenceTtlMs: 30 * 60 * 1000,
     // Aynı mekâna art arda check-in'ler arasında en az bu kadar süre olmalı.
     checkinCooldownMs: 10 * 60 * 1000,
     // "Aynı anda oradaydınız" rozeti için zaman penceresi.

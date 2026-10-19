@@ -35,7 +35,7 @@ describe('Overheard API', () => {
     assert.equal(evil.status, 403);
   });
 
-  test('check-in yalnızca yarıçap içindeki mekânları açar', async () => {
+  test('check-in bulunduğun mekânları bildirir; varış ve ayrılış', async () => {
     const c = client(srv.base);
     await c.register('checkin_user');
     const far = await c.post('/api/checkins', SPOTS.istanbulNowhere);
@@ -43,18 +43,26 @@ describe('Overheard API', () => {
     assert.equal(far.data.city, 'istanbul');
 
     const near = await c.post('/api/checkins', SPOTS.kadikoyIskeleEdge);
-    const ids = near.data.places.map((p) => p.id);
-    assert.ok(ids.includes('ist-kadikoy-iskele'));
-    assert.equal(near.data.places.find((p) => p.id === 'ist-kadikoy-iskele').newlyUnlocked, true);
+    const iskele = near.data.places.find((p) => p.id === 'ist-kadikoy-iskele');
+    assert.ok(iskele);
+    assert.deepEqual([iskele.here, iskele.arrived, iskele.firstVisit], [true, true, true]);
 
     const again = await c.post('/api/checkins', SPOTS.kadikoyIskeleEdge);
-    assert.equal(again.data.places.find((p) => p.id === 'ist-kadikoy-iskele').newlyUnlocked, false);
+    const still = again.data.places.find((p) => p.id === 'ist-kadikoy-iskele');
+    assert.deepEqual([still.arrived, still.firstVisit], [false, false]);
+
+    const away = await c.post('/api/checkins', SPOTS.modaSahil);
+    assert.deepEqual(away.data.left, ['ist-kadikoy-iskele']);
+    assert.equal(away.data.places[0].arrived, true);
 
     const mine = await c.get('/api/me/places');
-    assert.ok(mine.data.places.some((p) => p.id === 'ist-kadikoy-iskele'));
+    const history = mine.data.places.find((p) => p.id === 'ist-kadikoy-iskele');
+    assert.ok(history, 'uğranan mekânlar geçmişte kalır');
+    assert.equal(history.here, false);
+    assert.equal(mine.data.places.find((p) => p.id === 'ist-moda-sahil').here, true);
   });
 
-  test('ortak mekân kuralı: oraya gitmeyen sözü okuyamaz', async () => {
+  test('yerel söz yalnızca o mekândayken okunur; ayrılınca yeniden kilitlenir', async () => {
     const author = client(srv.base);
     const stranger = client(srv.base);
     const visitor = client(srv.base);
@@ -66,9 +74,10 @@ describe('Overheard API', () => {
     assert.equal(posted.status, 200, JSON.stringify(posted.data));
     const { id, placeId } = posted.data.overheard;
     assert.equal(placeId, 'ist-kadikoy-iskele');
+    assert.equal(posted.data.overheard.visibility, 'local', 'varsayılan görünürlük yerel');
     assert.equal(posted.data.overheard.mine, true);
 
-    // Misafir (giriş yapmamış) ve oraya hiç gitmemiş kullanıcı: kilitli, metin yok.
+    // Misafir (giriş yapmamış) ve orada olmayan kullanıcı: kilitli, metin yok.
     for (const viewer of [client(srv.base), stranger]) {
       const r = await viewer.get(`/api/overheards/${id}`);
       assert.equal(r.data.overheard.locked, true);
@@ -77,23 +86,64 @@ describe('Overheard API', () => {
       assert.ok(r.data.overheard.length > 0);
     }
     const map = await stranger.get('/api/cities/istanbul/map');
-    const onMap = map.data.overheards.find((o) => o.id === id);
-    assert.equal(onMap.locked, true);
+    assert.equal(map.data.overheards.find((o) => o.id === id).locked, true);
     assert.ok(!JSON.stringify(map.data).includes('martılar dakik'), 'kilitli metin haritaya sızmamalı');
+    const place = map.data.places.find((p) => p.id === 'ist-kadikoy-iskele');
+    assert.equal(place.localCount >= 1, true);
 
     // Kilitliyken tepki veremez, mesaj atamaz.
-    assert.equal((await stranger.post(`/api/overheards/${id}/reactions`, { kind: 'lol' })).data.error, 'not_mutual');
-    assert.equal((await stranger.post(`/api/overheards/${id}/messages`, { body: 'Selam!' })).data.error, 'not_mutual');
+    assert.equal((await stranger.post(`/api/overheards/${id}/reactions`, { kind: 'lol' })).data.error, 'not_here');
+    assert.equal((await stranger.post(`/api/overheards/${id}/messages`, { body: 'Selam!' })).data.error, 'not_here');
 
-    // Mekâna gidince açılır.
+    // Mekâna gelince açılır.
     await visitor.post('/api/checkins', SPOTS.kadikoyIskele);
     const open = await visitor.get(`/api/overheards/${id}`);
     assert.equal(open.data.overheard.locked, false);
     assert.equal(open.data.overheard.text, 'Vapur yine geç kaldı ama martılar dakik.');
     assert.equal(open.data.overheard.author, 'soz_sahibi');
+    assert.equal(open.data.overheard.here, true);
     assert.equal(open.data.overheard.sameTime, true);
     assert.equal(open.data.overheard.mutualPlaces, 1);
     assert.equal(open.data.overheard.canMessage, true);
+    // Oradayken başlattığı konuşma, ayrıldıktan sonra da sürer.
+    const conv = (await visitor.post(`/api/overheards/${id}/messages`, { body: 'Ben de iskeledeyim!' })).data.conversationId;
+
+    // Bir kez gitmek yetmez: başka yere geçince yerel söz yeniden kilitlenir.
+    await visitor.post('/api/checkins', SPOTS.modaSahil);
+    assert.equal((await visitor.get(`/api/overheards/${id}`)).data.overheard.locked, true);
+    assert.equal((await visitor.post(`/api/overheards/${id}/reactions`, { kind: 'lol' })).data.error, 'not_here');
+    assert.equal((await visitor.post(`/api/conversations/${conv}/messages`, { body: 'Moda\'ya geçtim.' })).status, 200);
+
+    // Geri dönünce yine açılır; ama konum bildirimi bayatlarsa (uygulama kapalı) kilitlenir.
+    await visitor.post('/api/checkins', SPOTS.kadikoyIskele);
+    assert.equal((await visitor.get(`/api/overheards/${id}`)).data.overheard.locked, false);
+    srv.db.prepare("UPDATE location_reports SET at = at - ? WHERE user_id = (SELECT id FROM users WHERE handle = 'ziyaretci')").run(srv.config.presenceTtlMs + 1000);
+    assert.equal((await visitor.get(`/api/overheards/${id}`)).data.overheard.locked, true);
+
+    // Söz sahibi her yerden kendi sözünü okur.
+    await author.post('/api/checkins', SPOTS.austin6th);
+    assert.equal((await author.get(`/api/overheards/${id}`)).data.overheard.locked, false);
+  });
+
+  test('herkese açık söz her yerden, girişsiz bile okunur', async () => {
+    const author = client(srv.base);
+    const far = client(srv.base);
+    await author.register('acik_yazar');
+    await far.register('uzaktaki');
+    const posted = await author.post('/api/overheards', { text: 'Herkes duysun: vapur bedava değilmiş.', visibility: 'public', ...SPOTS.kadikoyIskele });
+    assert.equal(posted.data.overheard.visibility, 'public');
+    const { id } = posted.data.overheard;
+    const guest = (await client(srv.base).get(`/api/overheards/${id}`)).data.overheard;
+    assert.equal(guest.locked, false);
+    assert.equal(guest.text, 'Herkes duysun: vapur bedava değilmiş.');
+    await far.post('/api/checkins', SPOTS.austin6th);
+    assert.equal((await far.post(`/api/overheards/${id}/reactions`, { kind: 'lol' })).status, 200);
+    assert.equal((await far.post(`/api/overheards/${id}/messages`, { body: 'Austin\'ten selam!' })).status, 200);
+    // Uzaktaki kişi "ben de duydum" diyemez: o sırada orada değildi.
+    assert.equal((await far.post(`/api/overheards/${id}/reactions`, { kind: 'same' })).data.error, 'not_same_time');
+    // Geçersiz görünürlük yerel sayılır.
+    const odd = await author.post('/api/overheards', { text: 'Garip görünürlük.', visibility: 'secret', ...SPOTS.kadikoyIskele });
+    assert.equal(odd.data.overheard.visibility, 'local');
   });
 
   test('söz paylaşmak için mekânda olmak gerekir', async () => {
@@ -221,12 +271,13 @@ describe('Demo modu', () => {
   before(async () => { srv = await startTestServer({ demo: true }); });
   after(async () => { await srv.close(); });
 
-  test('örnek sözler her pilot şehirde var ve kilitli gelir', async () => {
+  test('örnek sözler her pilot şehirde var; yereller kilitli, herkese açıklar okunur', async () => {
     const guest = client(srv.base);
     for (const city of ['istanbul', 'ankara', 'izmir', 'austin', 'new-york', 'los-angeles']) {
       const r = await guest.get(`/api/cities/${city}/map`);
       assert.ok(r.data.overheards.length >= 5, city);
-      assert.ok(r.data.overheards.every((o) => o.locked), city);
+      assert.ok(r.data.overheards.every((o) => o.locked === (o.visibility === 'local')), city);
+      assert.ok(r.data.overheards.some((o) => o.visibility === 'public'), city);
       assert.ok(r.data.places.some((p) => p.count > 0), city);
     }
   });

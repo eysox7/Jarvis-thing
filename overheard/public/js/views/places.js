@@ -33,6 +33,12 @@ export async function openPlaces(app) {
   body.lastChild.remove();
 
   const cityName = new Map(app.state.config.cities.map((c) => [c.id, c.name]));
+  const hereNow = places.filter((p) => p.here);
+  if (hereNow.length) {
+    body.append(
+      h('h3', { class: 'section-title' }, `💬 ${t('places.hereNow')}`),
+      h('ul', { class: 'list' }, hereNow.map((p) => placeRow(p, { app, meta: t('places.hereHint', { n: app.state.config.presenceMinutes }) }))));
+  }
   if (!places.length) body.append(h('p', { class: 'empty' }, `🚶 ${t('places.empty')}`));
   else {
     body.append(
@@ -46,13 +52,13 @@ export async function openPlaces(app) {
   // Bulunduğun şehirdeki, henüz gitmediğin ve sözü olan mekânlar: yürümek için bir sebep.
   const origin = app.state.position || app.state.city;
   const waiting = (app.state.data?.places || [])
-    .filter((p) => !p.visited && p.count > 0)
+    .filter((p) => !p.here && p.localCount > 0)
     .map((p) => ({ ...p, distance: distanceM(origin.lat, origin.lng, p.lat, p.lng) }))
     .sort((a, b) => a.distance - b.distance)
     .slice(0, 8);
   if (waiting.length) {
     body.append(
       h('h3', { class: 'section-title' }, t('places.nearby')),
-      h('ul', { class: 'list' }, waiting.map((p) => placeRow(p, { app, locked: true, meta: `🚶 ${formatDistance(p.distance)}` }))));
+      h('ul', { class: 'list' }, waiting.map((p) => placeRow({ ...p, count: p.localCount }, { app, locked: true, meta: `🚶 ${formatDistance(p.distance)}` }))));
   }
 }

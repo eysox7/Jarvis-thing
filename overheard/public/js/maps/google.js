@@ -144,7 +144,7 @@ export function createGoogleMap(el, handlers) {
     const locked = cssVar('--locked');
     for (const m of plan) {
       if (m.type === 'area') {
-        const color = m.item.visited ? open : locked;
+        const color = m.item.here ? open : locked;
         drawn.push(new maps.Circle({
           map,
           center: { lat: m.lat, lng: m.lng },

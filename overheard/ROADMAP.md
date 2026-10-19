@@ -62,6 +62,15 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
 
 Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
 
+## Kural değişikliği (kullanıcı geri bildirimi)
+
+- [x] **Yerel / herkese açık sözler.** "Bir kez git, sonsuza dek oku" kaldırıldı. Yerel sözler
+      (varsayılan) yalnızca o mekânda şu an bulunanlara açık; ayrılınca ya da konum 30 dk
+      güncellenmeyince yeniden kilitlenir. Herkese açık sözler herkese, her yerden açık. Söz
+      bırakırken seçilir. Check-in yanıtı varış/ayrılış bildirir; arayüz bildirim gösterir ve
+      haritayı yeniler. Uğranan mekânlar rozet ve keşif ilerlemesi için sayılmaya devam eder.
+      Şema v6.
+
 ## Kalite turlarında yapılanlar
 
 - Geniş ekran düzeni (bant, kart, sekme çubuğu ortalı), alt sayfada odak yönetimi.

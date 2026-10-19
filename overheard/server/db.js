@@ -151,6 +151,12 @@ export const MIGRATIONS = [
   );
   CREATE INDEX location_flags_user ON location_flags(user_id, at);
   `,
+  // v6: Görünürlük. 'local' sözler yalnızca o mekândayken, 'public' sözler her yerden okunur.
+  // "Şu an orada" bilgisi son bildirilen konumdan türetilir; konum doğruluğu da saklanır.
+  `
+  ALTER TABLE overheards ADD COLUMN visibility TEXT NOT NULL DEFAULT 'local';
+  ALTER TABLE location_reports ADD COLUMN accuracy REAL NOT NULL DEFAULT 0;
+  `,
 ];
 
 export function openDb(path) {

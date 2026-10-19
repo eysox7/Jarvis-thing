@@ -50,6 +50,8 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     googleMapsKey: config.googleMapsKey || null,
     reactions: domain.REACTIONS,
     limits: domain.LIMITS,
+    visibilities: domain.VISIBILITIES,
+    presenceMinutes: Math.round(config.presenceTtlMs / 60000),
   }));
 
   // --- Hesap ---
@@ -134,7 +136,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     return { ...result, newBadges };
   });
 
-  router.get('/api/me/places', (ctx) => ({ places: domain.myPlaces(db, requireUser(ctx)) }));
+  router.get('/api/me/places', (ctx) => ({ places: domain.myPlaces(db, config, requireUser(ctx)) }));
 
   // --- Sözler ---
   router.post('/api/overheards', async (ctx) => {
@@ -184,7 +186,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireActive(ctx);
     limit(`message:${user.id}`, 60, 3600000);
     const body = await readJson(ctx.req);
-    return deliver(domain.withBadges(db, user, () => domain.messageAboutOverheard(db, user, ctx.params.id, body.body, body.to)));
+    return deliver(domain.withBadges(db, user, () => domain.messageAboutOverheard(db, config, user, ctx.params.id, body.body, body.to)));
   });
 
   router.get('/api/conversations', (ctx) => ({ conversations: domain.listConversations(db, requireUser(ctx)) }));

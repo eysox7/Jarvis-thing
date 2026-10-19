@@ -1,7 +1,8 @@
-// Overheard'ün kuralları burada yaşar. En önemlisi "ortak mekân" kuralı:
-// bir sözü yalnızca o sözün duyulduğu mekânda bulunmuş olan kişi okuyabilir.
-// Söz sahibi de oraya gitmiş olduğundan (paylaşmak için orada olmak şart),
-// okuyabilmek = yazanla en az bir ortak mekânın olması demektir.
+// Overheard'ün kuralları burada yaşar. En önemlisi görünürlük kuralı:
+// - Yerel söz (varsayılan): yalnızca o mekânda ŞU AN bulunan kişi okuyabilir. Bir kez gidip
+//   okumak kalıcı erişim vermez; oradan ayrılınca söz yeniden kilitlenir.
+// - Herkese açık söz: herkes, her yerden okuyabilir.
+// Söz bırakmak için her iki durumda da o mekânda olmak gerekir.
 import { transaction } from './db.js';
 import { newId } from './auth.js';
 import { HttpError } from './http.js';
@@ -52,6 +53,24 @@ export function placesContaining(db, config, { lat, lng, accuracy }) {
     .sort((a, b) => a.distance - b.distance);
 }
 
+export const VISIBILITIES = ['local', 'public'];
+
+// Kullanıcının şu an bulunduğu mekânlar: son bildirilen konum taze (presenceTtlMs) ve mekânın
+// içindeyse, ve kullanıcı orada check-in yapabilmişse (saatlik açma sınırına takılmamışsa).
+export function currentPlaceIds(db, config, userId, now = Date.now()) {
+  if (!userId) return new Set();
+  const last = db.prepare('SELECT lat, lng, accuracy, at FROM location_reports WHERE user_id = ?').get(userId);
+  if (!last || now - last.at > config.presenceTtlMs) return new Set();
+  const checked = db.prepare('SELECT 1 FROM checkins WHERE user_id = ? AND place_id = ? LIMIT 1');
+  return new Set(placesContaining(db, config, last).filter((p) => checked.get(userId, p.id)).map((p) => p.id));
+}
+
+function recordPresence(db, user, coords, now) {
+  db.prepare(`INSERT INTO location_reports (user_id, lat, lng, accuracy, at) VALUES (?, ?, ?, ?, ?)
+              ON CONFLICT(user_id) DO UPDATE SET lat = excluded.lat, lng = excluded.lng, accuracy = excluded.accuracy, at = excluded.at`)
+    .run(user.id, coords.lat, coords.lng, coords.accuracy || 0, now);
+}
+
 export function visitedPlaceIds(db, userId) {
   if (!userId) return new Set();
   return new Set(db.prepare('SELECT DISTINCT place_id FROM checkins WHERE user_id = ?').all(userId).map((r) => r.place_id));
@@ -80,7 +99,7 @@ function flagLocation(db, userId, reason, detail) {
     .run(userId, reason, detail ? JSON.stringify(detail) : null, Date.now());
 }
 
-// { ok: true } ya da { ok: false, reason }. Güvenilen konum, bir sonraki karşılaştırma için saklanır.
+// { ok: true } ya da { ok: false, reason }. Güvenilen konum çağıran tarafından recordPresence ile saklanır.
 export function verifyLocation(db, config, user, coords, now = Date.now()) {
   if (!config.antiSpoofing) return { ok: true };
   if (coords.accuracy > config.maxAccuracyM) return { ok: false, reason: 'low_accuracy' };
@@ -97,9 +116,6 @@ export function verifyLocation(db, config, user, coords, now = Date.now()) {
       return { ok: false, reason: 'impossible_travel' };
     }
   }
-  db.prepare(`INSERT INTO location_reports (user_id, lat, lng, at) VALUES (?, ?, ?, ?)
-              ON CONFLICT(user_id) DO UPDATE SET lat = excluded.lat, lng = excluded.lng, at = excluded.at`)
-    .run(user.id, coords.lat, coords.lng, now);
   return { ok: true };
 }
 
@@ -119,12 +135,14 @@ export function checkIn(db, config, user, coords) {
   const now = Date.now();
   const city = cityAt(coords.lat, coords.lng)?.id || null;
   const trust = verifyLocation(db, config, user, coords, now);
-  if (!trust.ok) return { places: [], city, blocked: trust.reason };
+  if (!trust.ok) return { places: [], city, left: [], blocked: trust.reason };
 
+  const before = currentPlaceIds(db, config, user.id, now);
+  recordPresence(db, user, coords, now);
   const found = placesContaining(db, config, coords);
   const lastAt = db.prepare('SELECT MAX(at) AS at FROM checkins WHERE user_id = ? AND place_id = ?');
   const insert = db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)');
-  // Son bir saatte ilk kez açılan mekân sayısı: aşılırsa yeni mekân açılmaz (eskiler yine sayılır).
+  // Son bir saatte ilk kez uğranan mekân sayısı: aşılırsa yeni mekân sayılmaz (eskiler yine sayılır).
   let unlocksLeft = config.antiSpoofing
     ? config.maxUnlocksPerHour - db.prepare(`
         SELECT COUNT(*) AS n FROM (SELECT MIN(at) AS first FROM checkins WHERE user_id = ? GROUP BY place_id) WHERE first > ?`)
@@ -141,16 +159,20 @@ export function checkIn(db, config, user, coords) {
       unlocksLeft -= 1;
     }
     if (at == null || now - at >= config.checkinCooldownMs) insert.run(user.id, p.id, now);
-    return [serializePlace(p, { visited: true, newlyUnlocked: at == null, distance: Math.round(p.distance) })];
+    // arrived: az önce burada değildin (yerel sözler şimdi açıldı); firstVisit: ilk kez geldin.
+    return [serializePlace(p, { visited: true, here: true, arrived: !before.has(p.id), firstVisit: at == null, distance: Math.round(p.distance) })];
   }));
   if (throttled) flagLocation(db, user.id, 'unlock_burst', { limit: config.maxUnlocksPerHour });
-  return { places, city, ...(throttled ? { blocked: 'unlock_burst' } : {}) };
+  // Ayrıldığın mekânlar: oradaki yerel sözler yeniden kilitlendi.
+  const here = new Set(places.map((p) => p.id));
+  const left = [...before].filter((id) => !here.has(id));
+  return { places, city, left, ...(throttled ? { blocked: 'unlock_burst' } : {}) };
 }
 
 // --- Sözler ---------------------------------------------------------------
 
 const OVERHEARD_SELECT = `
-  SELECT o.id, o.user_id, o.place_id, o.text, o.created_at, o.hidden, o.anonymous,
+  SELECT o.id, o.user_id, o.place_id, o.text, o.created_at, o.hidden, o.anonymous, o.visibility,
          u.handle, p.name AS place_name, p.city_id, p.lat AS place_lat, p.lng AS place_lng, p.radius_m
   FROM overheards o
   JOIN users u ON u.id = o.user_id
@@ -168,6 +190,7 @@ function buildContext(db, config, viewer, rows) {
     viewer,
     config,
     visited: visitedPlaceIds(db, viewer?.id),
+    here: currentPlaceIds(db, config, viewer?.id),
     reactions: new Map(),
     mine: new Map(),
     checkins: new Map(),
@@ -218,7 +241,8 @@ function buildContext(db, config, viewer, rows) {
 }
 
 function canReadRow(ctx, row) {
-  return Boolean(ctx.viewer) && (row.user_id === ctx.viewer.id || ctx.visited.has(row.place_id));
+  if (row.visibility === 'public') return true;
+  return Boolean(ctx.viewer) && (row.user_id === ctx.viewer.id || ctx.here.has(row.place_id));
 }
 
 function serializeOverheard(row, ctx) {
@@ -233,12 +257,13 @@ function serializeOverheard(row, ctx) {
     ...position,
     createdAt: row.created_at,
     reactionTotal: total,
+    visibility: row.visibility,
   };
   if (!canReadRow(ctx, row)) {
-    // Kilitli söz: metin sunucudan hiç çıkmaz, yalnızca uzunluğu ipucu olarak verilir.
+    // Kilitli yerel söz: metin sunucudan hiç çıkmaz, yalnızca uzunluğu ipucu olarak verilir.
     return { ...base, locked: true, length: [...row.text].length };
   }
-  const mine = row.user_id === ctx.viewer.id;
+  const mine = Boolean(ctx.viewer) && row.user_id === ctx.viewer.id;
   const times = ctx.checkins.get(row.place_id) || [];
   const myReactions = ctx.mine.get(row.id) || [];
   const sameTime = !mine && times.some((t) => Math.abs(t - row.created_at) <= ctx.config.sameTimeWindowMs);
@@ -255,6 +280,7 @@ function serializeOverheard(row, ctx) {
     myReactions,
     sameTime,
     mutualPlaces: mine ? null : ctx.mutual.get(row.user_id) || 0,
+    here: ctx.here.has(row.place_id),
     canMessage: !mine,
     witnesses: (ctx.witnesses.get(row.id) || []).slice(0, 20),
     // 👂 yalnızca söz duyulduğunda orada olanlar içindir.
@@ -280,12 +306,22 @@ export function cityMap(db, config, viewer, cityId) {
   const overheards = rows.map((r) => serializeOverheard(r, ctx));
 
   const stats = new Map(db.prepare(`
-    SELECT o.place_id, COUNT(*) AS n, MAX(o.created_at) AS last_at
+    SELECT o.place_id, COUNT(*) AS n, SUM(o.visibility = 'local') AS local_n, MAX(o.created_at) AS last_at
     FROM overheards o JOIN places p ON p.id = o.place_id
     WHERE p.city_id = :city AND o.hidden = 0 AND ${NOT_BLOCKED}
     GROUP BY o.place_id`).all(params).map((r) => [r.place_id, r]));
   const places = db.prepare('SELECT * FROM places WHERE city_id = ? ORDER BY name').all(cityId)
-    .map((p) => serializePlace(p, { visited: ctx.visited.has(p.id), count: stats.get(p.id)?.n || 0, lastAt: stats.get(p.id)?.last_at || null }));
+    .map((p) => {
+      const st = stats.get(p.id);
+      return serializePlace(p, {
+        visited: ctx.visited.has(p.id),
+        here: ctx.here.has(p.id),
+        count: st?.n || 0,
+        localCount: st?.local_n || 0,
+        publicCount: (st?.n || 0) - (st?.local_n || 0),
+        lastAt: st?.last_at || null,
+      });
+    });
 
   return { city: CITY_BY_ID.get(cityId), places, overheards, truncated: rows.length === CITY_OVERHEARD_LIMIT };
 }
@@ -328,10 +364,11 @@ const isWitness = (db, overheardId, userId) => Boolean(
   db.prepare("SELECT 1 FROM reactions WHERE overheard_id = ? AND user_id = ? AND kind = 'same'").get(overheardId, userId));
 
 // Okuma iznini doğrular; yoksa nedenini söyleyen bir hata fırlatır.
-function requireReadable(db, viewer, row) {
-  if (row.user_id === viewer.id) return;
-  const visited = db.prepare('SELECT 1 FROM checkins WHERE user_id = ? AND place_id = ? LIMIT 1').get(viewer.id, row.place_id);
-  if (!visited) throw new HttpError(403, 'not_mutual', { placeId: row.place_id, placeName: row.place_name });
+function requireReadable(db, config, viewer, row) {
+  if (row.visibility === 'public' || row.user_id === viewer.id) return;
+  if (!currentPlaceIds(db, config, viewer.id).has(row.place_id)) {
+    throw new HttpError(403, 'not_here', { placeId: row.place_id, placeName: row.place_name });
+  }
 }
 
 export function createOverheard(db, config, user, body) {
@@ -345,6 +382,8 @@ export function createOverheard(db, config, user, body) {
   const now = Date.now();
   const trust = verifyLocation(db, config, user, coords, now);
   if (!trust.ok) throw new HttpError(403, trust.reason);
+  const visibility = VISIBILITIES.includes(body.visibility) ? body.visibility : 'local';
+  recordPresence(db, user, coords, now);
 
   return transaction(db, () => {
     let place;
@@ -374,8 +413,8 @@ export function createOverheard(db, config, user, body) {
 
     const id = newId();
     db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)').run(user.id, place.id, now);
-    db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(id, user.id, place.id, text, now, body.anonymous ? 1 : 0);
+    db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous, visibility) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(id, user.id, place.id, text, now, body.anonymous ? 1 : 0, visibility);
     return { ...getOverheard(db, config, user, id), masked };
   });
 }
@@ -390,7 +429,7 @@ export function deleteOverheard(db, user, id) {
 export function toggleReaction(db, config, user, id, kind) {
   if (!REACTIONS.includes(kind)) throw new HttpError(400, 'bad_reaction');
   const row = loadOverheardRow(db, id, user.id);
-  requireReadable(db, user, row);
+  requireReadable(db, config, user, row);
   const existing = db.prepare('SELECT 1 FROM reactions WHERE overheard_id = ? AND user_id = ? AND kind = ?').get(id, user.id, kind);
   if (!existing && kind === 'same' && !wasThereAtTheTime(db, config, user, row)) throw new HttpError(403, 'not_same_time');
   if (existing) db.prepare('DELETE FROM reactions WHERE overheard_id = ? AND user_id = ? AND kind = ?').run(id, user.id, kind);
@@ -400,7 +439,7 @@ export function toggleReaction(db, config, user, id, kind) {
 
 export function reportOverheard(db, config, user, id, reason) {
   const row = loadOverheardRow(db, id, user.id);
-  requireReadable(db, user, row);
+  requireReadable(db, config, user, row);
   if (row.user_id === user.id) throw new HttpError(400, 'own_overheard');
   const why = cleanText(reason).slice(0, 200) || 'unspecified';
   transaction(db, () => {
@@ -412,7 +451,8 @@ export function reportOverheard(db, config, user, id, reason) {
 
 // --- Ortak mekânlar ------------------------------------------------------
 
-export function myPlaces(db, user) {
+export function myPlaces(db, config, user) {
+  const here = currentPlaceIds(db, config, user.id);
   return db.prepare(`
     SELECT p.*, MIN(c.at) AS first_at, MAX(c.at) AS last_at, COUNT(c.id) AS visits,
            (SELECT COUNT(*) FROM overheards o WHERE o.place_id = p.id AND o.hidden = 0) AS overheard_count
@@ -420,7 +460,7 @@ export function myPlaces(db, user) {
     WHERE c.user_id = ?
     GROUP BY p.id
     ORDER BY last_at DESC`).all(user.id)
-    .map((p) => serializePlace(p, { visited: true, firstAt: p.first_at, lastAt: p.last_at, visits: p.visits, count: p.overheard_count }));
+    .map((p) => serializePlace(p, { visited: true, here: here.has(p.id), firstAt: p.first_at, lastAt: p.last_at, visits: p.visits, count: p.overheard_count }));
 }
 
 export function mutualPlaces(db, aId, bId) {
@@ -479,10 +519,10 @@ function insertMessage(db, conversationId, senderId, body, now) {
 // Bir söz hakkında yazar: varsayılan olarak sözün sahibine, `to` verilirse o sözün bir tanığına.
 // Yalnızca o mekânda bulunmuş olanlar yazabilir; tanıklara yalnızca söz sahibi ve diğer tanıklar.
 // İki kişi arasında aynı söz için tek konuşma vardır (kim başlatırsa başlatsın).
-export function messageAboutOverheard(db, user, overheardId, rawBody, to) {
+export function messageAboutOverheard(db, config, user, overheardId, rawBody, to) {
   const body = cleanMessage(rawBody);
   const row = loadOverheardRow(db, overheardId, user.id);
-  requireReadable(db, user, row);
+  requireReadable(db, config, user, row);
   let recipientId = row.user_id;
   let kind = 'author';
   if (to) {

@@ -8,7 +8,7 @@ export const DETAIL_ZOOM = 15;
 export const LONG_PRESS_MS = 600;
 
 export function bubbleElement(o) {
-  const classes = ['oh-bubble', o.locked ? 'is-locked' : 'is-open', o.mine && 'is-mine', o.sameTime && 'is-same'].filter(Boolean).join(' ');
+  const classes = ['oh-bubble', o.locked ? 'is-locked' : 'is-open', o.visibility === 'public' && 'is-public', o.mine && 'is-mine', o.sameTime && 'is-same'].filter(Boolean).join(' ');
   if (o.locked) {
     return h('div', { class: classes, dataset: { id: o.id } },
       h('span', { class: 'oh-bubble-lock', 'aria-hidden': 'true' }, '🔒'),
@@ -16,13 +16,23 @@ export function bubbleElement(o) {
       h('span', { class: 'visually-hidden' }, t('bubble.locked')));
   }
   return h('div', { class: classes, dataset: { id: o.id } },
+    o.visibility === 'public' ? h('span', { class: 'oh-bubble-globe', title: t('visibility.public') }, '🌍') : null,
     h('span', { class: 'oh-bubble-text' }, `“${truncate(o.text, 44)}”`),
     o.reactionTotal ? h('span', { class: 'oh-bubble-count' }, String(o.reactionTotal)) : null);
 }
 
+// Mekânın görüntüleyene göre durumu: buradaysan açık; değilsen herkese açık sözü varsa yarı açık,
+// yalnızca yerel sözleri varsa kilitli.
+export function placeState(p) {
+  if (p.here) return { cls: 'is-open', icon: '💬' };
+  if (p.publicCount > 0) return { cls: 'is-public', icon: '🌍' };
+  return { cls: 'is-locked', icon: '🔒' };
+}
+
 export function placeElement(p) {
-  return h('div', { class: `oh-place ${p.visited ? 'is-open' : 'is-locked'}`, dataset: { id: p.id } },
-    h('span', { class: 'oh-place-icon', 'aria-hidden': 'true' }, p.visited ? '💬' : '🔒'),
+  const state = placeState(p);
+  return h('div', { class: `oh-place ${state.cls}`, dataset: { id: p.id } },
+    h('span', { class: 'oh-place-icon', 'aria-hidden': 'true' }, state.icon),
     h('span', { class: 'oh-place-name' }, p.name),
     p.count ? h('span', { class: 'oh-place-count' }, String(p.count)) : null);
 }
@@ -58,13 +68,13 @@ export function planMarkers(data, view) {
 
   if (view.zoom < DETAIL_ZOOM) {
     const ranked = data.places
-      .filter((p) => (p.count > 0 || p.visited) && view.contains(p.lat, p.lng))
+      .filter((p) => (p.count > 0 || p.here) && view.contains(p.lat, p.lng))
       .sort((a, b) => b.count - a.count);
     for (const p of ranked) {
       const full = fits(view.project(p.lat, p.lng), placeWidth(p), 30);
       const element = full
         ? placeElement(p)
-        : dotElement(p.count ? String(p.count) : '🔒', `is-place ${p.visited ? 'is-open' : 'is-locked'}`);
+        : dotElement(p.count ? String(p.count) : placeState(p).icon, `is-place ${placeState(p).cls}`);
       plan.push({ type: 'place', lat: p.lat, lng: p.lng, item: p, element, full, title: p.name });
     }
     return plan;

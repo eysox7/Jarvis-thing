@@ -33,7 +33,7 @@ export async function seedDemoContent(db) {
       userIds.set(u.handle, findUser.get(u.handle).id);
     });
 
-    const insertOverheard = db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at) VALUES (?, ?, ?, ?, ?)');
+    const insertOverheard = db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at, visibility) VALUES (?, ?, ?, ?, ?, ?)');
     const insertCheckin = db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)');
     SAMPLE_OVERHEARDS.forEach(([placeId, text], i) => {
       const city = placeCity.get(placeId);
@@ -43,7 +43,8 @@ export async function seedDemoContent(db) {
       // Son üç güne yayılmış zamanlar.
       const at = now - ((i * 7919) % (72 * 60)) * 60000 - 5 * 60000;
       insertCheckin.run(userId, placeId, at);
-      insertOverheard.run(newId(), userId, placeId, text, at);
+      // Her üç sözden biri herkese açık: haritada her yerden okunabilen içerik de olsun.
+      insertOverheard.run(newId(), userId, placeId, text, at, i % 3 === 0 ? 'public' : 'local');
     });
   });
 }

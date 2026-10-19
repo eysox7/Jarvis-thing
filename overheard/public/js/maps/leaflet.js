@@ -35,7 +35,7 @@ export function createLeafletMap(el, handlers) {
         L.circle([m.lat, m.lng], {
           radius: m.item.radius,
           interactive: false,
-          className: `oh-place-area ${m.item.visited ? 'is-open' : 'is-locked'}`,
+          className: `oh-place-area ${m.item.here ? 'is-open' : 'is-locked'}`,
         }).addTo(layer);
         continue;
       }

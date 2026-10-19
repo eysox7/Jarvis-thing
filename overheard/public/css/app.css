@@ -304,6 +304,13 @@ button { cursor: pointer; }
 }
 .oh-place.is-locked { background: var(--locked-bg); color: var(--ink); border: 1.5px dashed var(--locked); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .oh-place.is-locked .oh-place-count { background: var(--locked); }
+.oh-place.is-public { border: 1.5px solid var(--locked); }
+.oh-place.is-public .oh-place-count { background: var(--ink); }
+.oh-dot.is-place.is-public { border: 1.5px solid var(--locked); }
+.oh-bubble.is-public:not(.is-mine) { border-color: var(--ink); }
+.oh-bubble.is-public:not(.is-mine)::after { border-color: var(--ink); }
+.oh-bubble-globe { flex: none; font-style: normal; font-size: 12px; }
+.option-hint { display: block; font-weight: 500; }
 
 .oh-place-area { stroke-width: 1.5; fill-opacity: 0.07; }
 .oh-place-area.is-open { stroke: var(--open); fill: var(--open); }
@@ -691,6 +698,7 @@ textarea { resize: vertical; min-height: 44px; }
   animation: toast-in 0.25s ease both;
 }
 .nudge[hidden] { display: none; }
+.nudge[data-hot] { border-style: solid; border-color: var(--hot); box-shadow: 0 0 0 4px rgba(255, 184, 0, 0.3), var(--shadow); }
 .nudge-icon { font-size: 20px; }
 .nudge-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; border: none; background: none; padding: 0; text-align: left; }
 .nudge-title { font-weight: 700; font-size: 14px; }

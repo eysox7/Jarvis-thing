@@ -18,6 +18,12 @@ export async function openCompose(app) {
   const where = h('div', { class: 'where' }, h('p', { class: 'muted' }, t('compose.locating')));
   const submit = h('button', { class: 'btn btn-primary btn-block', type: 'submit', disabled: true }, `🎈 ${t('compose.submit')}`);
   const anonymous = h('input', { type: 'checkbox', name: 'anonymous' });
+  const visibilityOption = (value, icon, checked) => h('label', { class: 'place-option' },
+    h('input', { type: 'radio', name: 'visibility', value, checked }),
+    h('span', { class: 'place-option-name' }, `${icon} ${t(`visibility.${value}`)}`, h('span', { class: 'muted small option-hint' }, t(`visibility.${value}Hint`))));
+  const visibility = h('div', { class: 'place-options', role: 'radiogroup' },
+    visibilityOption('local', '📍', true),
+    visibilityOption('public', '🌍', false));
 
   let position = null;
   let choice = null; // { placeId } | { newPlaceName: input }
@@ -76,7 +82,14 @@ export async function openCompose(app) {
       e.preventDefault();
       error.hide();
       busy(submit, async () => {
-        const payload = { text: text.value, lat: position.lat, lng: position.lng, accuracy: position.accuracy, anonymous: anonymous.checked };
+        const payload = {
+          text: text.value,
+          lat: position.lat,
+          lng: position.lng,
+          accuracy: position.accuracy,
+          anonymous: anonymous.checked,
+          visibility: form.querySelector('input[name="visibility"]:checked')?.value || 'local',
+        };
         if (choice?.placeId) payload.placeId = choice.placeId;
         else payload.newPlaceName = choice?.newPlaceName.value || '';
         try {
@@ -101,6 +114,8 @@ export async function openCompose(app) {
   h('div', { class: 'quote-input' }, h('span', { class: 'quote-mark', 'aria-hidden': 'true' }, '“'), text),
   h('div', { class: 'row-between' }, h('span', { class: 'muted small' }, t('compose.rules')), counter),
   where,
+  h('p', { class: 'field-label' }, t('compose.who')),
+  visibility,
   h('label', { class: 'check' }, anonymous, h('span', {}, `🎭 ${t('compose.anonymous')}`)),
   error.el,
   submit);

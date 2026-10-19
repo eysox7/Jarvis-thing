@@ -66,7 +66,8 @@ function locateOnce() {
         toast(t('toast.locationDenied'), { tone: 'error' });
         resolve(null);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
+      // "Konumum" taze konum ister: önbellekteki eski konum, ayrıldığın mekânı açık tutmasın.
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
   });
 }
@@ -77,9 +78,15 @@ const MAX_BOX_SPAN_DEG = 0.5;
 const MAX_CACHED_OVERHEARDS = 1500;
 let viewTimer = null;
 let lastBox = null;
+let lastView = null;
+// Her şehir verisi yenilemesinde artar: yenilemeden önce başlamış bir alan isteği (ör. kilit
+// açılmadan önceki kilitli hâller) geç dönerse taze veriyi ezmesin.
+let dataGeneration = 0;
 
-function onViewChange({ zoom, bbox }) {
+function onViewChange(view) {
+  lastView = view;
   clearTimeout(viewTimer);
+  const { zoom, bbox } = view;
   if (zoom < DETAIL_ZOOM || !state.data) return;
   const [w, s, e, n] = bbox;
   if (e - w > MAX_BOX_SPAN_DEG || n - s > MAX_BOX_SPAN_DEG) return;
@@ -87,9 +94,10 @@ function onViewChange({ zoom, bbox }) {
     const key = bbox.map((v) => v.toFixed(3)).join(',');
     if (key === lastBox) return;
     lastBox = key;
+    const generation = dataGeneration;
     try {
       const { overheards } = await api.overheardsInBox(bbox);
-      mergeOverheards(overheards);
+      if (generation === dataGeneration) mergeOverheards(overheards);
     } catch {
       lastBox = null;
     }
@@ -138,9 +146,13 @@ const app = {
 
   async refresh() {
     try {
-      state.data = await api.cityMap(state.city.id);
+      const data = await api.cityMap(state.city.id);
+      dataGeneration += 1;
+      state.data = data;
       lastBox = null;
       map.render(state.data);
+      // Yakın bakıştaysak görünür alanın sözlerini de tazele.
+      if (lastView) onViewChange(lastView);
       nudge.update();
       const openId = map.openId();
       const open = openId && state.data.overheards.find((o) => o.id === openId);
@@ -238,16 +250,19 @@ const app = {
       warnLocation(result.blocked);
       return result;
     }
-    const unlocked = result.places.filter((p) => p.newlyUnlocked);
+    // Yerel sözler yalnızca oradayken okunur: vardığın mekânların sözleri açılır, ayrıldıklarınınki kilitlenir.
+    const arrived = result.places.filter((p) => p.arrived);
+    const left = (result.left || []).map((id) => state.data?.places.find((p) => p.id === id)).filter(Boolean);
     if (result.city && result.city !== state.city.id) await app.selectCity(result.city, { keepView: true });
-    else if (unlocked.length) await app.refresh();
-    for (const p of unlocked) toast(t('toast.unlocked', { place: p.name }), { tone: 'success', timeout: 6000 });
+    else if (arrived.length || left.length) await app.refresh();
+    for (const p of arrived) toast(t('toast.arrived', { place: p.name }), { tone: 'success', timeout: 6000 });
+    for (const p of left) if (p.localCount) toast(t('toast.left', { place: p.name }));
     app.celebrate(result.newBadges);
-    if (!silent && !unlocked.length) {
+    if (!silent && !arrived.length) {
       if (result.places.length) toast(t('toast.checkedIn', { places: result.places.map((p) => p.name).join(', ') }));
       else toast(result.city ? t('toast.noPlacesHere') : t('toast.outsidePilot'));
     }
-    if (unlocked.length) refreshMe();
+    if (result.places.some((p) => p.firstVisit)) refreshMe();
     return result;
   },
 
@@ -356,7 +371,7 @@ function toggleExplore() {
       stopExplore();
       renderChrome();
     },
-    { enableHighAccuracy: true, maximumAge: 10000 },
+    { enableHighAccuracy: true, maximumAge: 0 },
   );
   state.exploring = true;
   toast(t('map.exploreOn'), { tone: 'success' });
@@ -483,6 +498,10 @@ async function boot() {
   await app.refresh();
   document.body.classList.add('is-ready');
   autoLocate();
+  // "Orada olma" süresi dolunca yerel sözler sunucuda kilitlenir; açık ekran da bunu yakalasın.
+  setInterval(() => {
+    if (document.visibilityState === 'visible') app.refresh();
+  }, 5 * 60000);
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('/sw.js').catch(() => {});

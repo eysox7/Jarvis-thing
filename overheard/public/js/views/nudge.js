@@ -24,16 +24,18 @@ export function createNudge(app) {
     const { position, data } = app.state;
     if (!position || !data) return hide();
     const nearest = data.places
-      .filter((p) => !p.visited && p.count > 0 && !dismissed.has(p.id))
+      .filter((p) => !p.here && p.localCount > 0 && !dismissed.has(p.id))
       .map((p) => ({ ...p, distance: distanceM(position.lat, position.lng, p.lat, p.lng) }))
       .filter((p) => p.distance <= MAX_DISTANCE_M)
       .sort((a, b) => a.distance - b.distance)[0];
     if (!nearest) return hide();
+    if (el.dataset.place !== nearest.id) delete el.dataset.hot;
+    el.dataset.place = nearest.id;
 
     clear(el).append(
       h('span', { class: 'nudge-icon', 'aria-hidden': 'true' }, '🔒'),
       h('button', { class: 'nudge-main', type: 'button', onclick: () => app.goToPlace(nearest) },
-        h('span', { class: 'nudge-title' }, t('nudge.waiting', { n: nearest.count })),
+        h('span', { class: 'nudge-title' }, t('nudge.waiting', { n: nearest.localCount })),
         h('span', { class: 'nudge-sub' }, `🚶 ${formatDistance(nearest.distance)} · ${nearest.name}`)),
       h('a', { class: 'btn btn-primary nudge-go', href: directionsUrl(nearest), target: '_blank', rel: 'noopener' }, t('bubble.directions')),
       h('button', {
@@ -53,6 +55,7 @@ export function createNudge(app) {
     for (const threshold of HOT_THRESHOLDS_M) {
       if (nearest.distance <= threshold && (warned.get(nearest.id) ?? Infinity) > threshold) {
         warned.set(nearest.id, threshold);
+        el.dataset.hot = String(threshold);
         toast(t('nudge.hot', { place: nearest.name, d: formatDistance(nearest.distance) }), { tone: 'success' });
       }
     }

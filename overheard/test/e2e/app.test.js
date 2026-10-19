@@ -85,7 +85,7 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
 
       // B mekâna "ışınlanır" (demo) → kilit açılır, aynı anda orada oldukları görülür.
       await b.page.locator('.leaflet-popup').getByRole('button', { name: /ışınlan/ }).click();
-      await b.page.locator('.toast', { hasText: 'Kadıköy İskelesi açıldı' }).waitFor();
+      await b.page.locator('.toast', { hasText: 'Kadıköy İskelesi: buradasın' }).waitFor();
       await b.page.locator('.leaflet-popup .bubble-quote', { hasText: 'Martılar bizden' }).waitFor();
       await b.page.locator('.leaflet-popup', { hasText: 'Sen de oradaydın' }).waitFor();
 
@@ -168,7 +168,7 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
 
       await loginAsGuest(b.page);
       await b.page.locator('#btn-locate').click();
-      await b.page.locator('.toast', { hasText: 'açıldı' }).first().waitFor();
+      await b.page.locator('.toast', { hasText: 'buradasın' }).first().waitFor();
       await b.page.evaluate((oid) => {
         const o = window.overheard.app.state.data.overheards.find((x) => x.id === oid);
         window.overheard.app.openOverheard(o);
@@ -192,13 +192,56 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await b.context.close();
     });
 
+    test('yerel söz ayrılınca yeniden kilitlenir; herkese açık söz her yerden okunur', async () => {
+      const a = await newUser(browser, srv.base, KADIKOY);
+      await loginAsGuest(a.page);
+      await a.page.locator('[data-nav="post"]').click();
+      await sheet(a.page).locator('textarea[name="text"]').fill('Herkese duyurulur: iskelede çay 20 lira olmuş.');
+      await sheet(a.page).getByText('Kadıköy İskelesi').waitFor();
+      await sheet(a.page).getByText('Herkese açık').click();
+      await sheet(a.page).getByRole('button', { name: /Bırak/ }).click();
+      await a.page.locator('.leaflet-popup .chip', { hasText: 'Herkese açık' }).waitFor();
+      const publicId = await a.page.evaluate(() => window.overheard.openBubbleId);
+
+      // Austin'deki biri herkese açık sözü okur; yerel olanları okuyamaz.
+      const far = await newUser(browser, srv.base, { latitude: 30.2672, longitude: -97.739, accuracy: 10 });
+      await loginAsGuest(far.page);
+      await far.page.evaluate(() => window.overheard.app.selectCity('istanbul'));
+      const view = await far.page.evaluate((id) => {
+        const list = window.overheard.app.state.data.overheards;
+        return { pub: list.find((o) => o.id === id), anyLocalOpen: list.some((o) => o.visibility === 'local' && !o.locked) };
+      }, publicId);
+      assert.equal(view.pub.locked, false);
+      assert.equal(view.pub.text, 'Herkese duyurulur: iskelede çay 20 lira olmuş.');
+      assert.equal(view.anyLocalOpen, false);
+
+      // Kadıköy'deyken yerel sözler açık; Moda'ya geçince kilitlenir.
+      const b = await newUser(browser, srv.base, KADIKOY);
+      await loginAsGuest(b.page);
+      await b.page.locator('#btn-locate').click();
+      await b.page.locator('.toast', { hasText: 'Kadıköy İskelesi: buradasın' }).waitFor();
+      const localOpen = () => b.page.evaluate(() => window.overheard.app.state.data.overheards
+        .filter((o) => o.placeId === 'ist-kadikoy-iskele' && o.visibility === 'local').map((o) => o.locked));
+      assert.ok((await localOpen()).every((locked) => locked === false));
+      await b.context.setGeolocation(MODA);
+      await b.page.locator('#btn-locate').click();
+      await b.page.locator('.toast', { hasText: 'Kadıköy İskelesi mekânından ayrıldın' }).waitFor();
+      assert.ok((await localOpen()).every((locked) => locked === true));
+
+      for (const u of [a, far, b]) {
+        assert.deepEqual(u.errors, []);
+        await u.context.close();
+      }
+    });
+
     test('Mekânlarım kilidi açılan ve bekleyen mekânları listeler', async () => {
       const u = await newUser(browser, srv.base, KADIKOY);
       await loginAsGuest(u.page);
       await u.page.locator('#btn-locate').click();
-      await u.page.locator('.toast', { hasText: 'Kadıköy İskelesi açıldı' }).waitFor();
+      await u.page.locator('.toast', { hasText: 'Kadıköy İskelesi: buradasın' }).waitFor();
       await u.page.locator('[data-nav="places"]').click();
-      await sheet(u.page).locator('.list-item:not(.is-locked)', { hasText: 'Kadıköy İskelesi' }).waitFor();
+      await sheet(u.page).locator('.list-item:not(.is-locked)', { hasText: 'Kadıköy İskelesi' }).first().waitFor();
+      await sheet(u.page).getByText('Şu an buradasın').waitFor();
       await sheet(u.page).locator('.list-item.is-locked').first().waitFor();
       // İlk check-in rozet kazandırır; profilde seri, şehir ilerlemesi ve rozet görünür.
       await u.page.locator('.toast', { hasText: 'Yeni rozet: İlk adım' }).waitFor();
@@ -216,18 +259,18 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await loginAsGuest(u.page);
       await u.page.locator('#btn-locate').click();
       const nudge = u.page.locator('#nudge');
-      await nudge.getByText('kilitli söz seni bekliyor').waitFor();
+      await nudge.getByText('yerel söz seni bekliyor').waitFor();
       await nudge.getByText('Bahariye Caddesi').waitFor();
 
       // Keşif modu: Bahariye'ye yaklaştıkça ipucu gelir (300 m eşiği).
       await u.page.locator('#btn-explore').click();
       await u.page.locator('.toast', { hasText: 'Keşif modu açık' }).waitFor();
       await u.context.setGeolocation({ latitude: 40.9862, longitude: 29.0305, accuracy: 12 });
-      await u.page.locator('.toast', { hasText: 'Sıcak! Bahariye Caddesi' }).waitFor();
+      await u.page.locator('#nudge[data-hot="300"]', { hasText: 'Bahariye Caddesi' }).waitFor();
 
       // Kartı kapatınca sıradaki kilitli mekân gösterilir.
       await nudge.getByRole('button', { name: 'Kapat' }).click();
-      await nudge.filter({ hasNotText: 'Bahariye Caddesi' }).getByText('kilitli söz seni bekliyor').waitFor();
+      await nudge.filter({ hasNotText: 'Bahariye Caddesi' }).getByText('yerel söz seni bekliyor').waitFor();
       assert.deepEqual(u.errors, []);
       await u.context.close();
     });
@@ -243,10 +286,11 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await sheet(u.page).locator('.profile-handle', { hasText: '@kalici_e2e' }).waitFor();
       assert.equal(await sheet(u.page).locator('form.upgrade').count(), 0);
 
-      // Konum izni verilmiş oturumda sayfayı yeniden açınca mekân kendiliğinden açılır.
+      // Konum izni verilmiş oturumda sayfayı yeniden açınca konum kendiliğinden alınır.
       await u.page.reload();
       await u.page.waitForSelector('body.is-ready');
-      await u.page.locator('.toast', { hasText: 'Kadıköy İskelesi açıldı' }).waitFor();
+      await u.page.waitForFunction(() => window.overheard.app.state.position !== null);
+      await u.page.waitForFunction(() => window.overheard.app.state.data.places.find((p) => p.id === 'ist-kadikoy-iskele').here);
       assert.deepEqual(u.errors, []);
       await u.context.close();
     });
@@ -254,7 +298,7 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
     test('ilk açılışta tanıtım gösterilir ve misafir olarak başlatır', async () => {
       const u = await newUser(browser, srv.base, KADIKOY, { intro: true });
       await sheet(u.page).getByText('Overheard\'e hoş geldin').waitFor();
-      await sheet(u.page).getByText('Okumak için oraya git').waitFor();
+      await sheet(u.page).getByText('Yerel sözler için oraya git').waitFor();
       await sheet(u.page).getByRole('button', { name: /misafir/ }).click();
       await u.page.waitForFunction(() => window.overheard.app.state.user?.isGuest);
       await u.page.reload();
@@ -361,13 +405,15 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       const info = u.page.locator('.gm-style-iw-c');
       await info.getByText('mekânında duyuldu').waitFor();
       await info.getByRole('button', { name: /ışınlan/ }).click();
-      await u.page.locator('.toast', { hasText: 'açıldı' }).first().waitFor();
+      await u.page.locator('.toast', { hasText: 'buradasın' }).first().waitFor();
       // Işınlanınca aynı balon açık hâliyle yeniden açılır; haritadaki balonlar da açılmıştır.
       await info.locator('.bubble-quote').waitFor();
-      await u.page.locator('.oh-gmarker .oh-bubble.is-open').first().waitFor();
+      // Kadıköy'deki yerel balonlar açıldı (herkese açık balonlar zaten açıktı, onları sayma).
+      const localOpen = u.page.locator('.oh-gmarker .oh-bubble.is-open:not(.is-public)').first();
+      await localOpen.waitFor();
       // Balonu kapatıp haritadan yeniden aç (bilgi penceresi balonları örtmesin diye önce kapat).
       await info.getByRole('button', { name: 'Close' }).click();
-      await u.page.locator('.oh-gmarker .oh-bubble.is-open').first().click();
+      await localOpen.click();
       await info.locator('.bubble-quote').waitFor();
       assert.deepEqual(u.errors, []);
       await u.context.close();
