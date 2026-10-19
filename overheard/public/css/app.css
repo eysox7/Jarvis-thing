@@ -536,6 +536,10 @@ button { cursor: pointer; }
   font-weight: 600;
 }
 .chip-hot { background: rgba(255, 184, 0, 0.22); }
+.chip-btn { border: 1px solid var(--line); cursor: pointer; }
+.chip-btn:hover { border-color: var(--accent); }
+.bubble-witnesses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.react:disabled { opacity: 0.45; cursor: not-allowed; }
 .pill { flex: none; padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; }
 
 /* Formlar */

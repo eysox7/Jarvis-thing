@@ -113,6 +113,45 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await b.context.close();
     });
 
+    test('"Ben de duydum" tanığı balonda görünür, söz sahibi ona yazar', async () => {
+      const a = await newUser(browser, srv.base, KADIKOY);
+      const b = await newUser(browser, srv.base, MODA);
+      await loginAsGuest(a.page);
+      await a.page.locator('[data-nav="post"]').click();
+      await sheet(a.page).locator('textarea[name="text"]').fill('İskelede biri: "Bu vapur da bizi beklemedi."');
+      await sheet(a.page).getByText('Kadıköy İskelesi').waitFor();
+      await sheet(a.page).getByRole('button', { name: /Bırak/ }).click();
+      await a.page.locator('.leaflet-popup .bubble-quote', { hasText: 'beklemedi' }).waitFor();
+      const id = await a.page.evaluate(() => window.overheard.openBubbleId);
+
+      await loginAsGuest(b.page);
+      const witness = await b.page.evaluate(() => window.overheard.app.state.user.handle);
+      await zoomTo(b.page, 40.9925, 29.0236);
+      await b.page.locator(`.oh-bubble[data-id="${id}"]`).click();
+      await b.page.locator('.leaflet-popup').getByRole('button', { name: /ışınlan/ }).click();
+      await b.page.locator('.leaflet-popup .bubble-quote', { hasText: 'beklemedi' }).waitFor();
+      await b.page.locator('.leaflet-popup .react[title="Ben de duydum"]').click();
+      await b.page.locator('.leaflet-popup .bubble-witnesses', { hasText: witness }).waitFor();
+
+      // Söz sahibi balonu yeniden açınca tanığı görür ve ona yazar.
+      await a.page.evaluate(() => window.overheard.app.refresh());
+      await a.page.evaluate((oid) => {
+        const o = window.overheard.app.state.data.overheards.find((x) => x.id === oid);
+        window.overheard.app.openOverheard(o);
+      }, id);
+      await a.page.locator('.leaflet-popup .bubble-witnesses .chip-btn', { hasText: witness }).last().click();
+      await sheet(a.page).getByText('İkiniz de bu sözü duydunuz').waitFor();
+      await sheet(a.page).locator('textarea').fill('Sen de oradaydın demek!');
+      await sheet(a.page).locator('textarea').press('Enter');
+      await sheet(a.page).locator('.msg.is-me', { hasText: 'oradaydın demek' }).waitFor();
+      await b.page.locator('.toast', { hasText: 'oradaydın demek' }).waitFor();
+
+      assert.deepEqual(a.errors, []);
+      assert.deepEqual(b.errors, []);
+      await a.context.close();
+      await b.context.close();
+    });
+
     test('Mekânlarım kilidi açılan ve bekleyen mekânları listeler', async () => {
       const u = await newUser(browser, srv.base, KADIKOY);
       await loginAsGuest(u.page);

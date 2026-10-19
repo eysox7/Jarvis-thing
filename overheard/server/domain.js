@@ -110,6 +110,7 @@ function buildContext(db, config, viewer, rows) {
     mine: new Map(),
     checkins: new Map(),
     mutual: new Map(),
+    witnesses: new Map(),
   };
   if (!ids.length) return ctx;
 
@@ -120,6 +121,16 @@ function buildContext(db, config, viewer, rows) {
   }
   if (!viewer) return ctx;
 
+  // "Ben de duydum" diyenler: o sırada orada olduğu doğrulanmış tanıklar.
+  for (const r of db.prepare(`
+    SELECT r.overheard_id, u.handle FROM reactions r JOIN users u ON u.id = r.user_id
+    WHERE r.kind = 'same' AND r.overheard_id IN (${marks})
+      AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = r.user_id)
+                                              OR (b.blocker_id = r.user_id AND b.blocked_id = ?))
+    ORDER BY r.created_at`).all(...ids, viewer.id, viewer.id)) {
+    if (!ctx.witnesses.has(r.overheard_id)) ctx.witnesses.set(r.overheard_id, []);
+    ctx.witnesses.get(r.overheard_id).push(r.handle);
+  }
   for (const r of db.prepare(`SELECT overheard_id, kind FROM reactions WHERE user_id = ? AND overheard_id IN (${marks})`).all(viewer.id, ...ids)) {
     if (!ctx.mine.has(r.overheard_id)) ctx.mine.set(r.overheard_id, []);
     ctx.mine.get(r.overheard_id).push(r.kind);
@@ -165,6 +176,9 @@ function serializeOverheard(row, ctx) {
   }
   const mine = row.user_id === ctx.viewer.id;
   const times = ctx.checkins.get(row.place_id) || [];
+  const myReactions = ctx.mine.get(row.id) || [];
+  const sameTime = !mine && times.some((t) => Math.abs(t - row.created_at) <= ctx.config.sameTimeWindowMs);
+  const witnessed = myReactions.includes('same');
   return {
     ...base,
     locked: false,
@@ -172,10 +186,15 @@ function serializeOverheard(row, ctx) {
     author: row.handle,
     mine,
     reactions,
-    myReactions: ctx.mine.get(row.id) || [],
-    sameTime: !mine && times.some((t) => Math.abs(t - row.created_at) <= ctx.config.sameTimeWindowMs),
+    myReactions,
+    sameTime,
     mutualPlaces: mine ? null : ctx.mutual.get(row.user_id) || 0,
     canMessage: !mine,
+    witnesses: (ctx.witnesses.get(row.id) || []).slice(0, 20),
+    // 👂 yalnızca söz duyulduğunda orada olanlar içindir.
+    canWitness: sameTime,
+    // Tanıklara yalnızca söz sahibi ya da diğer tanıklar yazabilir.
+    canMessageWitnesses: mine || witnessed,
   };
 }
 
@@ -210,6 +229,16 @@ export function getOverheard(db, config, viewer, id) {
   const row = loadOverheardRow(db, id, viewer?.id);
   return serializeOverheard(row, buildContext(db, config, viewer, [row]));
 }
+
+// Söz bırakıldığı sırada (± pencere) kullanıcının o mekânda check-in'i var mı? Söz sahibi hariç.
+function wasThereAtTheTime(db, config, user, row) {
+  if (row.user_id === user.id) return false;
+  return Boolean(db.prepare('SELECT 1 FROM checkins WHERE user_id = ? AND place_id = ? AND at BETWEEN ? AND ? LIMIT 1')
+    .get(user.id, row.place_id, row.created_at - config.sameTimeWindowMs, row.created_at + config.sameTimeWindowMs));
+}
+
+const isWitness = (db, overheardId, userId) => Boolean(
+  db.prepare("SELECT 1 FROM reactions WHERE overheard_id = ? AND user_id = ? AND kind = 'same'").get(overheardId, userId));
 
 // Okuma iznini doğrular; yoksa nedenini söyleyen bir hata fırlatır.
 function requireReadable(db, viewer, row) {
@@ -272,6 +301,7 @@ export function toggleReaction(db, config, user, id, kind) {
   const row = loadOverheardRow(db, id, user.id);
   requireReadable(db, user, row);
   const existing = db.prepare('SELECT 1 FROM reactions WHERE overheard_id = ? AND user_id = ? AND kind = ?').get(id, user.id, kind);
+  if (!existing && kind === 'same' && !wasThereAtTheTime(db, config, user, row)) throw new HttpError(403, 'not_same_time');
   if (existing) db.prepare('DELETE FROM reactions WHERE overheard_id = ? AND user_id = ? AND kind = ?').run(id, user.id, kind);
   else db.prepare('INSERT INTO reactions (overheard_id, user_id, kind, created_at) VALUES (?, ?, ?, ?)').run(id, user.id, kind, Date.now());
   return getOverheard(db, config, user, id);
@@ -347,25 +377,43 @@ function insertMessage(db, conversationId, senderId, body, now) {
   return { id: Number(lastInsertRowid), conversationId, sender: senderId, body, createdAt: now };
 }
 
-// Bir söz hakkında sözün sahibine yazar. Yalnızca o mekânda bulunmuş olanlar yazabilir.
-export function messageAboutOverheard(db, user, overheardId, rawBody) {
+// Bir söz hakkında yazar: varsayılan olarak sözün sahibine, `to` verilirse o sözün bir tanığına.
+// Yalnızca o mekânda bulunmuş olanlar yazabilir; tanıklara yalnızca söz sahibi ve diğer tanıklar.
+// İki kişi arasında aynı söz için tek konuşma vardır (kim başlatırsa başlatsın).
+export function messageAboutOverheard(db, user, overheardId, rawBody, to) {
   const body = cleanMessage(rawBody);
   const row = loadOverheardRow(db, overheardId, user.id);
-  if (row.user_id === user.id) throw new HttpError(400, 'own_overheard');
   requireReadable(db, user, row);
-  if (isBlocked(db, user.id, row.user_id)) throw new HttpError(403, 'blocked');
+  let recipientId = row.user_id;
+  let kind = 'author';
+  if (to) {
+    const target = db.prepare('SELECT id FROM users WHERE handle = ?').get(String(to));
+    if (!target) throw new HttpError(404, 'user_not_found');
+    if (target.id !== row.user_id) {
+      if (!isWitness(db, overheardId, target.id)) throw new HttpError(404, 'not_witness');
+      if (row.user_id !== user.id && !isWitness(db, overheardId, user.id)) throw new HttpError(403, 'witness_only');
+      kind = 'witness';
+    }
+    recipientId = target.id;
+  }
+  if (recipientId === user.id) throw new HttpError(400, 'own_overheard');
+  if (isBlocked(db, user.id, recipientId)) throw new HttpError(403, 'blocked');
   const now = Date.now();
   return transaction(db, () => {
-    let conv = db.prepare('SELECT * FROM conversations WHERE overheard_id = ? AND starter_id = ?').get(overheardId, user.id);
+    let conv = db.prepare(`
+      SELECT * FROM conversations WHERE overheard_id = ?
+        AND ((owner_id = ? AND starter_id = ?) OR (owner_id = ? AND starter_id = ?))`)
+      .get(overheardId, recipientId, user.id, user.id, recipientId);
     if (!conv) {
       const id = newId();
-      db.prepare(`INSERT INTO conversations (id, overheard_id, owner_id, starter_id, created_at, last_at, starter_read_at)
-                  VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id, overheardId, row.user_id, user.id, now, now, now);
+      db.prepare(`INSERT INTO conversations (id, overheard_id, owner_id, starter_id, kind, created_at, last_at, starter_read_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(id, overheardId, recipientId, user.id, kind, now, now, now);
       conv = db.prepare('SELECT * FROM conversations WHERE id = ?').get(id);
     }
     const message = insertMessage(db, conv.id, user.id, body, now);
-    db.prepare('UPDATE conversations SET last_at = ?, starter_read_at = ? WHERE id = ?').run(now, now, conv.id);
-    return { conversationId: conv.id, recipientId: row.user_id, message };
+    const readColumn = conv.owner_id === user.id ? 'owner_read_at' : 'starter_read_at';
+    db.prepare(`UPDATE conversations SET last_at = ?, ${readColumn} = ? WHERE id = ?`).run(now, now, conv.id);
+    return { conversationId: conv.id, recipientId, message };
   });
 }
 
@@ -411,6 +459,7 @@ export function listConversations(db, user) {
         placeName: c.place_name,
         with: amOwner ? c.starter_handle : c.owner_handle,
         role: amOwner ? 'owner' : 'starter',
+        kind: c.kind,
         lastAt: c.last_at,
         lastMessage: c.last_body,
         lastFromMe: c.last_sender === user.id,
@@ -432,6 +481,7 @@ export function getConversation(db, user, id) {
   return {
     id: conv.id,
     role: amOwner ? 'owner' : 'starter',
+    kind: conv.kind,
     with: other.handle,
     overheard: { id: overheard.id, text: overheard.text, placeName: overheard.place_name, createdAt: overheard.created_at },
     mutualPlaces: mutualPlaces(db, user.id, otherId),

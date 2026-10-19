@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 // Her sürüm bir öncekinin üzerine uygulanır; PRAGMA user_version hangisinde kaldığımızı tutar.
-const MIGRATIONS = [
+export const MIGRATIONS = [
   `
   CREATE TABLE users (
     id          INTEGER PRIMARY KEY,
@@ -103,6 +103,28 @@ const MIGRATIONS = [
     PRIMARY KEY (blocker_id, blocked_id)
   );
   `,
+  // v2: Konuşmalar artık yalnızca söz sahibiyle değil, aynı sözün tanıkları arasında da açılabilir.
+  // owner_id = yazılan kişi (söz sahibi ya da tanık), kind = 'author' | 'witness'.
+  `
+  CREATE TABLE conversations_v2 (
+    id            TEXT PRIMARY KEY,
+    overheard_id  TEXT NOT NULL REFERENCES overheards(id) ON DELETE CASCADE,
+    owner_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    starter_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind          TEXT NOT NULL DEFAULT 'author',
+    created_at    INTEGER NOT NULL,
+    last_at       INTEGER NOT NULL,
+    owner_read_at   INTEGER NOT NULL DEFAULT 0,
+    starter_read_at INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (overheard_id, owner_id, starter_id)
+  );
+  INSERT INTO conversations_v2 (id, overheard_id, owner_id, starter_id, created_at, last_at, owner_read_at, starter_read_at)
+    SELECT id, overheard_id, owner_id, starter_id, created_at, last_at, owner_read_at, starter_read_at FROM conversations;
+  DROP TABLE conversations;
+  ALTER TABLE conversations_v2 RENAME TO conversations;
+  CREATE INDEX conversations_owner ON conversations(owner_id, last_at);
+  CREATE INDEX conversations_starter ON conversations(starter_id, last_at);
+  `,
 ];
 
 export function openDb(path) {
@@ -116,11 +138,21 @@ export function openDb(path) {
 
 function migrate(db) {
   const { user_version: current } = db.prepare('PRAGMA user_version').get();
-  for (let v = current; v < MIGRATIONS.length; v++) {
-    transaction(db, () => {
-      db.exec(MIGRATIONS[v]);
-      db.exec(`PRAGMA user_version = ${v + 1}`);
-    });
+  if (current >= MIGRATIONS.length) return;
+  // Tablo yeniden kurulurken DROP TABLE'ın bağlı satırları silmemesi için yabancı anahtarlar
+  // geçici olarak kapatılır (bu PRAGMA işlem içinde değiştirilemez), sonunda bütünlük denetlenir.
+  db.exec('PRAGMA foreign_keys = OFF;');
+  try {
+    for (let v = current; v < MIGRATIONS.length; v++) {
+      transaction(db, () => {
+        db.exec(MIGRATIONS[v]);
+        db.exec(`PRAGMA user_version = ${v + 1}`);
+      });
+    }
+    const broken = db.prepare('PRAGMA foreign_key_check').all();
+    if (broken.length) throw new Error(`foreign key check failed: ${JSON.stringify(broken.slice(0, 3))}`);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON;');
   }
 }
 

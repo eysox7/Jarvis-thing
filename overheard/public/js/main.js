@@ -141,7 +141,7 @@ const app = {
     }
   },
 
-  startMessage: (o) => openNewMessage(app, o),
+  startMessage: (o, to) => openNewMessage(app, o, to),
 
   async reportOverheard(o) {
     if (!state.user) return app.openAuth();

@@ -32,11 +32,14 @@ function openCard(o, app) {
   const reactions = app.state.config.reactions.map((kind) => {
     const count = o.reactions[kind] || 0;
     const pressed = o.myReactions.includes(kind);
+    // 👂 "Ben de duydum" bir tanıklık iddiasıdır: yalnızca o sırada orada olanlara açık.
+    const blocked = kind === 'same' && !pressed && !o.canWitness;
     return h('button', {
       class: `react${pressed ? ' is-pressed' : ''}`,
       type: 'button',
-      title: t(`react.${kind}`),
+      title: blocked ? t('react.sameOnly') : t(`react.${kind}`),
       'aria-pressed': pressed ? 'true' : 'false',
+      disabled: blocked,
       onclick: () => app.react(o, kind),
     }, h('span', { 'aria-hidden': 'true' }, REACTION_EMOJI[kind]), count ? h('span', { class: 'react-count' }, String(count)) : null,
     h('span', { class: 'visually-hidden' }, t(`react.${kind}`)));
@@ -46,6 +49,15 @@ function openCard(o, app) {
     o.sameTime ? h('span', { class: 'chip chip-hot' }, `👂 ${t('bubble.sameTime')}`) : null,
     o.mutualPlaces ? h('span', { class: 'chip' }, `📍 ${t('bubble.mutual', { n: o.mutualPlaces })}`) : null,
   ].filter(Boolean);
+
+  const me = app.state.user?.handle;
+  const witnesses = o.witnesses.length
+    ? h('div', { class: 'bubble-witnesses' },
+      h('span', { class: 'muted small' }, `👂 ${t('bubble.witnesses')}:`),
+      o.witnesses.map((handle) => (o.canMessageWitnesses && handle !== me
+        ? h('button', { class: 'chip chip-btn', type: 'button', title: t('bubble.writeWitness', { handle }), onclick: () => app.startMessage(o, handle) }, `@${handle}`)
+        : h('span', { class: 'chip' }, `@${handle}`))))
+    : null;
 
   return h('div', { class: 'bubble-card' },
     h('blockquote', { class: 'bubble-quote' }, o.text),
@@ -57,6 +69,7 @@ function openCard(o, app) {
       h('time', { datetime: new Date(o.createdAt).toISOString() }, timeAgo(o.createdAt))),
     badges.length ? h('div', { class: 'bubble-badges' }, badges) : null,
     h('div', { class: 'bubble-reactions' }, reactions),
+    witnesses,
     h('div', { class: 'bubble-actions' },
       o.canMessage ? h('button', { class: 'btn btn-primary', type: 'button', onclick: () => app.startMessage(o) }, `💬 ${t('bubble.message')}`) : null,
       o.mine

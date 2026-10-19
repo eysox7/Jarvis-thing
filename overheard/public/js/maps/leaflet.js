@@ -62,7 +62,7 @@ export function createLeafletMap(el, handlers) {
       maxWidth: 330,
       minWidth: 250,
       offset: [0, -4],
-      autoPanPaddingTopLeft: [16, 130],
+      autoPanPaddingTopLeft: [16, 176],
       autoPanPaddingBottomRight: [16, 110],
     }).setLatLng(latlng).setContent(content).openOn(map);
     current.overheardId = overheardId;

@@ -136,7 +136,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireUser(ctx);
     limit(`message:${user.id}`, 60, 3600000);
     const body = await readJson(ctx.req);
-    return deliver(domain.messageAboutOverheard(db, user, ctx.params.id, body.body), user);
+    return deliver(domain.messageAboutOverheard(db, user, ctx.params.id, body.body, body.to), user);
   });
 
   router.get('/api/conversations', (ctx) => ({ conversations: domain.listConversations(db, requireUser(ctx)) }));

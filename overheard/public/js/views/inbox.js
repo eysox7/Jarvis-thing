@@ -98,31 +98,39 @@ export async function openConversation(app, id) {
           h('span', { class: 'muted small' }, `${t('chat.mutual')}: `),
           conv.mutualPlaces.map((p) => h('span', { class: 'chip' }, `📍 ${p.name}`)))
         : null,
-      h('p', { class: 'muted small' }, conv.role === 'owner' ? t('chat.ownerHint') : t('chat.starterHint'))),
+      h('p', { class: 'muted small' }, chatHint(conv))),
     list,
     box.el);
   list.scrollTop = list.scrollHeight;
   box.focus();
 }
 
-// Bir söz hakkında ilk mesaj. Konuşma zaten varsa aynı konuşmaya eklenir.
-export function openNewMessage(app, o) {
-  if (!app.state.user) return app.openAuth(() => openNewMessage(app, o));
+function chatHint(conv) {
+  if (conv.kind === 'witness') return t('chat.witnessHint');
+  return conv.role === 'owner' ? t('chat.ownerHint') : t('chat.starterHint');
+}
+
+// Bir söz hakkında ilk mesaj: sözün sahibine ya da (to verilirse) bir tanığa.
+// İki kişi arasında bu söz için konuşma zaten varsa ona eklenir.
+export function openNewMessage(app, o, to) {
+  if (!app.state.user) return app.openAuth(() => openNewMessage(app, o, to));
+  const recipient = to || o.author;
+  const toWitness = recipient !== o.author;
   const box = composer({
     placeholder: t('chat.placeholder'),
     onSend: async (text) => {
-      const { conversationId } = await api.messageAbout(o.id, text);
+      const { conversationId } = await api.messageAbout(o.id, text, toWitness ? recipient : undefined);
       await openConversation(app, conversationId);
     },
   });
   openSheet({
     key: 'new-message',
-    title: `@${o.author}`,
+    title: `@${recipient}`,
     body: h('div', { class: 'chat' },
       h('div', { class: 'chat-context' },
         h('p', { class: 'chat-about' }, t('chat.about')),
         h('blockquote', { class: 'chat-quote' }, o.text, h('span', { class: 'chat-place' }, ` — ${o.placeName}`)),
-        h('p', { class: 'muted small' }, t('chat.starterHint'))),
+        h('p', { class: 'muted small' }, toWitness || o.mine ? t('chat.witnessHint') : t('chat.starterHint'))),
       box.el),
   });
   setTimeout(box.focus, 50);

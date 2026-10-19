@@ -24,11 +24,13 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
       mekâna gitme → açma → tepki → canlı mesajlaşma; Mekânlarım; dil değişimi; Google Maps
       uyarlayıcısı (test için küçük bir Google Maps taklidiyle), Google yüklenemezse Leaflet'e
       dönüş, CSP. `npm run test:e2e`.
+- [x] **5. "Ben de duydum" tanıkları** — 👂 artık bir tanıklık iddiası: yalnızca söz söylendiği
+      sırada (±2 saat) o mekânda check-in'i olan basabilir. Tanıklar balonda listelenir; söz
+      sahibi ve tanıklar birbirine yazabilir. Konuşmalar iki kişi arasında söz başına tek
+      (kim başlatırsa başlatsın); şema v2 göçü (mesajlar korunarak tablo yeniden kurulur).
 
 ## Sıradakiler
 
-- [ ] **5. "Ben de duydum" tanıkları** — Aynı sözü 👂 ile işaretleyen ve o sırada orada bulunan
-      kişiler birbirini görür; tanıklar arasında da konuşma açılabilir.
 - [ ] **6. Anonim paylaşım** — Söz bırakırken "anonim" seçeneği; balonda kullanıcı adı yerine
       "anonim kulak", mesajlaşmada kimlik söz sahibi isterse açılır.
 - [ ] **7. Keşif motivasyonu** — Rozetler (ilk mekân, 5 mekân, 3 şehir…), haftalık keşif serisi,
