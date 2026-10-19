@@ -478,6 +478,7 @@ button { cursor: pointer; }
 }
 .sheet-grip { width: 42px; height: 5px; border-radius: 99px; background: var(--line); margin: 8px auto 0; flex: none; }
 .sheet-head { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 18px; flex: none; }
+.sheet-title:focus { outline: none; }
 .sheet-title { flex: 1; margin: 0; font-size: 19px; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Alt boşluk: sekme çubuğundan taşan "Duydum" düğmesi son içeriği örtmesin. */
 .sheet-body { padding: 4px 18px 44px; overflow-y: auto; overscroll-behavior: contain; }
@@ -725,6 +726,14 @@ body.has-nudge .toasts { bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 116
 @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(47, 128, 255, 0.5); } 100% { box-shadow: 0 0 0 18px rgba(47, 128, 255, 0); } }
 @keyframes breathe { 50% { box-shadow: 0 0 0 6px var(--accent-soft); } }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Geniş ekran: şeritler ekranı boydan boya kaplamasın. */
+@media (min-width: 720px) {
+  .demo-hint { right: auto; max-width: 520px; }
+  /* transform yerine margin: giriş animasyonu transform'u ezmesin. */
+  .nudge { left: 0; right: 0; margin: 0 auto; width: min(560px, calc(100% - 140px)); }
+  .tabbar { grid-template-columns: repeat(5, minmax(0, 132px)); justify-content: center; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

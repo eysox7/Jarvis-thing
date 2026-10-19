@@ -44,7 +44,11 @@ export function openSheet({ key, title, body, onClose, back }) {
     backdrop.hidden = false;
     dialog.show();
   }
-  dialog.querySelector('.sheet-title')?.setAttribute('id', 'sheet-title');
+  // Ekran okuyucular yeni sayfayı duysun: odak başlığa taşınır (görünümler isterse bir alana alır).
+  const heading = dialog.querySelector('.sheet-title');
+  heading.tabIndex = -1;
+  heading.focus({ preventScroll: true });
+  heading.id = 'sheet-title';
   dialog.setAttribute('aria-labelledby', 'sheet-title');
   return dialog;
 }

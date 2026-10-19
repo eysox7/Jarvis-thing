@@ -197,7 +197,9 @@ function buildContext(db, config, viewer, rows) {
     if (!ctx.mine.has(r.overheard_id)) ctx.mine.set(r.overheard_id, []);
     ctx.mine.get(r.overheard_id).push(r.kind);
   }
-  for (const r of db.prepare('SELECT place_id, at FROM checkins WHERE user_id = ?').all(viewer.id)) {
+  // Yalnızca bu sözlerin mekânlarındaki check-in'ler ("aynı anda oradaydın" için).
+  const placeIds = [...new Set(rows.map((r) => r.place_id))];
+  for (const r of db.prepare(`SELECT place_id, at FROM checkins WHERE user_id = ? AND place_id IN (${placeIds.map(() => '?').join(',')})`).all(viewer.id, ...placeIds)) {
     if (!ctx.checkins.has(r.place_id)) ctx.checkins.set(r.place_id, []);
     ctx.checkins.get(r.place_id).push(r.at);
   }
