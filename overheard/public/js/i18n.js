@@ -233,6 +233,9 @@ const STRINGS = {
     'room.placeholder': 'Odaya yaz…',
     'room.toast': '💬 {place} odası · @{author}: {body}',
     'room.closed': '{place} mekânından ayrıldın; odadan çıktın.',
+    'share.button': 'Paylaş',
+    'share.footer': 'Ne duydun? overheard\'de bırak.',
+    'share.downloaded': 'Paylaşım görseli indirildi 📤',
   },
   en: {
     'app.tagline': 'Drop what you heard. Local ones can only be read by people who are there right now.',
@@ -468,6 +471,9 @@ const STRINGS = {
     'room.placeholder': 'Write to the room…',
     'room.toast': '💬 {place} room · @{author}: {body}',
     'room.closed': 'You left {place}; you left the room.',
+    'share.button': 'Share',
+    'share.footer': 'Heard something? Drop it on overheard.',
+    'share.downloaded': 'Share image downloaded 📤',
   },
 };
 

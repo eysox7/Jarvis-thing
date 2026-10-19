@@ -12,6 +12,7 @@ import { openProfile } from './views/profile.js';
 import { createNudge } from './views/nudge.js';
 import { maybeShowIntro } from './views/intro.js';
 import { openRoom, handleRoomMessage, closeRoomIfLeft } from './views/room.js';
+import { shareOverheard } from './share.js';
 
 const CITY_KEY = 'oh_city';
 const HINT_KEY = 'oh_demo_hint_seen';
@@ -197,6 +198,12 @@ const app = {
   },
 
   startMessage: (o, to) => openNewMessage(app, o, to),
+
+  async share(o) {
+    const city = state.config.cities.find((c) => c.id === o.cityId);
+    const result = await shareOverheard(o, city?.name);
+    if (result === 'downloaded') toast(t('share.downloaded'), { tone: 'success' });
+  },
 
   async reportOverheard(o) {
     if (!state.user) return app.openAuth();

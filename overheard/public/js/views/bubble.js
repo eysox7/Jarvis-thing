@@ -80,6 +80,8 @@ function openCard(o, app) {
     witnesses,
     h('div', { class: 'bubble-actions' },
       o.canMessage ? h('button', { class: 'btn btn-primary', type: 'button', onclick: () => app.startMessage(o) }, `💬 ${t('bubble.message')}`) : null,
+      // Yalnızca herkese açık sözler dışarı paylaşılır; yerel sözler yerinde kalır.
+      o.visibility === 'public' ? h('button', { class: 'btn', type: 'button', onclick: () => app.share(o) }, `📤 ${t('share.button')}`) : null,
       o.mine
         ? h('button', { class: 'btn btn-ghost btn-danger', type: 'button', onclick: () => app.deleteOverheard(o) }, t('bubble.delete'))
         : h('span', { class: 'bubble-more' },

@@ -365,6 +365,35 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       }
     });
 
+    test('herkese açık sözden paylaşım görseli (1080×1920 PNG)', async () => {
+      const u = await newUser(browser, srv.base, KADIKOY);
+      // Masaüstü tarayıcıda dosya paylaşımı yok: görsel indirilir.
+      await u.page.evaluate(() => { navigator.canShare = undefined; });
+      const id = await u.page.evaluate(() => {
+        const o = window.overheard.app.state.data.overheards.find((x) => x.visibility === 'public');
+        window.overheard.app.openOverheard(o);
+        return o.id;
+      });
+      assert.ok(id);
+      const [download] = await Promise.all([
+        u.page.waitForEvent('download'),
+        u.page.locator('.leaflet-popup').last().getByRole('button', { name: /Paylaş/ }).click(),
+      ]);
+      assert.equal(download.suggestedFilename(), 'overheard.png');
+      const png = await (await import('node:fs/promises')).readFile(await download.path());
+      assert.equal(png.subarray(1, 4).toString(), 'PNG');
+      assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1080, 1920]);
+      // Yerel sözlerde paylaş düğmesi yok.
+      await u.page.evaluate(() => {
+        const o = window.overheard.app.state.data.overheards.find((x) => x.visibility === 'local' && x.locked);
+        window.overheard.app.openOverheard(o);
+      });
+      await u.page.locator('.leaflet-popup', { hasText: 'mekânında duyuldu' }).last().waitFor();
+      assert.equal(await u.page.locator('.leaflet-popup').last().getByRole('button', { name: /Paylaş/ }).count(), 0);
+      assert.deepEqual(u.errors, []);
+      await u.context.close();
+    });
+
     test('İngilizce arayüze geçiş', async () => {
       const u = await newUser(browser, srv.base, KADIKOY);
       await u.page.locator('[data-nav="profile"]').click();

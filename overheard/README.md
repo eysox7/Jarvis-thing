@@ -49,6 +49,8 @@ balonların altında sokak haritası görünür.</sub>
   mesajlar 12 saat sonra silinir.
 - **Seni bekleyen sözler.** Haritanın altındaki kart en yakın, yerel sözü olan mekânı ve orada kaç
   sözün beklediğini gösterir; keşif modunda yaklaştıkça "Sıcak!" ipuçları gelir.
+- **Paylaşılabilir kartlar.** Herkese açık bir sözü tek dokunuşla Instagram hikâyesi boyutunda
+  bir görsele çevirip paylaş (yazar adı görselde yer almaz; yerel sözler paylaşılamaz).
 - **Söz bırakma.** Yalnızca o mekândayken. Yakında kayıtlı mekân yoksa yeriyle birlikte yeni
   mekânı sen açarsın.
 - **Aynı anda oradaydınız.** Söz bırakıldığında sen de oradaysan balonda "Sen de oradaydın!"
@@ -219,6 +221,7 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | `POST /api/overheards/:id/messages` | `{body, to?}`: sahibine ya da (`to`) bir tanığa yazar |
 | `GET /api/conversations` · `GET /api/conversations/:id?before=` · `POST …/messages` | Mesajlar 100'erli sayfalanır |
 | `POST /api/conversations/:id/reveal` | Anonim söz sahibi kimliğini açar |
+| `GET/POST /api/places/:id/room` | Mekân odası (yalnızca o an mekândayken) |
 | `POST /api/overheards/:id/block-author` · `POST /api/users/:handle/block` | Engelleme |
 | `GET /api/admin/reports` · `POST …/overheards/:id/restore` · `DELETE …/overheards/:id` · `POST …/users/:handle/ban` | Moderasyon (yalnızca `OVERHEARD_ADMINS`) |
 | `GET /api/events` | SSE akışı (`dm`, `reveal`, `room` olayları) |

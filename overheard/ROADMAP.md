@@ -93,7 +93,9 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       ve yazılır, mesajlar 12 saat sonra silinir, kişisel veriler maskelenir, engellenenler
       görünmez, mesajlar o an oradakilere canlı (SSE) gider. Haritada oda düğmesi (yanında kişi
       sayısı), varış bildiriminde "Odaya gir", Mekânlarım'da giriş; ayrılınca oda kapanır. Şema v8.
-- [ ] **16. Paylaşılabilir kartlar** — Herkese açık sözden Instagram hikâyesi boyutunda görsel.
+- [x] **16. Paylaşılabilir kartlar** — Herkese açık sözden 1080×1920 hikâye görseli (konuşma balonu,
+      yer, logo; yazar adı yok). Telefonda sistem paylaşım menüsü, masaüstünde indirme. Yerel
+      sözlerde paylaş düğmesi yok.
 - [ ] **17. Haftanın en iyileri** — Şehir başına en çok tepki alan herkese açık sözler.
 - [ ] **18. 24 saatlik sözler** — İsteğe bağlı, bir gün sonra kaybolan sözler.
 
