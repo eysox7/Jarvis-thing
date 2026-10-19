@@ -56,6 +56,22 @@ Gereken tek şey **Node.js 22.13+** (yerleşik `node:sqlite` kullanılır; çal�
 cd overheard
 npm start            # http://localhost:8787
 npm test             # API testleri
+npm run test:e2e     # tarayıcıda uçtan uca testler (Playwright + Chromium)
+```
+
+### Google Maps
+
+`GOOGLE_MAPS_API_KEY` verilirse harita Google Maps JavaScript API ile çizilir: balonlar
+`OverlayView` ile aynı görünümde, açılan balon `InfoWindow` içinde. Anahtar yoksa, betik
+yüklenemezse ya da Google anahtarı reddederse uygulama kendiliğinden OpenStreetMap'e (Leaflet)
+döner. Kilitli sözlerdeki "Yol tarifi" her iki durumda da Google Maps yürüyüş rotasını açar.
+
+Anahtar tarayıcıya gider (Maps JS anahtarları doğası gereği herkese açıktır). Google Cloud
+konsolunda anahtarı **HTTP yönlendiren** kısıtıyla yalnızca kendi alan adınıza ve yalnızca
+*Maps JavaScript API*'ye kısıtlayın.
+
+```bash
+GOOGLE_MAPS_API_KEY=AIza... OVERHEARD_DEMO=0 npm start
 ```
 
 Ortam değişkenleri:
@@ -66,7 +82,7 @@ Ortam değişkenleri:
 | `OVERHEARD_DB` | `data/overheard.db` | SQLite dosyası |
 | `OVERHEARD_DEMO` | `1` | Demo modu: örnek sözler, misafir hesabı, haritaya uzun basınca ışınlanma. Üretimde `0`. |
 | `OVERHEARD_SECURE_COOKIES` | `0` | HTTPS arkasında `1` yap |
-| `GOOGLE_MAPS_API_KEY` | — | Google Maps entegrasyonu için (yol haritasında) |
+| `GOOGLE_MAPS_API_KEY` | — | Tanımlıysa harita Google Maps ile çizilir (yoksa OpenStreetMap) |
 
 ### Demo modunda deneme
 
@@ -90,8 +106,10 @@ overheard/
     events.js       Server-Sent Events (canlı mesaj)
     geo.js          mesafe, sınır kutusu, balon yerleşimi
     data/           pilot şehirler, mekânlar, demo sözleri
-  public/           derleme adımı olmayan mobil web uygulaması (ES modülleri + Leaflet)
-  test/             node:test ile API testleri
+  public/           derleme adımı olmayan mobil web uygulaması (ES modülleri)
+    js/map.js       harita cephesi: Google Maps ya da Leaflet seçer, gerekirse geri döner
+    js/maps/        ortak balon planı + Leaflet ve Google Maps uyarlayıcıları
+  test/             node:test ile API testleri, test/e2e/ altında Playwright senaryoları
 ```
 
 ### Görünürlük kuralı

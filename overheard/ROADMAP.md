@@ -15,15 +15,18 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
       etiketlerin noktaya inmesi, keşif modu (yürüdükçe check-in), demo ışınlanma, söz bırakma,
       Mekânlarım (ortak mekânlar + seni bekleyen kilitli mekânlar), Mesajlar, Profil, TR/EN,
       PWA kabuğu.
+- [x] **3. Google Maps entegrasyonu** — `GOOGLE_MAPS_API_KEY` tanımlıysa Google Maps JS API +
+      `OverlayView` ile aynı konuşma balonları ve `InfoWindow` ile açılan büyük balon; anahtar
+      yoksa, betik yüklenemezse ya da anahtar reddedilirse otomatik Leaflet/OSM. Ortak plan
+      (`maps/common.js`), iki uyarlayıcı (`maps/leaflet.js`, `maps/google.js`), tek cephe (`map.js`).
+      CSP, Google alan adlarına yalnızca anahtar varken izin verir.
+- [x] **4. Uçtan uca tarayıcı testleri** — Playwright: iki kullanıcıyla söz → kilitli görme →
+      mekâna gitme → açma → tepki → canlı mesajlaşma; Mekânlarım; dil değişimi; Google Maps
+      uyarlayıcısı (test için küçük bir Google Maps taklidiyle), Google yüklenemezse Leaflet'e
+      dönüş, CSP. `npm run test:e2e`.
 
 ## Sıradakiler
 
-- [ ] **3. Google Maps entegrasyonu** — `GOOGLE_MAPS_API_KEY` tanımlıysa Google Maps JS API +
-      `OverlayView` ile aynı baloncuklar; yoksa Leaflet/OSM. Harita sağlayıcısını soyutla
-      (`map.js` arayüzü korunur). Kilitli sözlerde "Yol tarifi" zaten Google Maps'e gider.
-- [ ] **4. Uçtan uca tarayıcı testi** — Playwright ile iki kullanıcı: biri söz bırakır, diğeri
-      kilitli görür, mekâna gidip açar, tepki verir, mesaj atar; mesaj SSE ile canlı düşer.
-      `npm run test:e2e`.
 - [ ] **5. "Ben de duydum" tanıkları** — Aynı sözü 👂 ile işaretleyen ve o sırada orada bulunan
       kişiler birbirini görür; tanıklar arasında da konuşma açılabilir.
 - [ ] **6. Anonim paylaşım** — Söz bırakırken "anonim" seçeneği; balonda kullanıcı adı yerine

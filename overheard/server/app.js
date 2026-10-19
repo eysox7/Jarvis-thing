@@ -24,16 +24,28 @@ const STREAMING = Symbol('streaming');
 
 function securityHeaders(config) {
   const tiles = 'https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org';
-  const google = config.googleMapsKey ? ' https://*.googleapis.com https://*.gstatic.com https://*.google.com' : '';
+  // Google Maps JS API'nin belgelenmiş izin listesi; yalnızca anahtar tanımlıysa açılır.
+  const g = config.googleMapsKey
+    ? {
+      script: " 'unsafe-eval' https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com https://*.googleusercontent.com blob:",
+      img: ' https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com',
+      style: ' https://fonts.googleapis.com',
+      connect: ' https://*.googleapis.com https://*.google.com https://*.gstatic.com data: blob:',
+      font: ' https://fonts.gstatic.com',
+      frame: ' https://*.google.com',
+    }
+    : { script: '', img: '', style: '', connect: '', font: '', frame: '' };
   return {
     'content-security-policy': [
       "default-src 'self'",
-      `img-src 'self' data: blob: ${tiles}${google}`,
-      // Leaflet işaretçileri konumlandırmak için satır içi stil kullanır.
-      `style-src 'self' 'unsafe-inline'${google ? ' https://fonts.googleapis.com' : ''}`,
-      `script-src 'self'${google}`,
-      `connect-src 'self'${google}`,
-      `font-src 'self'${google ? ' https://fonts.gstatic.com' : ''}`,
+      `img-src 'self' data: blob: ${tiles}${g.img}`,
+      // Leaflet ve Google Maps işaretçileri konumlandırmak için satır içi stil kullanır.
+      `style-src 'self' 'unsafe-inline'${g.style}`,
+      `script-src 'self'${g.script}`,
+      `connect-src 'self'${g.connect}`,
+      `font-src 'self'${g.font}`,
+      `frame-src${g.frame || " 'none'"}`,
+      "worker-src 'self' blob:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

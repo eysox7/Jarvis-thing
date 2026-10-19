@@ -134,7 +134,8 @@ const app = {
     try {
       const { overheard } = await api.react(o.id, kind);
       replaceOverheard(overheard);
-      app.openOverheard(overheard);
+      if (map.openId() === overheard.id) map.replaceOpen(bubbleContent(overheard, app));
+      else app.openOverheard(overheard);
     } catch (err) {
       toast(errorText(err), { tone: 'error' });
     }
@@ -373,11 +374,12 @@ async function boot() {
   const saved = storage.get(CITY_KEY);
   state.city = config.cities.find((c) => c.id === saved) || config.cities[0];
 
-  map = createMap(document.getElementById('map'), {
+  map = await createMap(document.getElementById('map'), {
     onBubbleClick: (o) => app.openOverheard(o),
     onPlaceClick: (p) => map.flyTo(p.lat, p.lng, 16),
     onLongPress,
-  });
+    onProviderFallback: () => toast(t('toast.mapFallback')),
+  }, config);
   map.setCity(state.city);
 
   bindNav();
@@ -398,4 +400,8 @@ boot().catch((err) => {
 });
 
 // Testlerin ve hata ayıklamanın uygulama durumuna erişebilmesi için.
-window.overheard = { app, get openBubbleId() { return map?.openId() ?? null; } };
+window.overheard = {
+  app,
+  get openBubbleId() { return map?.openId() ?? null; },
+  get mapProvider() { return map?.provider ?? null; },
+};

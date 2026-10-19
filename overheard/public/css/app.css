@@ -344,6 +344,24 @@ button { cursor: pointer; }
 .oh-popup a.leaflet-popup-close-button { top: 8px; right: 10px; color: var(--muted); font-size: 22px; }
 .oh-popup-small .leaflet-popup-content { margin: 12px; }
 
+/* Google Maps bilgi penceresini aynı konuşma balonuna benzet. */
+.gm-style .gm-style-iw-c {
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  padding: 0 !important;
+}
+.gm-style .gm-style-iw-d { overflow: auto !important; padding: 0 18px 14px; }
+.gm-style .gm-style-iw-tc::after { background: var(--paper); }
+.gm-style .gm-style-iw-ch { padding-top: 10px; }
+.gm-style .gm-style-iw-chr button span { background-color: var(--muted) !important; }
+.gm-style .oh-iw { font: 15px/1.45 var(--font); color: var(--ink); }
+.gm-style .oh-iw p { margin: 0; }
+.gm-style .oh-iw-small { padding-top: 4px; }
+.gm-style a.btn { color: var(--ink); }
+.gm-style a.btn-primary { color: var(--accent-ink); }
+
 .bubble-card { display: flex; flex-direction: column; gap: 10px; }
 .bubble-quote {
   margin: 0;
