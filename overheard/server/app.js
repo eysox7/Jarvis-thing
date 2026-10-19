@@ -53,8 +53,12 @@ function securityHeaders(config) {
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'strict-origin-when-cross-origin',
     'permissions-policy': 'geolocation=(self), camera=(), microphone=()',
+    // HTTPS arkasında tarayıcı bir yıl boyunca yalnızca HTTPS kullansın.
+    ...(config.secureCookies ? { 'strict-transport-security': 'max-age=31536000; includeSubDomains' } : {}),
   };
 }
+
+const VERSION = '0.2.0';
 
 export function createApp({ db, config }) {
   const router = new Router();
@@ -99,6 +103,16 @@ export function createApp({ db, config }) {
   async function handler(req, res) {
     const url = new URL(req.url, 'http://localhost');
     const pathname = url.pathname;
+
+    // Yük dengeleyici / konteyner sağlık denetimi.
+    if (pathname === '/healthz') {
+      try {
+        db.prepare('SELECT 1').get();
+        return sendJson(res, 200, { ok: true, version: VERSION, demo: config.demoMode });
+      } catch {
+        return sendJson(res, 503, { ok: false });
+      }
+    }
 
     if (!pathname.startsWith('/api/')) {
       if (req.method !== 'GET' && req.method !== 'HEAD') return sendJson(res, 405, { error: 'method_not_allowed' });

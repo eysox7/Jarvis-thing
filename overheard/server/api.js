@@ -54,7 +54,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
 
   // --- Hesap ---
   router.post('/api/auth/register', async (ctx) => {
-    limit(`register:${clientIp(ctx.req)}`, 10, 3600000);
+    limit(`register:${clientIp(ctx.req, config.trustProxy)}`, 10, 3600000);
     const body = await readJson(ctx.req);
     const handle = String(body.handle || '').trim();
     const password = String(body.password || '');
@@ -68,7 +68,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   });
 
   router.post('/api/auth/login', async (ctx) => {
-    limit(`login:${clientIp(ctx.req)}`, 20, 15 * 60000);
+    limit(`login:${clientIp(ctx.req, config.trustProxy)}`, 20, 15 * 60000);
     const body = await readJson(ctx.req);
     const user = db.prepare('SELECT * FROM users WHERE handle = ? AND is_guest = 0').get(String(body.handle || '').trim());
     if (!user || !(await verifyPassword(String(body.password || ''), user.pass_hash))) throw new HttpError(401, 'bad_credentials');
@@ -79,7 +79,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   // Demo modunda kayıt olmadan denemek için tek kullanımlık misafir hesabı.
   router.post('/api/auth/guest', async (ctx) => {
     if (!config.demoMode) throw new HttpError(404, 'not_found');
-    limit(`guest:${clientIp(ctx.req)}`, 20, 3600000);
+    limit(`guest:${clientIp(ctx.req, config.trustProxy)}`, 20, 3600000);
     const handle = `misafir_${randomBytes(4).toString('hex')}`;
     const passHash = await hashPassword(randomBytes(24).toString('hex'));
     const { lastInsertRowid } = db.prepare('INSERT INTO users (handle, pass_hash, is_guest, created_at) VALUES (?, ?, 1, ?)').run(handle, passHash, Date.now());

@@ -238,3 +238,68 @@ describe('Demo modu', () => {
     assert.equal((await c.get('/api/me')).data.user.isGuest, true);
   });
 });
+
+describe('Dağıtım', () => {
+  test('/healthz veritabanını denetler', async () => {
+    const srv = await startTestServer();
+    const r = await fetch(`${srv.base}/healthz`);
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).ok, true);
+    await srv.close();
+  });
+
+  test('X-Forwarded-For yalnızca vekile güveniliyorsa hız sınırında kullanılır', async () => {
+    for (const trustProxy of [false, true]) {
+      const srv = await startTestServer({ trustProxy, rateLimitScale: 0.1 });
+      // Ölçek 0.1 ile kayıt sınırı saatte 1: ikinci kayıt aynı IP'den reddedilir.
+      const register = (ip, handle) => fetch(`${srv.base}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
+        body: JSON.stringify({ handle, password: 'gizli-parola-123' }),
+      }).then((res) => res.status);
+      assert.equal(await register('1.1.1.1', 'vekil_a'), 200);
+      assert.equal(await register('2.2.2.2', 'vekil_b'), trustProxy ? 200 : 429);
+      await srv.close();
+    }
+  });
+
+  test('güvenli çerez modunda HSTS ve Secure çerez', async () => {
+    const srv = await startTestServer({ secureCookies: true });
+    const page = await fetch(`${srv.base}/`);
+    assert.match(page.headers.get('strict-transport-security'), /max-age=31536000/);
+    const reg = await fetch(`${srv.base}/api/auth/register`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ handle: 'guvenli', password: 'gizli-parola-123' }),
+    });
+    assert.match(reg.headers.get('set-cookie'), /; Secure/);
+    await srv.close();
+  });
+});
+
+describe('Yedekleme', () => {
+  test('backup.js çalışan veritabanının okunabilir bir kopyasını alır', async () => {
+    const { mkdtempSync, rmSync, readdirSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { execFileSync } = await import('node:child_process');
+    const { DatabaseSync } = await import('node:sqlite');
+    const { openDb } = await import('../server/db.js');
+    const { seedPlaces } = await import('../server/seed.js');
+    const dir = mkdtempSync(join(tmpdir(), 'overheard-backup-'));
+    try {
+      const dbPath = join(dir, 'live.db');
+      const live = openDb(dbPath);
+      seedPlaces(live);
+      const out = execFileSync(process.execPath, ['--disable-warning=ExperimentalWarning', 'server/backup.js', join(dir, 'b')], {
+        env: { ...process.env, OVERHEARD_DB: dbPath },
+        cwd: new URL('..', import.meta.url).pathname,
+      }).toString().trim();
+      live.close();
+      assert.equal(readdirSync(join(dir, 'b')).length, 1);
+      const copy = new DatabaseSync(out, { readOnly: true });
+      assert.ok(copy.prepare('SELECT COUNT(*) AS n FROM places').get().n > 50);
+      copy.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

@@ -12,6 +12,8 @@ export function loadConfig(overrides = {}) {
     // Demo modu: misafir hesabı, konum simülasyonu ve örnek sözler.
     demoMode: flag(env.OVERHEARD_DEMO, true),
     secureCookies: flag(env.OVERHEARD_SECURE_COOKIES, false),
+    // Ters vekil (Caddy, nginx) arkasında X-Forwarded-For'a güven.
+    trustProxy: flag(env.OVERHEARD_TRUST_PROXY, false),
     sessionDays: 30,
     // Konum doğruluğu (accuracy) toleransının üst sınırı, metre.
     maxAccuracyBonusM: 75,

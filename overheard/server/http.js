@@ -64,6 +64,12 @@ export function serializeCookie(name, value, { maxAge, secure } = {}) {
   return parts.join('; ');
 }
 
-export function clientIp(req) {
+// Ters vekil arkasında (OVERHEARD_TRUST_PROXY=1) istemci adresi, vekilin X-Forwarded-For'a
+// eklediği son öğedir (öncekiler istemcinin uydurabileceği değerlerdir). Vekil yoksa başlık yok sayılır.
+export function clientIp(req, trustProxy = false) {
+  if (trustProxy) {
+    const forwarded = String(req.headers['x-forwarded-for'] || '').split(',').pop().trim();
+    if (forwarded) return forwarded;
+  }
   return req.socket.remoteAddress || 'unknown';
 }

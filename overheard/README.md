@@ -105,12 +105,43 @@ Ortam değişkenleri:
 4. Mekânın kilidi açılır, sözler okunur hâle gelir. Tepki ver, **Mesaj at**.
 5. Ortadaki **“ Duydum** düğmesiyle kendi sözünü bırak.
 
+## Dağıtım
+
+**Docker + otomatik HTTPS (Caddy):**
+
+```bash
+cd overheard
+OVERHEARD_DOMAIN=overheard.example.com \
+OVERHEARD_ADMINS=ayse \
+GOOGLE_MAPS_API_KEY=AIza... \
+docker compose up -d
+```
+
+İmaj üretim ayarlarıyla gelir: demo kapalı (`OVERHEARD_DEMO=0`), güvenli çerez + HSTS açık,
+veritabanı `/data` biriminde, uygulama yetkisiz `node` kullanıcısıyla çalışır, `/healthz`
+sağlık denetimi tanımlı. Compose dosyası Caddy'yi önüne koyar ve `OVERHEARD_TRUST_PROXY=1`
+ile hız sınırları gerçek istemci adresine göre işler.
+
+**Docker olmadan:** Node.js 22.13+ olan bir sunucuda
+`OVERHEARD_DEMO=0 OVERHEARD_SECURE_COOKIES=1 OVERHEARD_TRUST_PROXY=1 npm start`, önüne HTTPS
+sonlandıran bir ters vekil (Caddy/nginx). Konum API'si tarayıcıda yalnızca HTTPS'te çalışır.
+
+**Yedekleme:** `npm run backup [klasör]` çalışan veritabanının tutarlı bir kopyasını alır
+(SQLite `VACUUM INTO`). Konteynerde: `docker compose exec app node server/backup.js /data/backups`.
+Bunu günlük bir zamanlayıcıya bağlayıp yedekleri sunucu dışına kopyalayın.
+
+| Ek değişken | Varsayılan | Açıklama |
+| --- | --- | --- |
+| `OVERHEARD_TRUST_PROXY` | `0` | Ters vekil arkasında `1`: istemci adresi `X-Forwarded-For`'un son öğesi |
+| `OVERHEARD_RATE_SCALE` | `1` | Hız sınırı çarpanı |
+
 ## Mimari
 
 ```
 overheard/
   server/
     index.js        giriş noktası (HTTP sunucusu)
+    backup.js       tutarlı veritabanı yedeği (VACUUM INTO)
     app.js          istek işleyici: statik dosyalar, güvenlik başlıkları, API yönlendirme
     api.js          API uçları
     domain.js       kurallar: ortak mekân, check-in, sözler, mesajlaşma

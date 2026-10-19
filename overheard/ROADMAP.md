@@ -44,11 +44,13 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
       nefret söylemi reddedilir (mesajlarda da). `OVERHEARD_ADMINS` ile moderatörler: şikâyet
       edilen/gizlenen sözleri görme, geri yükleme, silme, yazarı yasaklama (yasaklı okur ama
       yazamaz). Şema v4.
+- [x] **10. Dağıtım** — Dockerfile (üretim ayarları, yetkisiz kullanıcı, kalıcı birim,
+      HEALTHCHECK), Caddy ile otomatik HTTPS sunan docker-compose örneği, `/healthz`,
+      `OVERHEARD_TRUST_PROXY` (hız sınırı gerçek istemci adresine göre), HTTPS'te HSTS,
+      `npm run backup` (VACUUM INTO). README'de dağıtım rehberi.
 
 ## Sıradakiler
 
-- [ ] **10. Dağıtım** — Dockerfile, `/healthz`, üretim ayarları rehberi (HTTPS, güvenli çerez,
-      ters vekil), yedekleme notları.
 - [ ] **11. Konum sahteciliğine karşı** — İmkânsız seyahat (hız) denetimi, düşük doğruluklu
       konumları reddetme, şüpheli check-in işaretleme.
 - [ ] **12. Ölçek** — Harita verisini görünür alana (bbox) göre çekme, sayfalama, indeksler.

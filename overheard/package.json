@@ -1,6 +1,6 @@
 {
   "name": "overheard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Overheard — duyduğun sözü haritaya bırak. Yalnızca ortak mekânlarında okunur.",
@@ -12,7 +12,8 @@
     "dev": "OVERHEARD_DEMO=1 node --watch --disable-warning=ExperimentalWarning server/index.js",
     "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"test/*.test.js\"",
     "test:e2e": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"test/e2e/*.test.js\"",
-    "test:all": "npm test && npm run test:e2e"
+    "test:all": "npm test && npm run test:e2e",
+    "backup": "node --disable-warning=ExperimentalWarning server/backup.js"
   },
   "devDependencies": {
     "playwright": "^1.56.1"

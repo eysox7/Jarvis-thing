@@ -1,0 +1,28 @@
+# Örnek: Overheard + otomatik HTTPS için Caddy.
+#   OVERHEARD_DOMAIN=overheard.example.com GOOGLE_MAPS_API_KEY=... docker compose up -d
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      OVERHEARD_TRUST_PROXY: "1"
+      OVERHEARD_ADMINS: ${OVERHEARD_ADMINS:-}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    volumes:
+      - overheard-data:/data
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    command: caddy reverse-proxy --from ${OVERHEARD_DOMAIN:-localhost} --to app:8787
+    volumes:
+      - caddy-data:/data
+    depends_on:
+      - app
+
+volumes:
+  overheard-data:
+  caddy-data:
