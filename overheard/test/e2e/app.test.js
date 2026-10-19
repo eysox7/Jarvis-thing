@@ -17,13 +17,14 @@ const MODA = { latitude: 40.981, longitude: 29.027, accuracy: 12 };
 const BLANK_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 const FAKE_GOOGLE = await readFile(new URL('../fixtures/fake-google-maps.js', import.meta.url), 'utf8');
 
-async function newUser(browser, base, geolocation, { google = 'none' } = {}) {
+async function newUser(browser, base, geolocation, { google = 'none', intro = false } = {}) {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     permissions: ['geolocation'],
     geolocation,
     locale: 'tr-TR',
   });
+  if (!intro) await context.addInitScript(() => localStorage.setItem('oh_intro_seen', '1'));
   await context.route(/basemaps\.cartocdn\.com|tile\.openstreetmap\.org/, (route) => route.fulfill({ status: 200, contentType: 'image/png', body: BLANK_PNG }));
   await context.route(/maps\.googleapis\.com/, (route) => (google === 'fake'
     ? route.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_GOOGLE })
@@ -250,6 +251,19 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await u.context.close();
     });
 
+    test('ilk açılışta tanıtım gösterilir ve misafir olarak başlatır', async () => {
+      const u = await newUser(browser, srv.base, KADIKOY, { intro: true });
+      await sheet(u.page).getByText('Overheard\'e hoş geldin').waitFor();
+      await sheet(u.page).getByText('Okumak için oraya git').waitFor();
+      await sheet(u.page).getByRole('button', { name: /misafir/ }).click();
+      await u.page.waitForFunction(() => window.overheard.app.state.user?.isGuest);
+      await u.page.reload();
+      await u.page.waitForSelector('body.is-ready');
+      assert.equal(await sheet(u.page).isVisible(), false, 'tanıtım bir kez gösterilir');
+      assert.deepEqual(u.errors, []);
+      await u.context.close();
+    });
+
     test('İngilizce arayüze geçiş', async () => {
       const u = await newUser(browser, srv.base, KADIKOY);
       await u.page.locator('[data-nav="profile"]').click();
@@ -348,7 +362,11 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await info.getByText('mekânında duyuldu').waitFor();
       await info.getByRole('button', { name: /ışınlan/ }).click();
       await u.page.locator('.toast', { hasText: 'açıldı' }).first().waitFor();
+      // Işınlanınca aynı balon açık hâliyle yeniden açılır; haritadaki balonlar da açılmıştır.
+      await info.locator('.bubble-quote').waitFor();
       await u.page.locator('.oh-gmarker .oh-bubble.is-open').first().waitFor();
+      // Balonu kapatıp haritadan yeniden aç (bilgi penceresi balonları örtmesin diye önce kapat).
+      await info.getByRole('button', { name: 'Close' }).click();
       await u.page.locator('.oh-gmarker .oh-bubble.is-open').first().click();
       await info.locator('.bubble-quote').waitFor();
       assert.deepEqual(u.errors, []);

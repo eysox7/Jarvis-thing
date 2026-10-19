@@ -67,7 +67,9 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
 - Geniş ekran düzeni (bant, kart, sekme çubuğu ortalı), alt sayfada odak yönetimi.
 - Misafir hesabını kalıcı hesaba çevirme (`/api/auth/upgrade`): ilerleme korunur.
 - Konum izni verilmişse açılışta sessiz konum + check-in.
-- Dil anahtarları TR/EN eşit (192/192), ESLint temel kurallarla temiz.
+- İlk açılışta üç adımlık tanıtım (misafir olarak başla / giriş / önce haritaya bak).
+- Kullanıcı başına en fazla 5 canlı bağlantı; süresi dolan oturumların temizliği.
+- Dil anahtarları TR/EN eşit, ESLint temel kurallarla temiz; tarayıcı testlerindeki yarış durumları giderildi.
 
 ## Kalite turları (tüm adımlar bitince)
 

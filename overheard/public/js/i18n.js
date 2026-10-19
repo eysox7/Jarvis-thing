@@ -1,6 +1,11 @@
 const STRINGS = {
   tr: {
     'app.tagline': 'Duyduğunu bırak. Yalnızca orada bulunanlar okur.',
+    'intro.title': 'Overheard\'e hoş geldin',
+    'intro.step1': 'Duyduğunu bırak',
+    'intro.step2': 'Okumak için oraya git',
+    'intro.step3': 'Aynı yerlerdekilerle tanış',
+    'intro.look': 'Önce haritaya bakayım',
     'nav.map': 'Harita',
     'nav.places': 'Mekânlar',
     'nav.post': 'Duydum',
@@ -202,6 +207,11 @@ const STRINGS = {
   },
   en: {
     'app.tagline': 'Drop what you heard. Only people who were there can read it.',
+    'intro.title': 'Welcome to Overheard',
+    'intro.step1': 'Drop what you heard',
+    'intro.step2': 'Go there to read',
+    'intro.step3': 'Meet people from the same places',
+    'intro.look': 'Let me look at the map first',
     'nav.map': 'Map',
     'nav.places': 'Places',
     'nav.post': 'Heard it',

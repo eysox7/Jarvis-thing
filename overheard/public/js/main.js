@@ -10,6 +10,7 @@ import { openPlaces } from './views/places.js';
 import { openInbox, openConversation, openNewMessage, handleIncoming } from './views/inbox.js';
 import { openProfile } from './views/profile.js';
 import { createNudge } from './views/nudge.js';
+import { maybeShowIntro } from './views/intro.js';
 
 const CITY_KEY = 'oh_city';
 const HINT_KEY = 'oh_demo_hint_seen';
@@ -476,6 +477,7 @@ async function boot() {
 
   bindNav();
   renderChrome();
+  maybeShowIntro(app);
   showDemoHint();
   connectEvents();
   await app.refresh();
