@@ -412,7 +412,9 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       const localOpen = u.page.locator('.oh-gmarker .oh-bubble.is-open:not(.is-public)').first();
       await localOpen.waitFor();
       // Balonu kapatıp haritadan yeniden aç (bilgi penceresi balonları örtmesin diye önce kapat).
-      await info.getByRole('button', { name: 'Close' }).click();
+      // Taklit bilgi penceresinin kapatma düğmesi sabit konumda; üstüne binen bildirimler tıklamayı
+      // geciktirmesin diye doğrudan tetiklenir.
+      await info.getByRole('button', { name: 'Close' }).dispatchEvent('click');
       await localOpen.click();
       await info.locator('.bubble-quote').waitFor();
       assert.deepEqual(u.errors, []);
