@@ -1,0 +1,14 @@
+{
+  "name": "Overheard",
+  "short_name": "Overheard",
+  "description": "Duyduğun sözü haritaya bırak. Yalnızca orada bulunanlar okur.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f1ea",
+  "theme_color": "#ff5a3c",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

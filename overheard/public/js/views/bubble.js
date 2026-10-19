@@ -1,0 +1,72 @@
+import { h, timeAgo, distanceM, formatDistance, REACTION_EMOJI } from '../util.js';
+import { t } from '../i18n.js';
+
+const directionsUrl = (o) => `https://www.google.com/maps/dir/?api=1&destination=${o.lat},${o.lng}&travelmode=walking`;
+
+// Kilitli sözün yerine, uzunluğuna göre bulanık "hayalet" satırlar.
+function ghostLines(length) {
+  const lines = Math.max(1, Math.min(4, Math.ceil(length / 48)));
+  return Array.from({ length: lines }, (_, i) => h('span', {
+    class: 'ghost-line',
+    style: { width: `${i === lines - 1 && lines > 1 ? 35 + ((length * 7) % 45) : 92}%` },
+  }));
+}
+
+function lockedCard(o, app) {
+  const { state } = app;
+  const distance = state.position ? distanceM(state.position.lat, state.position.lng, o.lat, o.lng) : null;
+  return h('div', { class: 'bubble-card is-locked' },
+    h('div', { class: 'bubble-ghost', 'aria-hidden': 'true' }, h('span', { class: 'bubble-lock-icon' }, '🔒'), h('div', { class: 'ghost-lines' }, ghostLines(o.length))),
+    h('p', { class: 'bubble-where' }, t('bubble.lockedWhere', { place: o.placeName })),
+    h('p', { class: 'bubble-how' }, state.user ? t('bubble.lockedHow') : t('bubble.loginToRead')),
+    distance != null ? h('p', { class: 'bubble-distance' }, `🚶 ${t('bubble.distance', { d: formatDistance(distance) })}`) : null,
+    h('div', { class: 'bubble-actions' },
+      h('a', { class: 'btn btn-primary', href: directionsUrl(o), target: '_blank', rel: 'noopener' }, `🧭 ${t('bubble.directions')}`),
+      !state.user ? h('button', { class: 'btn', type: 'button', onclick: () => app.openAuth() }, t('auth.login')) : null,
+      state.config.demoMode && state.user
+        ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.teleport({ lat: o.lat, lng: o.lng }, o.id) }, `✨ ${t('map.teleport')}`)
+        : null));
+}
+
+function openCard(o, app) {
+  const reactions = app.state.config.reactions.map((kind) => {
+    const count = o.reactions[kind] || 0;
+    const pressed = o.myReactions.includes(kind);
+    return h('button', {
+      class: `react${pressed ? ' is-pressed' : ''}`,
+      type: 'button',
+      title: t(`react.${kind}`),
+      'aria-pressed': pressed ? 'true' : 'false',
+      onclick: () => app.react(o, kind),
+    }, h('span', { 'aria-hidden': 'true' }, REACTION_EMOJI[kind]), count ? h('span', { class: 'react-count' }, String(count)) : null,
+    h('span', { class: 'visually-hidden' }, t(`react.${kind}`)));
+  });
+
+  const badges = [
+    o.sameTime ? h('span', { class: 'chip chip-hot' }, `👂 ${t('bubble.sameTime')}`) : null,
+    o.mutualPlaces ? h('span', { class: 'chip' }, `📍 ${t('bubble.mutual', { n: o.mutualPlaces })}`) : null,
+  ].filter(Boolean);
+
+  return h('div', { class: 'bubble-card' },
+    h('blockquote', { class: 'bubble-quote' }, o.text),
+    h('div', { class: 'bubble-meta' },
+      h('span', { class: 'bubble-author' }, o.mine ? t('bubble.mine') : `@${o.author}`),
+      h('span', { 'aria-hidden': 'true' }, ' · '),
+      h('span', {}, o.placeName),
+      h('span', { 'aria-hidden': 'true' }, ' · '),
+      h('time', { datetime: new Date(o.createdAt).toISOString() }, timeAgo(o.createdAt))),
+    badges.length ? h('div', { class: 'bubble-badges' }, badges) : null,
+    h('div', { class: 'bubble-reactions' }, reactions),
+    h('div', { class: 'bubble-actions' },
+      o.canMessage ? h('button', { class: 'btn btn-primary', type: 'button', onclick: () => app.startMessage(o) }, `💬 ${t('bubble.message')}`) : null,
+      o.mine
+        ? h('button', { class: 'btn btn-ghost btn-danger', type: 'button', onclick: () => app.deleteOverheard(o) }, t('bubble.delete'))
+        : h('span', { class: 'bubble-more' },
+          h('button', { class: 'link-btn', type: 'button', onclick: () => app.reportOverheard(o) }, t('bubble.report')),
+          h('span', { 'aria-hidden': 'true' }, ' · '),
+          h('button', { class: 'link-btn', type: 'button', onclick: () => app.blockAuthor(o) }, t('bubble.block')))));
+}
+
+export function bubbleContent(o, app) {
+  return o.locked ? lockedCard(o, app) : openCard(o, app);
+}

@@ -1,0 +1,18 @@
+{
+  "name": "overheard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Overheard — duyduğun sözü haritaya bırak. Yalnızca ortak mekânlarında okunur.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "OVERHEARD_DEMO=1 node --watch --disable-warning=ExperimentalWarning server/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"test/**/*.test.js\""
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}

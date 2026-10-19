@@ -1,0 +1,163 @@
+import { randomBytes } from 'node:crypto';
+import { HttpError, clientIp, readJson, serializeCookie } from './http.js';
+import { HANDLE_RE, createSession, destroySession, hashPassword, verifyPassword } from './auth.js';
+import { CITIES } from './data/cities.js';
+import * as domain from './domain.js';
+
+export const SESSION_COOKIE = 'oh_session';
+
+export function registerApi(router, { db, config, events, rateLimit }) {
+  const limit = (key, max, windowMs) => {
+    if (!rateLimit(key, Math.ceil(max * config.rateLimitScale), windowMs)) throw new HttpError(429, 'rate_limited');
+  };
+
+  const requireUser = (ctx) => {
+    if (!ctx.user) throw new HttpError(401, 'login_required');
+    return ctx.user;
+  };
+
+  const startSession = (ctx, userId) => {
+    const token = createSession(db, userId, config.sessionDays);
+    ctx.setCookie(serializeCookie(SESSION_COOKIE, token, { maxAge: config.sessionDays * 86400, secure: config.secureCookies }));
+  };
+
+  const publicUser = (user) => ({ handle: user.handle, isGuest: Boolean(user.isGuest ?? user.is_guest) });
+
+  // --- Yapılandırma ---
+  router.get('/api/config', () => ({
+    cities: CITIES,
+    demoMode: config.demoMode,
+    googleMapsKey: config.googleMapsKey || null,
+    reactions: domain.REACTIONS,
+    limits: domain.LIMITS,
+  }));
+
+  // --- Hesap ---
+  router.post('/api/auth/register', async (ctx) => {
+    limit(`register:${clientIp(ctx.req)}`, 10, 3600000);
+    const body = await readJson(ctx.req);
+    const handle = String(body.handle || '').trim();
+    const password = String(body.password || '');
+    if (!HANDLE_RE.test(handle)) throw new HttpError(400, 'bad_handle');
+    if (password.length < 8 || password.length > 200) throw new HttpError(400, 'bad_password');
+    if (db.prepare('SELECT 1 FROM users WHERE handle = ?').get(handle)) throw new HttpError(409, 'handle_taken');
+    const passHash = await hashPassword(password);
+    const { lastInsertRowid } = db.prepare('INSERT INTO users (handle, pass_hash, created_at) VALUES (?, ?, ?)').run(handle, passHash, Date.now());
+    startSession(ctx, Number(lastInsertRowid));
+    return { user: { handle, isGuest: false } };
+  });
+
+  router.post('/api/auth/login', async (ctx) => {
+    limit(`login:${clientIp(ctx.req)}`, 20, 15 * 60000);
+    const body = await readJson(ctx.req);
+    const user = db.prepare('SELECT * FROM users WHERE handle = ? AND is_guest = 0').get(String(body.handle || '').trim());
+    if (!user || !(await verifyPassword(String(body.password || ''), user.pass_hash))) throw new HttpError(401, 'bad_credentials');
+    startSession(ctx, user.id);
+    return { user: publicUser(user) };
+  });
+
+  // Demo modunda kayıt olmadan denemek için tek kullanımlık misafir hesabı.
+  router.post('/api/auth/guest', async (ctx) => {
+    if (!config.demoMode) throw new HttpError(404, 'not_found');
+    limit(`guest:${clientIp(ctx.req)}`, 20, 3600000);
+    const handle = `misafir_${randomBytes(4).toString('hex')}`;
+    const passHash = await hashPassword(randomBytes(24).toString('hex'));
+    const { lastInsertRowid } = db.prepare('INSERT INTO users (handle, pass_hash, is_guest, created_at) VALUES (?, ?, 1, ?)').run(handle, passHash, Date.now());
+    startSession(ctx, Number(lastInsertRowid));
+    return { user: { handle, isGuest: true } };
+  });
+
+  router.post('/api/auth/logout', (ctx) => {
+    if (ctx.token) destroySession(db, ctx.token);
+    ctx.setCookie(serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure: config.secureCookies }));
+    return { ok: true };
+  });
+
+  router.get('/api/me', (ctx) => {
+    if (!ctx.user) return { user: null };
+    return { user: publicUser(ctx.user), stats: domain.profileStats(db, ctx.user), unread: domain.unreadCount(db, ctx.user) };
+  });
+
+  // --- Harita ve mekânlar ---
+  router.get('/api/cities/:id/map', (ctx) => domain.cityMap(db, config, ctx.user, ctx.params.id));
+
+  router.post('/api/checkins', async (ctx) => {
+    const user = requireUser(ctx);
+    limit(`checkin:${user.id}`, 120, 3600000);
+    const coords = domain.readCoords(await readJson(ctx.req));
+    return domain.checkIn(db, config, user, coords);
+  });
+
+  router.get('/api/me/places', (ctx) => ({ places: domain.myPlaces(db, requireUser(ctx)) }));
+
+  // --- Sözler ---
+  router.post('/api/overheards', async (ctx) => {
+    const user = requireUser(ctx);
+    const body = await readJson(ctx.req);
+    limit(`post:${user.id}`, 10, 3600000);
+    return { overheard: domain.createOverheard(db, config, user, body) };
+  });
+
+  router.get('/api/overheards/:id', (ctx) => ({ overheard: domain.getOverheard(db, config, ctx.user, ctx.params.id) }));
+
+  router.delete('/api/overheards/:id', (ctx) => {
+    domain.deleteOverheard(db, requireUser(ctx), ctx.params.id);
+    return { ok: true };
+  });
+
+  router.post('/api/overheards/:id/reactions', async (ctx) => {
+    const user = requireUser(ctx);
+    limit(`react:${user.id}`, 300, 3600000);
+    const body = await readJson(ctx.req);
+    return { overheard: domain.toggleReaction(db, config, user, ctx.params.id, String(body.kind || '')) };
+  });
+
+  router.post('/api/overheards/:id/report', async (ctx) => {
+    const user = requireUser(ctx);
+    limit(`report:${user.id}`, 30, 3600000);
+    const body = await readJson(ctx.req);
+    domain.reportOverheard(db, config, user, ctx.params.id, body.reason);
+    return { ok: true };
+  });
+
+  // --- Mesajlar ---
+  const deliver = (result, sender) => {
+    events.publish(result.recipientId, 'dm', {
+      conversationId: result.conversationId,
+      from: sender.handle,
+      body: result.message.body,
+      createdAt: result.message.createdAt,
+    });
+    const { id, body, createdAt } = result.message;
+    return { conversationId: result.conversationId, message: { id, body, createdAt, fromMe: true } };
+  };
+
+  router.post('/api/overheards/:id/messages', async (ctx) => {
+    const user = requireUser(ctx);
+    limit(`message:${user.id}`, 60, 3600000);
+    const body = await readJson(ctx.req);
+    return deliver(domain.messageAboutOverheard(db, user, ctx.params.id, body.body), user);
+  });
+
+  router.get('/api/conversations', (ctx) => ({ conversations: domain.listConversations(db, requireUser(ctx)) }));
+
+  router.get('/api/conversations/:id', (ctx) => ({ conversation: domain.getConversation(db, requireUser(ctx), ctx.params.id) }));
+
+  router.post('/api/conversations/:id/messages', async (ctx) => {
+    const user = requireUser(ctx);
+    limit(`message:${user.id}`, 60, 3600000);
+    const body = await readJson(ctx.req);
+    return deliver(domain.sendMessage(db, user, ctx.params.id, body.body), user);
+  });
+
+  router.post('/api/users/:handle/block', (ctx) => {
+    domain.blockUser(db, requireUser(ctx), ctx.params.handle);
+    return { ok: true };
+  });
+
+  router.get('/api/events', (ctx) => {
+    const user = requireUser(ctx);
+    events.subscribe(user.id, ctx.req, ctx.res);
+    return ctx.STREAMING;
+  });
+}
