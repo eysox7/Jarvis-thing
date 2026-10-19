@@ -48,6 +48,8 @@ export const api = {
   react: (id, kind) => request('POST', `/api/overheards/${enc(id)}/reactions`, { kind }),
   report: (id, reason) => request('POST', `/api/overheards/${enc(id)}/report`, { reason }),
   messageAbout: (id, body, to) => request('POST', `/api/overheards/${enc(id)}/messages`, { body, to }),
+  room: (placeId) => request('GET', `/api/places/${enc(placeId)}/room`),
+  roomPost: (placeId, body) => request('POST', `/api/places/${enc(placeId)}/room`, { body }),
   conversations: () => request('GET', '/api/conversations'),
   conversation: (id, before) => request('GET', `/api/conversations/${enc(id)}${before ? `?before=${enc(before)}` : ''}`),
   reply: (id, body) => request('POST', `/api/conversations/${enc(id)}/messages`, { body }),

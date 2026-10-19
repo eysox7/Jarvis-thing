@@ -44,6 +44,9 @@ balonların altında sokak haritası görünür.</sub>
   açıkken yürüdükçe otomatik check-in yapılır. Bir mekâna varınca "buradasın, yerel sözler açık",
   ayrılınca "yerel sözler kilitlendi" bildirimi gelir. Konum izni verdiysen uygulamayı açmak bile
   bulunduğun mekânın yerel sözlerini açar.
+- **Şu an burada ve mekân odası.** Her mekânda o an kaç kişinin bulunduğu (isimsiz) görünür. Bir
+  mekândaysan oradakilerle grup sohbetine katılabilirsin; oda yalnızca oradayken görünür,
+  mesajlar 12 saat sonra silinir.
 - **Seni bekleyen sözler.** Haritanın altındaki kart en yakın, yerel sözü olan mekânı ve orada kaç
   sözün beklediğini gösterir; keşif modunda yaklaştıkça "Sıcak!" ipuçları gelir.
 - **Söz bırakma.** Yalnızca o mekândayken. Yakında kayıtlı mekân yoksa yeriyle birlikte yeni
@@ -218,7 +221,7 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | `POST /api/conversations/:id/reveal` | Anonim söz sahibi kimliğini açar |
 | `POST /api/overheards/:id/block-author` · `POST /api/users/:handle/block` | Engelleme |
 | `GET /api/admin/reports` · `POST …/overheards/:id/restore` · `DELETE …/overheards/:id` · `POST …/users/:handle/ban` | Moderasyon (yalnızca `OVERHEARD_ADMINS`) |
-| `GET /api/events` | SSE akışı (`dm`, `reveal` olayları) |
+| `GET /api/events` | SSE akışı (`dm`, `reveal`, `room` olayları) |
 
 ## Testler
 

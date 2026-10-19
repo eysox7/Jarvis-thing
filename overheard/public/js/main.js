@@ -11,6 +11,7 @@ import { openInbox, openConversation, openNewMessage, handleIncoming } from './v
 import { openProfile } from './views/profile.js';
 import { createNudge } from './views/nudge.js';
 import { maybeShowIntro } from './views/intro.js';
+import { openRoom, handleRoomMessage, closeRoomIfLeft } from './views/room.js';
 
 const CITY_KEY = 'oh_city';
 const HINT_KEY = 'oh_demo_hint_seen';
@@ -154,6 +155,7 @@ const app = {
       // Yakın bakıştaysak görünür alanın sözlerini de tazele.
       if (lastView) onViewChange(lastView);
       nudge.update();
+      renderRoomButton();
       const openId = map.openId();
       const open = openId && state.data.overheards.find((o) => o.id === openId);
       if (open) map.updateOpen(bubbleContent(open, app));
@@ -255,7 +257,10 @@ const app = {
     const left = (result.left || []).map((id) => state.data?.places.find((p) => p.id === id)).filter(Boolean);
     if (result.city && result.city !== state.city.id) await app.selectCity(result.city, { keepView: true });
     else if (arrived.length || left.length) await app.refresh();
-    for (const p of arrived) toast(t('toast.arrived', { place: p.name }), { tone: 'success', timeout: 6000 });
+    for (const p of arrived) {
+      toast(t('toast.arrived', { place: p.name }), { tone: 'success', timeout: 6000, action: t('room.enter'), onAction: () => openRoom(app, p) });
+    }
+    closeRoomIfLeft(left);
     for (const p of left) if (p.localCount) toast(t('toast.left', { place: p.name }));
     app.celebrate(result.newBadges);
     if (!silent && !arrived.length) {
@@ -328,6 +333,7 @@ function connectEvents() {
     toast(t('toast.revealed', { handle: `@${data.handle}` }));
     if (sheetKey() === `chat:${data.conversationId}`) openConversation(app, data.conversationId);
   });
+  events.addEventListener('room', (e) => handleRoomMessage(app, JSON.parse(e.data)));
   events.addEventListener('dm', async (e) => {
     const data = JSON.parse(e.data);
     if (await handleIncoming(app, data)) return;
@@ -413,6 +419,20 @@ function renderCities() {
   nav.querySelector('.is-active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
 
+// Bir mekândaysan haritada mekân odası düğmesi görünür (yanında oradaki kişi sayısı).
+function hereNow() {
+  return state.user ? (state.data?.places || []).filter((p) => p.here) : [];
+}
+
+function renderRoomButton() {
+  const button = document.getElementById('btn-room');
+  const here = hereNow()[0];
+  button.hidden = !here;
+  const count = button.querySelector('.tool-count');
+  count.hidden = !here?.peopleHere;
+  count.textContent = here?.peopleHere ? String(here.peopleHere) : '';
+}
+
 function renderBadge() {
   const badge = document.querySelector('[data-nav="inbox"] .badge');
   badge.hidden = !state.unread;
@@ -453,6 +473,10 @@ function bindNav() {
   }
   document.getElementById('btn-locate').addEventListener('click', locateAndCheckIn);
   document.getElementById('btn-explore').addEventListener('click', toggleExplore);
+  document.getElementById('btn-room').addEventListener('click', () => {
+    const here = hereNow()[0];
+    if (here) openRoom(app, here);
+  });
 }
 
 // Konum izni daha önce verildiyse açılışta sessizce konum alıp check-in yap: uygulamayı açmak,

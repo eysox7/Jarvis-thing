@@ -334,6 +334,37 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await u.context.close();
     });
 
+    test('mekân odası: aynı yerdekiler canlı yazışır, ayrılınca oda kapanır', async () => {
+      const a = await newUser(browser, srv.base, KADIKOY);
+      const b = await newUser(browser, srv.base, KADIKOY);
+      for (const u of [a, b]) {
+        await loginAsGuest(u.page);
+        await u.page.locator('#btn-locate').click();
+        await u.page.locator('.toast', { hasText: 'buradasın' }).first().waitFor();
+      }
+      await a.page.evaluate(() => window.overheard.app.refresh());
+      // Sunucu diğer testlerle ortak: Kadıköy'de en az bu iki kişi var.
+      await a.page.locator('#btn-room:not([hidden]) .tool-count:not([hidden])').waitFor();
+      assert.ok(Number(await a.page.locator('#btn-room .tool-count').textContent()) >= 2);
+      await a.page.locator('#btn-room').click();
+      await sheet(a.page).getByText(/Şu an burada \d+ kişi/).waitFor();
+
+      await b.page.locator('#btn-room').click();
+      await sheet(b.page).locator('textarea').fill('Vapur kaçta kalkıyor, bilen var mı?');
+      await sheet(b.page).locator('textarea').press('Enter');
+      await sheet(b.page).locator('.room-msg.is-me', { hasText: 'Vapur kaçta' }).waitFor();
+      await sheet(a.page).locator('.room-msg.is-them', { hasText: 'Vapur kaçta' }).waitFor();
+
+      // B oda açıkken yürüyüp Moda'ya geçince (keşif modundaki gibi bir check-in) oda kapanır.
+      await b.page.evaluate(() => window.overheard.app.checkIn({ lat: 40.981, lng: 29.027, accuracy: 10 }, { silent: true }));
+      await b.page.locator('.toast', { hasText: 'odadan çıktın' }).waitFor();
+      assert.equal(await sheet(b.page).isVisible(), false);
+      for (const u of [a, b]) {
+        assert.deepEqual(u.errors, []);
+        await u.context.close();
+      }
+    });
+
     test('İngilizce arayüze geçiş', async () => {
       const u = await newUser(browser, srv.base, KADIKOY);
       await u.page.locator('[data-nav="profile"]').click();

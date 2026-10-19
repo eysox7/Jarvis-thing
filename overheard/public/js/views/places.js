@@ -2,6 +2,7 @@ import { h, distanceM, formatDistance, formatDate } from '../util.js';
 import { t, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { openSheet, closeSheet } from '../ui.js';
+import { openRoom } from './room.js';
 
 function placeRow(p, { app, meta, locked }) {
   return h('li', {},
@@ -40,7 +41,9 @@ export async function openPlaces(app) {
       h('ul', { class: 'list' }, hereNow.map((p) => {
         const people = app.state.data?.places.find((x) => x.id === p.id)?.peopleHere;
         const meta = [people ? `👥 ${t('place.peopleHere', { n: people })}` : null, t('places.hereHint', { n: app.state.config.presenceMinutes })].filter(Boolean).join(' · ');
-        return placeRow(p, { app, meta });
+        return h('li', { class: 'here-row' },
+          placeRow(p, { app, meta }).firstChild,
+          h('button', { class: 'btn btn-primary', type: 'button', onclick: () => openRoom(app, p) }, `💬 ${t('room.enter')}`));
       })));
   }
   if (!places.length) body.append(h('p', { class: 'empty' }, `🚶 ${t('places.empty')}`));

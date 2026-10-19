@@ -161,6 +161,17 @@ export const MIGRATIONS = [
   `
   ALTER TABLE users ADD COLUMN terms_accepted_at INTEGER;
   `,
+  // v8: Mekân odası: o an aynı mekânda bulunanların geçici grup sohbeti.
+  `
+  CREATE TABLE room_messages (
+    id          INTEGER PRIMARY KEY,
+    place_id    TEXT NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body        TEXT NOT NULL,
+    created_at  INTEGER NOT NULL
+  );
+  CREATE INDEX room_messages_place ON room_messages(place_id, id);
+  `,
 ];
 
 export function openDb(path) {

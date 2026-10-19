@@ -89,7 +89,10 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       Keşif modu artık geçici konum hatasında kapanmıyor (yalnızca izin reddinde).
 - [x] **14. "Şu an burada N kişi"** — Taze konum bildirimlerinden mekân başına isimsiz kişi sayısı;
       haritadaki mekân balonunda 👥, söz balonlarında (kilitli olanlarda da) ve Mekânlarım'da.
-- [ ] **15. Mekân odası** — O an aynı mekânda olanların geçici grup sohbeti (12 saatte silinir).
+- [x] **15. Mekân odası** — O an aynı mekânda bulunanların grup sohbeti: yalnızca oradayken okunur
+      ve yazılır, mesajlar 12 saat sonra silinir, kişisel veriler maskelenir, engellenenler
+      görünmez, mesajlar o an oradakilere canlı (SSE) gider. Haritada oda düğmesi (yanında kişi
+      sayısı), varış bildiriminde "Odaya gir", Mekânlarım'da giriş; ayrılınca oda kapanır. Şema v8.
 - [ ] **16. Paylaşılabilir kartlar** — Herkese açık sözden Instagram hikâyesi boyutunda görsel.
 - [ ] **17. Haftanın en iyileri** — Şehir başına en çok tepki alan herkese açık sözler.
 - [ ] **18. 24 saatlik sözler** — İsteğe bağlı, bir gün sonra kaybolan sözler.

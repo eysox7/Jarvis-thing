@@ -240,6 +240,18 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     return { ok: true };
   });
 
+  // --- Mekân odası ---
+  router.get('/api/places/:id/room', (ctx) => ({ room: domain.getRoom(db, config, requireUser(ctx), ctx.params.id) }));
+
+  router.post('/api/places/:id/room', async (ctx) => {
+    const user = requireActive(ctx);
+    limit(`room:${user.id}`, 30, 10 * 60000);
+    const body = await readJson(ctx.req);
+    const { placeId, message, recipients } = domain.postRoomMessage(db, config, user, ctx.params.id, body.body);
+    for (const id of recipients) events.publish(id, 'room', { placeId, message });
+    return { message: { ...message, mine: true } };
+  });
+
   router.post('/api/users/:handle/block', (ctx) => {
     domain.blockUser(db, requireUser(ctx), ctx.params.handle);
     return { ok: true };

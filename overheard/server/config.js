@@ -33,6 +33,8 @@ export function loadConfig(overrides = {}) {
     presenceTtlMs: 30 * 60 * 1000,
     // Kesin konum (son konum bildirimi) en fazla bu kadar saklanır; mekân düzeyindeki check-in'ler kalır.
     locationRetentionMs: 24 * 60 * 60 * 1000,
+    // Mekân odası mesajları bu kadar süre sonra silinir.
+    roomRetentionMs: 12 * 60 * 60 * 1000,
     // Şüpheli konum kayıtlarının saklama süresi.
     flagRetentionMs: 90 * 24 * 60 * 60 * 1000,
     // Aynı mekâna art arda check-in'ler arasında en az bu kadar süre olmalı.

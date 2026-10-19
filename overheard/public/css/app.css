@@ -156,6 +156,13 @@ button { cursor: pointer; }
   background: var(--paper);
   box-shadow: var(--shadow-sm);
 }
+.tool-btn[hidden] { display: none; }
+.tool-room { position: relative; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tool-count { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; background: var(--ink); color: var(--bg); font-size: 11px; line-height: 20px; }
+.tool-count[hidden] { display: none; }
+.here-row { display: flex; gap: 8px; align-items: center; }
+.here-row > .list-item { flex: 1; min-width: 0; }
+.room-author { font-size: 12px; font-weight: 700; color: var(--accent); }
 .tool-btn.is-on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); animation: breathe 2.4s ease-in-out infinite; }
 
 .demo-hint {

@@ -11,7 +11,7 @@ import { CITIES, CITY_BY_ID } from './data/cities.js';
 import { moderatePublicText, moderatePrivateText } from './moderation.js';
 
 export const REACTIONS = ['lol', 'wow', 'same', 'heart'];
-export const LIMITS = { textMin: 3, textMax: 280, placeNameMin: 2, placeNameMax: 60, messageMax: 1000 };
+export const LIMITS = { textMin: 3, textMax: 280, placeNameMin: 2, placeNameMax: 60, messageMax: 1000, roomMessageMax: 500 };
 
 // Kontrol karakterlerini atar, boşlukları sadeleştirir.
 export function cleanText(value, { multiline = false } = {}) {
@@ -845,9 +845,67 @@ export function deleteAccount(db, user) {
   db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
 }
 
-// Saklama süreleri: kesin konum 24 saat, şüpheli konum kayıtları 90 gün.
+// Saklama süreleri: kesin konum 24 saat, mekân odası mesajları 12 saat, şüpheli konum kayıtları 90 gün.
 export function purgeStaleData(db, config, now = Date.now()) {
   const locations = db.prepare('DELETE FROM location_reports WHERE at < ?').run(now - config.locationRetentionMs).changes;
+  const rooms = db.prepare('DELETE FROM room_messages WHERE created_at < ?').run(now - config.roomRetentionMs).changes;
   const flags = db.prepare('DELETE FROM location_flags WHERE at < ?').run(now - config.flagRetentionMs).changes;
-  return { locations: Number(locations), flags: Number(flags) };
+  return { locations: Number(locations), rooms: Number(rooms), flags: Number(flags) };
+}
+
+// --- Mekân odası -----------------------------------------------------------
+// O an aynı mekânda bulunanların grup sohbeti. Yalnızca oradayken okunur ve yazılır;
+// mesajlar 12 saat sonra silinir. Engellenen kişilerin mesajları görünmez.
+
+function requireHere(db, config, user, placeId) {
+  const place = db.prepare('SELECT id, name, city_id, lat, lng, radius_m FROM places WHERE id = ?').get(String(placeId));
+  if (!place) throw new HttpError(404, 'place_not_found');
+  if (!currentPlaceIds(db, config, user.id).has(place.id)) throw new HttpError(403, 'not_here', { placeName: place.name });
+  return place;
+}
+
+// Mekânda şu an bulunan kullanıcıların kimlikleri (canlı bildirim için).
+export function usersAtPlace(db, config, place, now = Date.now()) {
+  return db.prepare('SELECT user_id, lat, lng, accuracy FROM location_reports WHERE at > ?').all(now - config.presenceTtlMs)
+    .filter((r) => distanceM(r.lat, r.lng, place.lat, place.lng) <= place.radius_m + Math.min(r.accuracy || 0, config.maxAccuracyBonusM))
+    .map((r) => r.user_id);
+}
+
+export function getRoom(db, config, user, placeId) {
+  const place = requireHere(db, config, user, placeId);
+  const messages = db.prepare(`
+    SELECT * FROM (
+      SELECT m.id, m.user_id, m.body, m.created_at, u.handle FROM room_messages m JOIN users u ON u.id = m.user_id
+      WHERE m.place_id = ? AND m.created_at > ?
+        AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = m.user_id)
+                                                OR (b.blocker_id = m.user_id AND b.blocked_id = ?))
+      ORDER BY m.id DESC LIMIT 100) ORDER BY id`)
+    .all(place.id, Date.now() - config.roomRetentionMs, user.id, user.id)
+    .map((m) => ({ id: m.id, author: m.handle, mine: m.user_id === user.id, body: m.body, createdAt: m.created_at }));
+  return {
+    place: { id: place.id, name: place.name, cityId: place.city_id },
+    peopleHere: usersAtPlace(db, config, place).length,
+    retentionHours: Math.round(config.roomRetentionMs / 3600000),
+    messages,
+  };
+}
+
+export function postRoomMessage(db, config, user, placeId, rawBody) {
+  const place = requireHere(db, config, user, placeId);
+  const clean = cleanText(rawBody, { multiline: true });
+  if (!clean) throw new HttpError(400, 'message_empty');
+  if ([...clean].length > LIMITS.roomMessageMax) throw new HttpError(400, 'message_too_long');
+  // Yabancılarla ortak bir oda: kişisel veriler maskelenir, nefret söylemi reddedilir.
+  const { text } = moderatePublicText(clean);
+  const now = Date.now();
+  const { lastInsertRowid } = db.prepare('INSERT INTO room_messages (place_id, user_id, body, created_at) VALUES (?, ?, ?, ?)')
+    .run(place.id, user.id, text, now);
+  const blocked = new Set(db.prepare('SELECT blocked_id AS id FROM blocks WHERE blocker_id = ? UNION SELECT blocker_id FROM blocks WHERE blocked_id = ?')
+    .all(user.id, user.id).map((r) => r.id));
+  const recipients = usersAtPlace(db, config, place, now).filter((id) => id !== user.id && !blocked.has(id));
+  return {
+    placeId: place.id,
+    message: { id: Number(lastInsertRowid), author: user.handle, body: text, createdAt: now },
+    recipients,
+  };
 }
