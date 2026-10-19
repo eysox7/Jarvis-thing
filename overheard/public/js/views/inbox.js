@@ -80,6 +80,22 @@ export async function openConversation(app, id) {
   document.querySelector('#sheet .sheet-title').textContent = displayName(conv.with);
 
   const list = h('div', { class: 'msg-list', 'aria-live': 'polite' }, conv.messages.map(messageBubble));
+  // Eski mesajlar sayfa sayfa yüklenir.
+  let oldestId = conv.messages[0]?.id;
+  const loadOlder = h('button', {
+    class: 'link-btn small older',
+    type: 'button',
+    hidden: !conv.hasMore,
+    onclick: (e) => busy(e.currentTarget, async () => {
+      const { conversation: page } = await api.conversation(id, oldestId);
+      const height = list.scrollHeight;
+      loadOlder.after(...page.messages.map(messageBubble));
+      list.scrollTop += list.scrollHeight - height;
+      oldestId = page.messages[0]?.id ?? oldestId;
+      loadOlder.hidden = !page.hasMore;
+    }),
+  }, t('chat.older'));
+  list.prepend(loadOlder);
   const box = composer({
     placeholder: t('chat.placeholder'),
     onSend: async (text) => {

@@ -53,10 +53,14 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
       işaretlenir (uçuşla mümkün yolculuklar geçer); 24 saatte 3 olaydan sonra 24 saat mekân
       açılmaz; saatte en fazla 30 yeni mekân. Söz bırakma da aynı denetimden geçer. Moderatör
       panelinde şüpheli hesaplar. Demo modunda (ışınlanma) varsayılan olarak kapalı. Şema v5.
+- [x] **12. Ölçek** — Mekân söz sayıları SQL'de (liste sınırından bağımsız); şehir haritası en
+      yeni 300 sözü getirir, yakın bakışta görünür alanın sözleri `/api/overheards?bbox=` ile
+      ayrıca çekilip önbellekte birleştirilir (en fazla 1500); mesajlar 100'erli sayfalanır
+      ("Önceki mesajlar").
 
 ## Sıradakiler
 
-- [ ] **12. Ölçek** — Harita verisini görünür alana (bbox) göre çekme, sayfalama, indeksler.
+Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
 
 ## Kalite turları (tüm adımlar bitince)
 

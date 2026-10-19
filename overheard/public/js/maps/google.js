@@ -165,7 +165,14 @@ export function createGoogleMap(el, handlers) {
     }
   }
 
-  map.addListener('idle', redraw);
+  map.addListener('idle', () => {
+    redraw();
+    const bounds = map.getBounds();
+    if (!bounds) return;
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+    handlers.onViewChange?.({ zoom: map.getZoom(), bbox: [sw.lng(), sw.lat(), ne.lng(), ne.lat()] });
+  });
 
   const longPress = debounceLongPress(handlers.onLongPress);
   map.addListener('contextmenu', (e) => longPress({ lat: e.latLng.lat(), lng: e.latLng.lng() }));

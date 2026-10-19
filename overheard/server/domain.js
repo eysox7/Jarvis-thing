@@ -262,25 +262,46 @@ function serializeOverheard(row, ctx) {
   };
 }
 
+// Şehir haritası: tüm mekânlar (söz sayıları SQL'de, engellenenler hariç sayılır) + şehrin en
+// yeni sözleri. Yoğun bölgelerde ayrıntı için istemci görünür alanı /api/overheards?bbox= ile ister.
+export const CITY_OVERHEARD_LIMIT = 300;
+export const BBOX_OVERHEARD_LIMIT = 300;
+const MAX_BBOX_SPAN_DEG = 0.6;
+
 export function cityMap(db, config, viewer, cityId) {
   if (!CITY_BY_ID.has(cityId)) throw new HttpError(404, 'city_not_found');
+  const params = { city: cityId, viewer: viewer?.id ?? -1 };
   const rows = db.prepare(`${OVERHEARD_SELECT}
     WHERE p.city_id = :city AND o.hidden = 0 AND ${NOT_BLOCKED}
-    ORDER BY o.created_at DESC LIMIT 500`).all({ city: cityId, viewer: viewer?.id ?? -1 });
+    ORDER BY o.created_at DESC LIMIT ${CITY_OVERHEARD_LIMIT}`).all(params);
   const ctx = buildContext(db, config, viewer, rows);
   const overheards = rows.map((r) => serializeOverheard(r, ctx));
 
-  const stats = new Map();
-  for (const o of overheards) {
-    const s = stats.get(o.placeId) || { count: 0, lastAt: 0 };
-    s.count += 1;
-    s.lastAt = Math.max(s.lastAt, o.createdAt);
-    stats.set(o.placeId, s);
-  }
+  const stats = new Map(db.prepare(`
+    SELECT o.place_id, COUNT(*) AS n, MAX(o.created_at) AS last_at
+    FROM overheards o JOIN places p ON p.id = o.place_id
+    WHERE p.city_id = :city AND o.hidden = 0 AND ${NOT_BLOCKED}
+    GROUP BY o.place_id`).all(params).map((r) => [r.place_id, r]));
   const places = db.prepare('SELECT * FROM places WHERE city_id = ? ORDER BY name').all(cityId)
-    .map((p) => serializePlace(p, { visited: ctx.visited.has(p.id), count: stats.get(p.id)?.count || 0, lastAt: stats.get(p.id)?.lastAt || null }));
+    .map((p) => serializePlace(p, { visited: ctx.visited.has(p.id), count: stats.get(p.id)?.n || 0, lastAt: stats.get(p.id)?.last_at || null }));
 
-  return { city: CITY_BY_ID.get(cityId), places, overheards };
+  return { city: CITY_BY_ID.get(cityId), places, overheards, truncated: rows.length === CITY_OVERHEARD_LIMIT };
+}
+
+// Görünür alandaki sözler (mekân merkezine göre), en yeniden eskiye.
+export function overheardsInBox(db, config, viewer, bbox) {
+  const parts = String(bbox || '').split(',').map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) throw new HttpError(400, 'bad_bbox');
+  const [minLng, minLat, maxLng, maxLat] = parts;
+  if (minLat > maxLat || minLng > maxLng || !isValidCoord(minLat, minLng) || !isValidCoord(maxLat, maxLng)) throw new HttpError(400, 'bad_bbox');
+  if (maxLat - minLat > MAX_BBOX_SPAN_DEG || maxLng - minLng > MAX_BBOX_SPAN_DEG) throw new HttpError(400, 'bbox_too_large');
+  const rows = db.prepare(`${OVERHEARD_SELECT}
+    WHERE p.lat BETWEEN :minLat AND :maxLat AND p.lng BETWEEN :minLng AND :maxLng
+      AND o.hidden = 0 AND ${NOT_BLOCKED}
+    ORDER BY o.created_at DESC LIMIT ${BBOX_OVERHEARD_LIMIT}`)
+    .all({ minLat, maxLat, minLng, maxLng, viewer: viewer?.id ?? -1 });
+  const ctx = buildContext(db, config, viewer, rows);
+  return { overheards: rows.map((r) => serializeOverheard(r, ctx)), truncated: rows.length === BBOX_OVERHEARD_LIMIT };
 }
 
 function loadOverheardRow(db, id, viewerId) {
@@ -505,6 +526,8 @@ function senderName(db, conv, senderId, handle) {
   return hiddenAuthor(conv, conversationOverheard(db, conv), senderId) ? null : handle;
 }
 
+const MESSAGE_PAGE = 100;
+
 function loadConversation(db, user, id) {
   const conv = db.prepare('SELECT * FROM conversations WHERE id = ?').get(id);
   if (!conv || (conv.owner_id !== user.id && conv.starter_id !== user.id)) throw new HttpError(404, 'conversation_not_found');
@@ -558,15 +581,19 @@ export function listConversations(db, user) {
     });
 }
 
-export function getConversation(db, user, id) {
+export function getConversation(db, user, id, { before } = {}) {
   const conv = loadConversation(db, user, id);
   const amOwner = conv.owner_id === user.id;
   const otherId = amOwner ? conv.starter_id : conv.owner_id;
   db.prepare(`UPDATE conversations SET ${amOwner ? 'owner_read_at' : 'starter_read_at'} = ? WHERE id = ?`).run(Date.now(), id);
   const other = db.prepare('SELECT handle FROM users WHERE id = ?').get(otherId);
   const overheard = conversationOverheard(db, conv);
-  const messages = db.prepare(`
-    SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 200) ORDER BY id`).all(id)
+  // Sayfalama: en yeni 100 mesaj; `before` verilirse o mesajdan eskiler.
+  const page = db.prepare(`
+    SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? AND id < ? ORDER BY id DESC LIMIT ?) ORDER BY id`)
+    .all(id, Number(before) > 0 ? Number(before) : Number.MAX_SAFE_INTEGER, MESSAGE_PAGE + 1);
+  const hasMore = page.length > MESSAGE_PAGE;
+  const messages = page.slice(hasMore ? 1 : 0)
     .map((m) => ({ id: m.id, body: m.body, createdAt: m.created_at, fromMe: m.sender_id === user.id }));
   return {
     id: conv.id,
@@ -578,6 +605,7 @@ export function getConversation(db, user, id) {
     // Anonim sözün sahibi bu konuşmada kimliğini açabilir.
     canReveal: hiddenAuthor(conv, overheard, user.id),
     messages,
+    hasMore,
   };
 }
 

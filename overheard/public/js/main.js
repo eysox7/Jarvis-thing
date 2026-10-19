@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { t, errorText } from './i18n.js';
 import { h, clear, distanceM, truncate, displayName } from './util.js';
-import { createMap } from './map.js';
+import { createMap, DETAIL_ZOOM } from './map.js';
 import { toast, closeSheet, sheetKey } from './ui.js';
 import { bubbleContent } from './views/bubble.js';
 import { openAuth } from './views/auth.js';
@@ -70,6 +70,39 @@ function locateOnce() {
   });
 }
 
+// Yakın bakışta görünür alanın sözlerini ayrıca çeker: yoğun mekânlarda şehir listesinin
+// sınırına takılmadan tüm balonlar görünsün.
+const MAX_BOX_SPAN_DEG = 0.5;
+const MAX_CACHED_OVERHEARDS = 1500;
+let viewTimer = null;
+let lastBox = null;
+
+function onViewChange({ zoom, bbox }) {
+  clearTimeout(viewTimer);
+  if (zoom < DETAIL_ZOOM || !state.data) return;
+  const [w, s, e, n] = bbox;
+  if (e - w > MAX_BOX_SPAN_DEG || n - s > MAX_BOX_SPAN_DEG) return;
+  viewTimer = setTimeout(async () => {
+    const key = bbox.map((v) => v.toFixed(3)).join(',');
+    if (key === lastBox) return;
+    lastBox = key;
+    try {
+      const { overheards } = await api.overheardsInBox(bbox);
+      mergeOverheards(overheards);
+    } catch {
+      lastBox = null;
+    }
+  }, 250);
+}
+
+function mergeOverheards(incoming) {
+  if (!state.data || !incoming.length) return;
+  const byId = new Map(state.data.overheards.map((o) => [o.id, o]));
+  for (const o of incoming) byId.set(o.id, o);
+  state.data.overheards = [...byId.values()].sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_CACHED_OVERHEARDS);
+  map.render(state.data);
+}
+
 function replaceOverheard(updated) {
   if (!state.data) return;
   const i = state.data.overheards.findIndex((o) => o.id === updated.id);
@@ -105,6 +138,7 @@ const app = {
   async refresh() {
     try {
       state.data = await api.cityMap(state.city.id);
+      lastBox = null;
       map.render(state.data);
       nudge.update();
       const openId = map.openId();
@@ -414,6 +448,7 @@ async function boot() {
     onBubbleClick: (o) => app.openOverheard(o),
     onPlaceClick: (p) => map.flyTo(p.lat, p.lng, 16),
     onLongPress,
+    onViewChange,
     onProviderFallback: () => toast(t('toast.mapFallback')),
   }, config);
   map.setCity(state.city);

@@ -106,6 +106,9 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   // --- Harita ve mekânlar ---
   router.get('/api/cities/:id/map', (ctx) => domain.cityMap(db, config, ctx.user, ctx.params.id));
 
+  // Görünür alan: ?bbox=minLng,minLat,maxLng,maxLat
+  router.get('/api/overheards', (ctx) => domain.overheardsInBox(db, config, ctx.user, ctx.url.searchParams.get('bbox')));
+
   router.post('/api/checkins', async (ctx) => {
     const user = requireUser(ctx);
     limit(`checkin:${user.id}`, 120, 3600000);
@@ -169,7 +172,9 @@ export function registerApi(router, { db, config, events, rateLimit }) {
 
   router.get('/api/conversations', (ctx) => ({ conversations: domain.listConversations(db, requireUser(ctx)) }));
 
-  router.get('/api/conversations/:id', (ctx) => ({ conversation: domain.getConversation(db, requireUser(ctx), ctx.params.id) }));
+  router.get('/api/conversations/:id', (ctx) => ({
+    conversation: domain.getConversation(db, requireUser(ctx), ctx.params.id, { before: ctx.url.searchParams.get('before') }),
+  }));
 
   router.post('/api/conversations/:id/messages', async (ctx) => {
     const user = requireActive(ctx);

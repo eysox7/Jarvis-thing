@@ -51,6 +51,10 @@ export function createLeafletMap(el, handlers) {
   }
 
   map.on('zoomend moveend', redraw);
+  map.on('moveend', () => {
+    const b = map.getBounds();
+    handlers.onViewChange?.({ zoom: map.getZoom(), bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()] });
+  });
 
   const longPress = debounceLongPress(handlers.onLongPress);
   map.on('contextmenu', (e) => longPress(e.latlng));

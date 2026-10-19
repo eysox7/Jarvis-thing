@@ -175,14 +175,15 @@ ayrıntıları gönderilmez. Tepki vermek, şikâyet etmek ve mesaj atmak da ayn
 | `GET /api/config` | Pilot şehirler, sınırlar, demo modu |
 | `POST /api/auth/register` · `login` · `guest` · `logout` | Hesap |
 | `GET /api/me` | Kullanıcı, istatistikler, okunmamış mesaj sayısı |
-| `GET /api/cities/:id/map` | Şehrin mekânları ve sözleri (görüntüleyene göre kilitli/açık) |
+| `GET /api/cities/:id/map` | Şehrin mekânları (söz sayılarıyla) ve en yeni 300 sözü (görüntüleyene göre kilitli/açık) |
+| `GET /api/overheards?bbox=minLng,minLat,maxLng,maxLat` | Görünür alandaki sözler (en fazla 300; alan ≤ 0,6°) |
 | `POST /api/checkins` | `{lat, lng, accuracy}` → bulunduğun mekânlar, yeni açılanlar |
 | `GET /api/me/places` | Kilidini açtığın mekânlar |
 | `POST /api/overheards` | `{text, lat, lng, placeId? , newPlaceName?}` |
 | `GET/DELETE /api/overheards/:id` | |
 | `POST /api/overheards/:id/reactions` · `report` | `kind: same` yalnızca o sırada orada olanlara |
 | `POST /api/overheards/:id/messages` | `{body, to?}`: sahibine ya da (`to`) bir tanığa yazar |
-| `GET /api/conversations` · `GET /api/conversations/:id` · `POST …/messages` | |
+| `GET /api/conversations` · `GET /api/conversations/:id?before=` · `POST …/messages` | Mesajlar 100'erli sayfalanır |
 | `POST /api/conversations/:id/reveal` | Anonim söz sahibi kimliğini açar |
 | `POST /api/overheards/:id/block-author` · `POST /api/users/:handle/block` | Engelleme |
 | `GET /api/admin/reports` · `POST …/overheards/:id/restore` · `DELETE …/overheards/:id` · `POST …/users/:handle/ban` | Moderasyon (yalnızca `OVERHEARD_ADMINS`) |

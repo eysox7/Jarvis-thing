@@ -280,6 +280,34 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
     });
   });
 
+  describe('Yoğun bölge', () => {
+    let srv;
+    before(async () => {
+      srv = await startTestServer({ demo: true });
+      const { id: userId } = srv.db.prepare('SELECT id FROM users LIMIT 1').get();
+      const insert = srv.db.prepare("INSERT INTO overheards (id, user_id, place_id, text, created_at) VALUES (?, ?, 'ist-bebek', ?, ?)");
+      srv.db.exec('BEGIN');
+      for (let i = 0; i < 400; i++) insert.run(`yogun${i}`, userId, `Bebek'te söz ${i}`, Date.now() - i * 1000);
+      srv.db.exec('COMMIT');
+    });
+    after(async () => { await srv.close(); });
+
+    test('yakınlaşınca görünür alanın sözleri ayrıca yüklenir', async () => {
+      const u = await newUser(browser, srv.base, KADIKOY);
+      const before = await u.page.evaluate(() => window.overheard.app.state.data.overheards.length);
+      assert.equal(before, 300);
+      // Mekân sayacı listedeki 300 sözle sınırlı değildir (400 toplu + 1 demo sözü).
+      const count = await u.page.evaluate(() => window.overheard.app.state.data.places.find((p) => p.id === 'ist-bebek').count);
+      assert.equal(count, 401);
+      await u.page.locator('.oh-place, .oh-dot', { hasText: '401' }).first().waitFor();
+      await zoomTo(u.page, 41.077, 29.0435);
+      await u.page.waitForFunction(() => window.overheard.app.state.data.overheards.filter((o) => o.placeId === 'ist-bebek').length >= 300);
+      await u.page.locator('.oh-bubble.is-locked, .oh-dot.is-locked').first().waitFor();
+      assert.deepEqual(u.errors, []);
+      await u.context.close();
+    });
+  });
+
   describe('Google Maps', () => {
     let srv;
     before(async () => { srv = await startTestServer({ demo: true, googleMapsKey: 'test-key' }); });
