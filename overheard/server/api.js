@@ -64,7 +64,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const passHash = await hashPassword(password);
     const { lastInsertRowid } = db.prepare('INSERT INTO users (handle, pass_hash, created_at) VALUES (?, ?, ?)').run(handle, passHash, Date.now());
     startSession(ctx, Number(lastInsertRowid));
-    return { user: { handle, isGuest: false } };
+    return { user: publicUser({ handle, isGuest: false }) };
   });
 
   router.post('/api/auth/login', async (ctx) => {
@@ -84,7 +84,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const passHash = await hashPassword(randomBytes(24).toString('hex'));
     const { lastInsertRowid } = db.prepare('INSERT INTO users (handle, pass_hash, is_guest, created_at) VALUES (?, ?, 1, ?)').run(handle, passHash, Date.now());
     startSession(ctx, Number(lastInsertRowid));
-    return { user: { handle, isGuest: true } };
+    return { user: publicUser({ handle, isGuest: true }) };
   });
 
   router.post('/api/auth/logout', (ctx) => {
@@ -199,6 +199,11 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   router.get('/api/admin/reports', (ctx) => {
     requireAdmin(ctx);
     return { overheards: domain.reportedOverheards(db) };
+  });
+
+  router.get('/api/admin/location-flags', (ctx) => {
+    requireAdmin(ctx);
+    return { users: domain.locationFlags(db) };
   });
 
   router.post('/api/admin/overheards/:id/restore', (ctx) => {

@@ -260,7 +260,12 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await sheet(u.page).locator('input[name="handle"]').fill('moderator');
       await sheet(u.page).locator('input[name="password"]').fill('cok-gizli-parola');
       await sheet(u.page).locator('form').getByRole('button', { name: 'Kayıt ol' }).click();
-      await u.page.waitForFunction(() => window.overheard.app.state.user?.isAdmin);
+      try {
+        await u.page.waitForFunction(() => window.overheard.app.state.user?.isAdmin, null, { timeout: 8000 });
+      } catch (err) {
+        const debug = await u.page.evaluate(() => ({ user: window.overheard.app.state.user, sheet: document.querySelector('#sheet')?.innerText }));
+        throw new Error(`kayıt olmadı: ${JSON.stringify(debug)} ${JSON.stringify(u.errors)}`);
+      }
 
       await u.page.locator('[data-nav="profile"]').click();
       await sheet(u.page).getByRole('button', { name: /Moderasyon paneli/ }).click();

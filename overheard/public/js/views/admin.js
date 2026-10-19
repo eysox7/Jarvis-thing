@@ -9,13 +9,32 @@ export async function openAdmin(app) {
   openSheet({ key: 'admin', title: `🛡️ ${t('admin.title')}`, body });
 
   let items;
+  let flagged;
   try {
-    ({ overheards: items } = await api.adminReports());
+    [{ overheards: items }, { users: flagged }] = await Promise.all([api.adminReports(), api.adminLocationFlags()]);
   } catch (err) {
     clear(body).append(h('p', { class: 'form-error' }, errorText(err)));
     return;
   }
   clear(body);
+  if (flagged.length) {
+    body.append(
+      h('h3', { class: 'section-title' }, `📍 ${t('admin.locationFlags')}`),
+      h('ul', { class: 'list' }, flagged.map((u) => h('li', { class: 'admin-item' },
+        h('p', { class: 'row-between' }, h('strong', {}, `@${u.handle}`), h('span', { class: 'chip chip-hot' }, t('admin.flags', { n: u.flags }))),
+        h('p', { class: 'muted small' }, `${timeAgo(u.lastAt)} · ${u.last}`),
+        h('div', { class: 'bubble-actions' },
+          h('button', {
+            class: 'btn btn-ghost',
+            type: 'button',
+            onclick: (e) => busy(e.currentTarget, async () => {
+              await api.adminBan(u.handle, !u.banned);
+              toast(u.banned ? t('admin.unbanned') : t('admin.bannedToast'));
+              await openAdmin(app);
+            }),
+          }, u.banned ? t('admin.unban') : t('admin.ban')))))),
+      h('h3', { class: 'section-title' }, `🚩 ${t('admin.title')}`));
+  }
   if (!items.length) {
     body.append(h('p', { class: 'empty' }, `✅ ${t('admin.empty')}`));
     return;

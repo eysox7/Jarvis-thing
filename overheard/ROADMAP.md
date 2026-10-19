@@ -48,11 +48,14 @@ commit'lenir ve `claude/overheard-app-development-bg76id` dalına push'lanır.
       HEALTHCHECK), Caddy ile otomatik HTTPS sunan docker-compose örneği, `/healthz`,
       `OVERHEARD_TRUST_PROXY` (hız sınırı gerçek istemci adresine göre), HTTPS'te HSTS,
       `npm run backup` (VACUUM INTO). README'de dağıtım rehberi.
+- [x] **11. Konum sahteciliğine karşı** — 200 m'den belirsiz konum mekân açmaz; son güvenilir
+      konuma göre 5 km'den uzun ve 1000 km/sa'ten hızlı sıçramalar "imkânsız seyahat" olarak
+      işaretlenir (uçuşla mümkün yolculuklar geçer); 24 saatte 3 olaydan sonra 24 saat mekân
+      açılmaz; saatte en fazla 30 yeni mekân. Söz bırakma da aynı denetimden geçer. Moderatör
+      panelinde şüpheli hesaplar. Demo modunda (ışınlanma) varsayılan olarak kapalı. Şema v5.
 
 ## Sıradakiler
 
-- [ ] **11. Konum sahteciliğine karşı** — İmkânsız seyahat (hız) denetimi, düşük doğruluklu
-      konumları reddetme, şüpheli check-in işaretleme.
 - [ ] **12. Ölçek** — Harita verisini görünür alana (bbox) göre çekme, sayfalama, indeksler.
 
 ## Kalite turları (tüm adımlar bitince)

@@ -134,6 +134,23 @@ export const MIGRATIONS = [
   `
   ALTER TABLE users ADD COLUMN banned_at INTEGER;
   `,
+  // v5: Konum sahteciliğine karşı: son güvenilir konum ve şüpheli olay kayıtları.
+  `
+  CREATE TABLE location_reports (
+    user_id  INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    lat      REAL NOT NULL,
+    lng      REAL NOT NULL,
+    at       INTEGER NOT NULL
+  );
+  CREATE TABLE location_flags (
+    id       INTEGER PRIMARY KEY,
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason   TEXT NOT NULL,
+    detail   TEXT,
+    at       INTEGER NOT NULL
+  );
+  CREATE INDEX location_flags_user ON location_flags(user_id, at);
+  `,
 ];
 
 export function openDb(path) {

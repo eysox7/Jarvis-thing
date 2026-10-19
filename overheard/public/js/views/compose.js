@@ -60,6 +60,10 @@ export async function openCompose(app) {
     }
     try {
       const result = await app.checkIn(position, { silent: true });
+      if (result.blocked && result.blocked !== 'unlock_burst') {
+        clear(where).append(h('p', { class: 'form-error' }, t(`location.${result.blocked}`)));
+        return;
+      }
       renderPlaces(result.places);
     } catch (err) {
       clear(where).append(h('p', { class: 'form-error' }, errorText(err)));

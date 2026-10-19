@@ -134,6 +134,7 @@ Bunu günlük bir zamanlayıcıya bağlayıp yedekleri sunucu dışına kopyalay
 | --- | --- | --- |
 | `OVERHEARD_TRUST_PROXY` | `0` | Ters vekil arkasında `1`: istemci adresi `X-Forwarded-For`'un son öğesi |
 | `OVERHEARD_RATE_SCALE` | `1` | Hız sınırı çarpanı |
+| `OVERHEARD_ANTI_SPOOF` | demo kapalıysa `1` | Konum sahteciliği denetimleri |
 
 ## Mimari
 
@@ -187,10 +188,23 @@ ayrıntıları gönderilmez. Tepki vermek, şikâyet etmek ve mesaj atmak da ayn
 | `GET /api/admin/reports` · `POST …/overheards/:id/restore` · `DELETE …/overheards/:id` · `POST …/users/:handle/ban` | Moderasyon (yalnızca `OVERHEARD_ADMINS`) |
 | `GET /api/events` | SSE akışı (`dm`, `reveal` olayları) |
 
+## Konum güvenilirliği
+
+Tarayıcıdan gelen konum kriptografik olarak doğrulanamaz. Üretimde (`OVERHEARD_DEMO=0`) şu
+denetimler açıktır (`OVERHEARD_ANTI_SPOOF` ile değiştirilebilir):
+
+- 200 m'den belirsiz konum mekân açmaz.
+- Son güvenilir konuma göre 5 km'den uzun ve 1000 km/sa'ten hızlı sıçrama "imkânsız seyahat"
+  sayılır ve işaretlenir (uçakla mümkün yolculuklar geçer).
+- 24 saatte 3 şüpheli olaydan sonra check-in'ler 24 saat mekân açmaz.
+- Saatte en fazla 30 yeni mekân açılabilir.
+- Şüpheli hesaplar moderatör panelinde listelenir.
+
 ## Bilinen sınırlar
 
-- Tarayıcıdan gelen konum doğrulanamaz; kararlı bir kullanıcı konumunu taklit edebilir. Üretimde
-  hız/tutarlılık denetimleri ve yerli uygulama doğrulaması gerekir (bkz. `ROADMAP.md`).
+- Yukarıdaki denetimler kaba sahteciliği frenler ama kararlı bir kullanıcıyı (yavaş yavaş sahte
+  konumla "yürüyen") durduramaz. Kesin çözüm için yerli uygulama + cihaz doğrulaması (App Attest /
+  Play Integrity) ya da ortak mekânlarda QR/BLE işaretçileri gerekir.
 - Hız sınırları ve canlı bağlantılar tek süreç içindedir; yatay ölçeklemede paylaşılan bir depo
   (ör. Redis) gerekir.
 - Harita karoları CARTO/OpenStreetMap'ten gelir; yoğun kullanımda kendi karo sunucunuz ya da

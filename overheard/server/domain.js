@@ -71,19 +71,80 @@ export function serializePlace(p, extra = {}) {
   };
 }
 
+// --- Konum güvenilirliği -----------------------------------------------------
+// Tarayıcıdan gelen konum doğrulanamaz; bu denetimler kaba sahteciliği (ışınlanma, belirsiz
+// konum, toplu mekân açma) frenler ve moderatörlere şüpheli hesapları gösterir.
+
+function flagLocation(db, userId, reason, detail) {
+  db.prepare('INSERT INTO location_flags (user_id, reason, detail, at) VALUES (?, ?, ?, ?)')
+    .run(userId, reason, detail ? JSON.stringify(detail) : null, Date.now());
+}
+
+// { ok: true } ya da { ok: false, reason }. Güvenilen konum, bir sonraki karşılaştırma için saklanır.
+export function verifyLocation(db, config, user, coords, now = Date.now()) {
+  if (!config.antiSpoofing) return { ok: true };
+  if (coords.accuracy > config.maxAccuracyM) return { ok: false, reason: 'low_accuracy' };
+  const { n: flags } = db.prepare('SELECT COUNT(*) AS n FROM location_flags WHERE user_id = ? AND at > ?').get(user.id, now - 86400000);
+  if (flags >= config.flagLimitPerDay) return { ok: false, reason: 'location_cooldown' };
+
+  const last = db.prepare('SELECT lat, lng, at FROM location_reports WHERE user_id = ?').get(user.id);
+  if (last) {
+    const meters = distanceM(last.lat, last.lng, coords.lat, coords.lng);
+    const hours = Math.max(1, now - last.at) / 3600000;
+    const kmh = meters / 1000 / hours;
+    if (meters > config.minJumpM && kmh > config.maxSpeedKmh) {
+      flagLocation(db, user.id, 'impossible_travel', { km: Math.round(meters / 1000), minutes: Math.round(hours * 60), kmh: Math.round(kmh) });
+      return { ok: false, reason: 'impossible_travel' };
+    }
+  }
+  db.prepare(`INSERT INTO location_reports (user_id, lat, lng, at) VALUES (?, ?, ?, ?)
+              ON CONFLICT(user_id) DO UPDATE SET lat = excluded.lat, lng = excluded.lng, at = excluded.at`)
+    .run(user.id, coords.lat, coords.lng, now);
+  return { ok: true };
+}
+
+export function locationFlags(db) {
+  return db.prepare(`
+    SELECT u.handle, u.banned_at, COUNT(*) AS flags, MAX(f.at) AS last_at,
+           (SELECT reason || ' ' || COALESCE(detail, '') FROM location_flags x WHERE x.user_id = f.user_id ORDER BY x.at DESC LIMIT 1) AS last
+    FROM location_flags f JOIN users u ON u.id = f.user_id
+    WHERE f.at > ?
+    GROUP BY f.user_id ORDER BY flags DESC, last_at DESC LIMIT 100`).all(Date.now() - 7 * 86400000)
+    .map((r) => ({ handle: r.handle, banned: r.banned_at != null, flags: r.flags, lastAt: r.last_at, last: r.last }));
+}
+
 // --- Check-in -------------------------------------------------------------
 
 export function checkIn(db, config, user, coords) {
   const now = Date.now();
+  const city = cityAt(coords.lat, coords.lng)?.id || null;
+  const trust = verifyLocation(db, config, user, coords, now);
+  if (!trust.ok) return { places: [], city, blocked: trust.reason };
+
   const found = placesContaining(db, config, coords);
   const lastAt = db.prepare('SELECT MAX(at) AS at FROM checkins WHERE user_id = ? AND place_id = ?');
   const insert = db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)');
-  const places = transaction(db, () => found.map((p) => {
+  // Son bir saatte ilk kez açılan mekân sayısı: aşılırsa yeni mekân açılmaz (eskiler yine sayılır).
+  let unlocksLeft = config.antiSpoofing
+    ? config.maxUnlocksPerHour - db.prepare(`
+        SELECT COUNT(*) AS n FROM (SELECT MIN(at) AS first FROM checkins WHERE user_id = ? GROUP BY place_id) WHERE first > ?`)
+      .get(user.id, now - 3600000).n
+    : Infinity;
+  let throttled = false;
+  const places = transaction(db, () => found.flatMap((p) => {
     const { at } = lastAt.get(user.id, p.id);
+    if (at == null) {
+      if (unlocksLeft <= 0) {
+        throttled = true;
+        return [];
+      }
+      unlocksLeft -= 1;
+    }
     if (at == null || now - at >= config.checkinCooldownMs) insert.run(user.id, p.id, now);
-    return serializePlace(p, { visited: true, newlyUnlocked: at == null, distance: Math.round(p.distance) });
+    return [serializePlace(p, { visited: true, newlyUnlocked: at == null, distance: Math.round(p.distance) })];
   }));
-  return { places, city: cityAt(coords.lat, coords.lng)?.id || null };
+  if (throttled) flagLocation(db, user.id, 'unlock_burst', { limit: config.maxUnlocksPerHour });
+  return { places, city, ...(throttled ? { blocked: 'unlock_burst' } : {}) };
 }
 
 // --- Sözler ---------------------------------------------------------------
@@ -259,6 +320,8 @@ export function createOverheard(db, config, user, body) {
   if ([...text].length > LIMITS.textMax) throw new HttpError(400, 'text_too_long');
   const coords = readCoords(body);
   const now = Date.now();
+  const trust = verifyLocation(db, config, user, coords, now);
+  if (!trust.ok) throw new HttpError(403, trust.reason);
 
   return transaction(db, () => {
     let place;

@@ -17,6 +17,18 @@ export function loadConfig(overrides = {}) {
     sessionDays: 30,
     // Konum doğruluğu (accuracy) toleransının üst sınırı, metre.
     maxAccuracyBonusM: 75,
+    // Konum sahteciliği denetimleri. Demo modunda (ışınlanma serbest) varsayılan olarak kapalı.
+    antiSpoofing: flag(env.OVERHEARD_ANTI_SPOOF, !flag(env.OVERHEARD_DEMO, true)),
+    // Bundan daha belirsiz konumlar (metre) mekân açmaz.
+    maxAccuracyM: 200,
+    // Bu hızın (km/sa) üstündeki sıçramalar imkânsız seyahat sayılır (yolcu uçağı ~900).
+    maxSpeedKmh: 1000,
+    // Kısa sıçramalar (GPS oynaması) hız denetimine girmez.
+    minJumpM: 5000,
+    // 24 saatte bu kadar şüpheli olaydan sonra check-in'ler 24 saat mekân açmaz.
+    flagLimitPerDay: 3,
+    // Saatte en fazla bu kadar yeni mekân açılabilir (bot/otomasyon frenleme).
+    maxUnlocksPerHour: 30,
     // Aynı mekâna art arda check-in'ler arasında en az bu kadar süre olmalı.
     checkinCooldownMs: 10 * 60 * 1000,
     // "Aynı anda oradaydınız" rozeti için zaman penceresi.

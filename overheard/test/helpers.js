@@ -6,7 +6,7 @@ import { seedDemoContent, seedPlaces } from '../server/seed.js';
 
 // Bellek içi veritabanıyla gerçek bir HTTP sunucusu ayağa kaldırır.
 export async function startTestServer({ demo = false, ...overrides } = {}) {
-  const config = loadConfig({ dbPath: ':memory:', demoMode: demo, rateLimitScale: 100, ...overrides });
+  const config = loadConfig({ dbPath: ':memory:', demoMode: demo, rateLimitScale: 100, antiSpoofing: false, ...overrides });
   const db = openDb(':memory:');
   seedPlaces(db);
   if (demo) await seedDemoContent(db);

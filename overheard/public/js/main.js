@@ -199,6 +199,10 @@ const app = {
     }
     const result = await api.checkIn({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy });
     lastCheckIn = { lat: pos.lat, lng: pos.lng, at: Date.now() };
+    if (result.blocked) {
+      warnLocation(result.blocked);
+      return result;
+    }
     const unlocked = result.places.filter((p) => p.newlyUnlocked);
     if (result.city && result.city !== state.city.id) await app.selectCity(result.city, { keepView: true });
     else if (unlocked.length) await app.refresh();
@@ -240,9 +244,22 @@ const app = {
   },
 };
 
+// Konum uyarıları (belirsiz konum, imkânsız seyahat...) keşif modunda her adımda tekrarlanmasın.
+const lastWarning = new Map();
+function warnLocation(reason) {
+  if (Date.now() - (lastWarning.get(reason) || 0) < 5 * 60000) return;
+  lastWarning.set(reason, Date.now());
+  toast(t(`location.${reason}`), { tone: 'error', timeout: 7000 });
+}
+
+// Yalnızca en son başlatılan /api/me yanıtı uygulanır: girişten önce başlamış eski bir istek
+// geç dönerse yeni oturumu ezmesin.
+let meSeq = 0;
 async function refreshMe() {
+  const seq = ++meSeq;
   try {
     const me = await api.me();
+    if (seq !== meSeq) return;
     state.user = me.user;
     state.stats = me.stats || null;
     state.unread = me.unread || 0;

@@ -52,6 +52,7 @@ export const api = {
   blockAuthor: (id) => request('POST', `/api/overheards/${enc(id)}/block-author`, {}),
   reveal: (id) => request('POST', `/api/conversations/${enc(id)}/reveal`, {}),
   adminReports: () => request('GET', '/api/admin/reports'),
+  adminLocationFlags: () => request('GET', '/api/admin/location-flags'),
   adminRestore: (id) => request('POST', `/api/admin/overheards/${enc(id)}/restore`, {}),
   adminDelete: (id) => request('DELETE', `/api/admin/overheards/${enc(id)}`),
   adminBan: (handle, banned) => request('POST', `/api/admin/users/${enc(handle)}/ban`, { banned }),
