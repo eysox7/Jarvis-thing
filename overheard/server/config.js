@@ -31,6 +31,10 @@ export function loadConfig(overrides = {}) {
     maxUnlocksPerHour: 30,
     // Son konum bildiriminden bu kadar süre sonra "orada" sayılmaz; yerel sözler yeniden kilitlenir.
     presenceTtlMs: 30 * 60 * 1000,
+    // Kesin konum (son konum bildirimi) en fazla bu kadar saklanır; mekân düzeyindeki check-in'ler kalır.
+    locationRetentionMs: 24 * 60 * 60 * 1000,
+    // Şüpheli konum kayıtlarının saklama süresi.
+    flagRetentionMs: 90 * 24 * 60 * 60 * 1000,
     // Aynı mekâna art arda check-in'ler arasında en az bu kadar süre olmalı.
     checkinCooldownMs: 10 * 60 * 1000,
     // "Aynı anda oradaydınız" rozeti için zaman penceresi.

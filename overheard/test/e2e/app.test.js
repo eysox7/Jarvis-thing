@@ -308,6 +308,32 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await u.context.close();
     });
 
+    test('verilerimi indir ve hesabımı sil', async () => {
+      const u = await newUser(browser, srv.base, KADIKOY);
+      await loginAsGuest(u.page);
+      await u.page.locator('#btn-locate').click();
+      await u.page.locator('.toast', { hasText: 'buradasın' }).first().waitFor();
+      await u.page.locator('[data-nav="profile"]').click();
+      const [download] = await Promise.all([
+        u.page.waitForEvent('download'),
+        sheet(u.page).getByRole('link', { name: /Verilerimi indir/ }).click(),
+      ]);
+      assert.equal(download.suggestedFilename(), 'overheard-verilerim.json');
+      const data = JSON.parse(await (await import('node:fs/promises')).readFile(await download.path(), 'utf8'));
+      assert.ok(data.checkins.some((c) => c.place === 'Kadıköy İskelesi'));
+
+      u.page.once('dialog', (d) => d.accept());
+      await sheet(u.page).getByRole('button', { name: 'Hesabımı sil' }).click();
+      await u.page.locator('.toast', { hasText: 'Hesabın ve verilerin silindi' }).waitFor();
+      await u.page.waitForFunction(() => window.overheard.app.state.user === null);
+      // Yasal sayfalar açılır.
+      const privacy = await fetch(`${srv.base}/privacy.html`);
+      assert.equal(privacy.status, 200);
+      assert.match(await privacy.text(), /24 saat/);
+      assert.deepEqual(u.errors, []);
+      await u.context.close();
+    });
+
     test('İngilizce arayüze geçiş', async () => {
       const u = await newUser(browser, srv.base, KADIKOY);
       await u.page.locator('[data-nav="profile"]').click();
@@ -336,6 +362,10 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await sheet(u.page).getByRole('tab', { name: 'Kayıt ol' }).click();
       await sheet(u.page).locator('input[name="handle"]').fill('moderator');
       await sheet(u.page).locator('input[name="password"]').fill('cok-gizli-parola');
+      // Onaysız kayıt reddedilir; onay kutusu işaretlenince hesap açılır.
+      await sheet(u.page).locator('form').getByRole('button', { name: 'Kayıt ol' }).click();
+      await sheet(u.page).getByText('kullanım koşullarını ve gizlilik politikasını kabul etmelisin').waitFor();
+      await sheet(u.page).locator('input[name="acceptTerms"]').check();
       await sheet(u.page).locator('form').getByRole('button', { name: 'Kayıt ol' }).click();
       try {
         await u.page.waitForFunction(() => window.overheard.app.state.user?.isAdmin, null, { timeout: 8000 });

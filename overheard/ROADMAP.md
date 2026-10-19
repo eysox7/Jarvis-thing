@@ -80,6 +80,19 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
 - Kullanıcı başına en fazla 5 canlı bağlantı; süresi dolan oturumların temizliği.
 - Dil anahtarları TR/EN eşit, ESLint temel kurallarla temiz; tarayıcı testlerindeki yarış durumları giderildi.
 
+## Yayın öncesi ve büyüme (ikinci tur)
+
+- [x] **13. KVKK/GDPR** — Kayıtta açık onay (18+, kullanım koşulları, gizlilik politikası; zamanı
+      saklanır), misafirde bilgilendirme. "Verilerimi indir" (tüm kişisel veriler tek JSON) ve
+      "Hesabımı sil" (parolayla; tüm veriler kademeli silinir). Kesin konum 24 saat, şüpheli konum
+      kayıtları 90 gün saklanır (saatlik bakım). `privacy.html` ve `terms.html` taslakları. Şema v7.
+      Keşif modu artık geçici konum hatasında kapanmıyor (yalnızca izin reddinde).
+- [ ] **14. "Şu an burada N kişi"** — Mekânda o an bulunan kişi sayısı (isimsiz).
+- [ ] **15. Mekân odası** — O an aynı mekânda olanların geçici grup sohbeti (12 saatte silinir).
+- [ ] **16. Paylaşılabilir kartlar** — Herkese açık sözden Instagram hikâyesi boyutunda görsel.
+- [ ] **17. Haftanın en iyileri** — Şehir başına en çok tepki alan herkese açık sözler.
+- [ ] **18. 24 saatlik sözler** — İsteğe bağlı, bir gün sonra kaybolan sözler.
+
 ## Kalite turları (tüm adımlar bitince)
 
 Erişilebilirlik denetimi, mobil Safari uyumluluğu, performans profili, hata mesajları, kopya

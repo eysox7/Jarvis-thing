@@ -366,10 +366,16 @@ function toggleExplore() {
         || Date.now() - lastCheckIn.at > EXPLORE_MIN_WAIT_MS;
       if (moved) app.checkIn(state.position, { silent: true }).catch(() => {});
     },
-    () => {
-      toast(t('toast.locationDenied'), { tone: 'error' });
-      stopExplore();
-      renderChrome();
+    (err) => {
+      // Yalnızca izin reddi keşfi bitirir; zaman aşımı ya da geçici konum hatasında (tünel, kapalı
+      // alan) izleme sürer ve konum gelince kaldığı yerden devam eder.
+      if (err.code === err.PERMISSION_DENIED) {
+        toast(t('toast.locationDenied'), { tone: 'error' });
+        stopExplore();
+        renderChrome();
+      } else {
+        warnLocation('signal_lost');
+      }
     },
     { enableHighAccuracy: true, maximumAge: 0 },
   );

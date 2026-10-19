@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { HttpError, clientIp, readJson, serializeCookie } from './http.js';
+import { HttpError, clientIp, readJson, sendJson, serializeCookie } from './http.js';
 import { HANDLE_RE, createSession, destroySession, hashPassword, verifyPassword } from './auth.js';
 import { CITIES } from './data/cities.js';
 import * as domain from './domain.js';
@@ -62,9 +62,12 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const password = String(body.password || '');
     if (!HANDLE_RE.test(handle)) throw new HttpError(400, 'bad_handle');
     if (password.length < 8 || password.length > 200) throw new HttpError(400, 'bad_password');
+    // Kullanım koşulları ve gizlilik politikası açıkça kabul edilmeden hesap açılmaz.
+    if (body.acceptTerms !== true) throw new HttpError(400, 'terms_required');
     if (db.prepare('SELECT 1 FROM users WHERE handle = ?').get(handle)) throw new HttpError(409, 'handle_taken');
     const passHash = await hashPassword(password);
-    const { lastInsertRowid } = db.prepare('INSERT INTO users (handle, pass_hash, created_at) VALUES (?, ?, ?)').run(handle, passHash, Date.now());
+    const now = Date.now();
+    const { lastInsertRowid } = db.prepare('INSERT INTO users (handle, pass_hash, created_at, terms_accepted_at) VALUES (?, ?, ?, ?)').run(handle, passHash, now, now);
     startSession(ctx, Number(lastInsertRowid));
     return { user: publicUser({ handle, isGuest: false }) };
   });
@@ -84,7 +87,9 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     limit(`guest:${clientIp(ctx.req, config.trustProxy)}`, 20, 3600000);
     const handle = `misafir_${randomBytes(4).toString('hex')}`;
     const passHash = await hashPassword(randomBytes(24).toString('hex'));
-    const { lastInsertRowid } = db.prepare('INSERT INTO users (handle, pass_hash, is_guest, created_at) VALUES (?, ?, 1, ?)').run(handle, passHash, Date.now());
+    // Misafir düğmesinin altındaki metin: devam etmek koşulları kabul etmektir.
+    const now = Date.now();
+    const { lastInsertRowid } = db.prepare('INSERT INTO users (handle, pass_hash, is_guest, created_at, terms_accepted_at) VALUES (?, ?, 1, ?, ?)').run(handle, passHash, now, now);
     startSession(ctx, Number(lastInsertRowid));
     return { user: publicUser({ handle, isGuest: true }) };
   });
@@ -137,6 +142,27 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   });
 
   router.get('/api/me/places', (ctx) => ({ places: domain.myPlaces(db, config, requireUser(ctx)) }));
+
+  // KVKK/GDPR: kişisel verilerin indirilebilir kopyası.
+  router.get('/api/me/export', (ctx) => {
+    const data = domain.exportUserData(db, requireUser(ctx));
+    sendJson(ctx.res, 200, data, { 'content-disposition': 'attachment; filename="overheard-verilerim.json"' });
+    return ctx.STREAMING;
+  });
+
+  // KVKK/GDPR: hesabı ve ona bağlı tüm verileri kalıcı olarak siler.
+  router.post('/api/me/delete', async (ctx) => {
+    const user = requireUser(ctx);
+    limit(`delete:${user.id}`, 5, 3600000);
+    const body = await readJson(ctx.req);
+    if (!user.isGuest) {
+      const row = db.prepare('SELECT pass_hash FROM users WHERE id = ?').get(user.id);
+      if (!(await verifyPassword(String(body.password || ''), row.pass_hash))) throw new HttpError(401, 'bad_credentials');
+    }
+    domain.deleteAccount(db, user);
+    ctx.setCookie(serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure: config.secureCookies }));
+    return { ok: true };
+  });
 
   // --- Sözler ---
   router.post('/api/overheards', async (ctx) => {

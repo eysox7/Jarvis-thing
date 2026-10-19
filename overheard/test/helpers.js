@@ -47,7 +47,7 @@ export function client(base) {
     post: (p, b = {}) => request('POST', p, b),
     del: (p) => request('DELETE', p),
     async register(handle, password = 'gizli-parola-123') {
-      const r = await request('POST', '/api/auth/register', { handle, password });
+      const r = await request('POST', '/api/auth/register', { handle, password, acceptTerms: true });
       if (r.status !== 200) throw new Error(`register failed: ${JSON.stringify(r.data)}`);
       return r;
     },

@@ -20,7 +20,8 @@ describe('Overheard API', () => {
     assert.equal((await c.post('/api/auth/register', { handle: 'ayse', password: 'kisa' })).data.error, 'bad_password');
     await c.register('ayse');
     assert.equal((await c.get('/api/me')).data.user.handle, 'ayse');
-    assert.equal((await client(srv.base).post('/api/auth/register', { handle: 'AYSE', password: 'gizli-parola-123' })).data.error, 'handle_taken');
+    assert.equal((await client(srv.base).post('/api/auth/register', { handle: 'yeni_biri', password: 'gizli-parola-123' })).data.error, 'terms_required');
+    assert.equal((await client(srv.base).post('/api/auth/register', { handle: 'AYSE', password: 'gizli-parola-123', acceptTerms: true })).data.error, 'handle_taken');
     await c.post('/api/auth/logout');
     assert.equal((await c.get('/api/me')).data.user, null);
     assert.equal((await c.post('/api/auth/login', { handle: 'ayse', password: 'yanlis-parola' })).status, 401);
@@ -306,7 +307,7 @@ describe('Dağıtım', () => {
       const register = (ip, handle) => fetch(`${srv.base}/api/auth/register`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
-        body: JSON.stringify({ handle, password: 'gizli-parola-123' }),
+        body: JSON.stringify({ handle, password: 'gizli-parola-123', acceptTerms: true }),
       }).then((res) => res.status);
       assert.equal(await register('1.1.1.1', 'vekil_a'), 200);
       assert.equal(await register('2.2.2.2', 'vekil_b'), trustProxy ? 200 : 429);
@@ -319,7 +320,7 @@ describe('Dağıtım', () => {
     const page = await fetch(`${srv.base}/`);
     assert.match(page.headers.get('strict-transport-security'), /max-age=31536000/);
     const reg = await fetch(`${srv.base}/api/auth/register`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ handle: 'guvenli', password: 'gizli-parola-123' }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ handle: 'guvenli', password: 'gizli-parola-123', acceptTerms: true }),
     });
     assert.match(reg.headers.get('set-cookie'), /; Secure/);
     await srv.close();

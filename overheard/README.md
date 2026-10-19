@@ -62,6 +62,9 @@ balonların altında sokak haritası görünür.</sub>
 - **Moderasyon.** Sözlerde telefon, e-posta, bağlantı, plaka ve @kişi otomatik gizlenir; küfür
   maskelenir, nefret söylemi reddedilir. Moderatör paneli: gizlenen sözleri gözden geçirme, geri
   yükleme, silme, yasaklama.
+- **Kişisel veriler (KVKK/GDPR).** Kayıtta açık onay; Profil'den "Verilerimi indir" ve "Hesabımı
+  sil"; kesin konum 24 saatte silinir. Taslak [gizlilik politikası](public/privacy.html) ve
+  [kullanım koşulları](public/terms.html) (yayından önce doldurulup hukukçuya inceletilmeli).
 - **Güvenlik.** Şikâyet (eşikte otomatik gizleme), engelleme, hız sınırları, CSP, Origin denetimi,
   özetlenmiş oturum belirteçleri, scrypt ile parola. Yazanın gerçek konumu saklanmaz/gösterilmez;
   balonlar mekân dairesi içinde sabit ama rastgele bir noktada durur.
@@ -205,7 +208,8 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | `GET /api/cities/:id/map` | Şehrin mekânları (söz sayılarıyla) ve en yeni 300 sözü (görüntüleyene göre kilitli/açık) |
 | `GET /api/overheards?bbox=minLng,minLat,maxLng,maxLat` | Görünür alandaki sözler (en fazla 300; alan ≤ 0,6°) |
 | `POST /api/checkins` | `{lat, lng, accuracy}` → şu an bulunduğun mekânlar (`arrived`, `firstVisit`) ve ayrıldıkların (`left`) |
-| `GET /api/me/places` | Kilidini açtığın mekânlar |
+| `GET /api/me/places` | Uğradığın ve şu an bulunduğun mekânlar |
+| `GET /api/me/export` · `POST /api/me/delete` | Verilerimi indir (JSON) · hesabı sil (`{password}`) |
 | `POST /api/overheards` | `{text, lat, lng, visibility: local\|public, anonymous?, placeId?, newPlaceName?}` |
 | `GET/DELETE /api/overheards/:id` | |
 | `POST /api/overheards/:id/reactions` · `report` | `kind: same` yalnızca o sırada orada olanlara |

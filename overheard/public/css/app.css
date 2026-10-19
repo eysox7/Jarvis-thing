@@ -580,6 +580,7 @@ textarea { resize: vertical; min-height: 44px; }
 .quote-input textarea { font: italic 600 18px/1.4 var(--font-quote); padding-left: 36px; min-height: 120px; }
 .quote-mark { position: absolute; left: 10px; top: 2px; color: var(--accent); font: 700 40px/1 var(--font-quote); pointer-events: none; }
 .check { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: var(--muted); cursor: pointer; }
+.check[hidden] { display: none; }
 .check input { width: auto; margin-top: 2px; accent-color: var(--accent); }
 .counter { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .counter.is-over { color: var(--danger); }
@@ -644,6 +645,16 @@ textarea { resize: vertical; min-height: 44px; }
 .msg-time { font-size: 11px; opacity: 0.7; align-self: flex-end; }
 .composer { display: flex; gap: 8px; align-items: flex-end; }
 .composer textarea { flex: 1; min-height: 44px; max-height: 140px; resize: none; }
+
+/* Gizlilik ve koşullar sayfaları */
+body.doc-page { overflow: auto; }
+.doc { max-width: 720px; margin: 0 auto; padding: 24px 18px 64px; line-height: 1.6; }
+.doc h1 { font-size: 28px; letter-spacing: -0.02em; margin: 8px 0; }
+.doc h2 { font-size: 18px; margin: 28px 0 8px; }
+.doc a { color: var(--accent); }
+.doc hr { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+.legal { margin: 0; font-size: 12.5px; color: var(--muted); }
+.legal a { color: inherit; }
 
 /* İlk açılış tanıtımı */
 .intro-lead { margin: 0; font: italic 600 19px/1.35 var(--font-quote); }

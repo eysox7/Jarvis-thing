@@ -1,5 +1,5 @@
 // Uygulama kabuğunu önbelleğe alır; API ve harita karoları her zaman ağdan gelir.
-const CACHE = 'overheard-shell-v5';
+const CACHE = 'overheard-shell-v6';
 const SHELL = [
   '/',
   '/css/app.css',
@@ -25,6 +25,8 @@ const SHELL = [
   '/js/views/profile.js',
   '/icons/icon.svg',
   '/manifest.webmanifest',
+  '/privacy.html',
+  '/terms.html',
 ];
 
 self.addEventListener('install', (event) => {

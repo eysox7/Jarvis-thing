@@ -4,14 +4,20 @@ import { openDb } from './db.js';
 import { createApp } from './app.js';
 import { seedDemoContent, seedPlaces } from './seed.js';
 import { purgeExpiredSessions } from './auth.js';
+import { purgeStaleData } from './domain.js';
 
 const config = loadConfig();
 const db = openDb(config.dbPath);
 seedPlaces(db);
 if (config.demoMode) await seedDemoContent(db);
 
-purgeExpiredSessions(db);
-setInterval(() => purgeExpiredSessions(db), 3600000).unref();
+// Bakım: süresi dolan oturumlar ve saklama süresini aşan konum verileri saatte bir silinir.
+const maintain = () => {
+  purgeExpiredSessions(db);
+  purgeStaleData(db, config);
+};
+maintain();
+setInterval(maintain, 3600000).unref();
 
 const app = createApp({ db, config });
 const server = createServer(app.handler);

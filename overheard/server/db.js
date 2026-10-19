@@ -157,6 +157,10 @@ export const MIGRATIONS = [
   ALTER TABLE overheards ADD COLUMN visibility TEXT NOT NULL DEFAULT 'local';
   ALTER TABLE location_reports ADD COLUMN accuracy REAL NOT NULL DEFAULT 0;
   `,
+  // v7: Kullanım koşulları ve gizlilik onayının zamanı (KVKK/GDPR kaydı).
+  `
+  ALTER TABLE users ADD COLUMN terms_accepted_at INTEGER;
+  `,
 ];
 
 export function openDb(path) {

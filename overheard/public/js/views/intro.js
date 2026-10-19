@@ -2,6 +2,7 @@ import { h } from '../util.js';
 import { t, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { openSheet, closeSheet, busy, toast } from '../ui.js';
+import { legalText } from './auth.js';
 
 const KEY = 'oh_intro_seen';
 
@@ -37,6 +38,7 @@ export function maybeShowIntro(app) {
       : null,
     h('button', { class: 'btn btn-block', type: 'button', onclick: () => app.openAuth() }, t('auth.login')),
     h('button', { class: 'btn btn-ghost btn-block', type: 'button', onclick: () => closeSheet() }, t('intro.look')),
+    app.state.config.demoMode ? h('p', { class: 'legal' }, legalText('auth.guestConsent')) : null,
   ];
 
   openSheet({

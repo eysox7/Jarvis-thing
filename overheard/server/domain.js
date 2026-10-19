@@ -778,3 +778,53 @@ export function setBanned(db, handle, banned) {
   const { changes } = db.prepare('UPDATE users SET banned_at = ? WHERE handle = ?').run(banned ? Date.now() : null, String(handle));
   if (!changes) throw new HttpError(404, 'user_not_found');
 }
+
+// --- Kişisel veriler (KVKK/GDPR) -----------------------------------------
+
+export function exportUserData(db, user) {
+  const u = db.prepare('SELECT handle, is_guest, created_at, terms_accepted_at FROM users WHERE id = ?').get(user.id);
+  const last = db.prepare('SELECT lat, lng, accuracy, at FROM location_reports WHERE user_id = ?').get(user.id);
+  const conversations = db.prepare(`
+    SELECT c.*, o.user_id AS author_id, o.anonymous FROM conversations c JOIN overheards o ON o.id = c.overheard_id
+    WHERE c.owner_id = ? OR c.starter_id = ? ORDER BY c.created_at`).all(user.id, user.id)
+    .map((c) => {
+      const otherId = c.owner_id === user.id ? c.starter_id : c.owner_id;
+      const other = db.prepare('SELECT handle FROM users WHERE id = ?').get(otherId);
+      return {
+        id: c.id,
+        overheardId: c.overheard_id,
+        with: hiddenAuthor(c, { user_id: c.author_id, anonymous: c.anonymous }, otherId) ? null : other?.handle ?? null,
+        messages: db.prepare('SELECT sender_id, body, created_at FROM messages WHERE conversation_id = ? ORDER BY id').all(c.id)
+          .map((m) => ({ fromMe: m.sender_id === user.id, body: m.body, createdAt: new Date(m.created_at).toISOString() })),
+      };
+    });
+  const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
+  return {
+    exportedAt: iso(Date.now()),
+    user: { handle: u.handle, isGuest: Boolean(u.is_guest), createdAt: iso(u.created_at), termsAcceptedAt: iso(u.terms_accepted_at) },
+    lastLocation: last ? { lat: last.lat, lng: last.lng, accuracy: last.accuracy, at: iso(last.at) } : null,
+    checkins: db.prepare('SELECT p.name, p.city_id, c.at FROM checkins c JOIN places p ON p.id = c.place_id WHERE c.user_id = ? ORDER BY c.at')
+      .all(user.id).map((c) => ({ place: c.name, city: c.city_id, at: iso(c.at) })),
+    overheards: db.prepare('SELECT o.id, o.text, o.visibility, o.anonymous, o.hidden, o.created_at, p.name FROM overheards o JOIN places p ON p.id = o.place_id WHERE o.user_id = ? ORDER BY o.created_at')
+      .all(user.id).map((o) => ({ id: o.id, place: o.name, text: o.text, visibility: o.visibility, anonymous: Boolean(o.anonymous), hidden: Boolean(o.hidden), createdAt: iso(o.created_at) })),
+    reactions: db.prepare('SELECT overheard_id, kind, created_at FROM reactions WHERE user_id = ? ORDER BY created_at')
+      .all(user.id).map((r) => ({ overheardId: r.overheard_id, kind: r.kind, createdAt: iso(r.created_at) })),
+    reports: db.prepare('SELECT overheard_id, reason, created_at FROM reports WHERE user_id = ?')
+      .all(user.id).map((r) => ({ overheardId: r.overheard_id, reason: r.reason, createdAt: iso(r.created_at) })),
+    blocked: db.prepare('SELECT u.handle FROM blocks b JOIN users u ON u.id = b.blocked_id WHERE b.blocker_id = ?').all(user.id).map((r) => r.handle),
+    conversations,
+  };
+}
+
+// Hesabı siler; oturumlar, check-in'ler, sözler, tepkiler, konuşmalar ve konum kayıtları
+// yabancı anahtarlarla (ON DELETE CASCADE) birlikte gider. Açtığı mekânlar sahipsiz kalır.
+export function deleteAccount(db, user) {
+  db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+}
+
+// Saklama süreleri: kesin konum 24 saat, şüpheli konum kayıtları 90 gün.
+export function purgeStaleData(db, config, now = Date.now()) {
+  const locations = db.prepare('DELETE FROM location_reports WHERE at < ?').run(now - config.locationRetentionMs).changes;
+  const flags = db.prepare('DELETE FROM location_flags WHERE at < ?').run(now - config.flagRetentionMs).changes;
+  return { locations: Number(locations), flags: Number(flags) };
+}

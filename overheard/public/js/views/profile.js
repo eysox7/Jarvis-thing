@@ -72,6 +72,31 @@ function upgradeForm(app) {
   submit);
 }
 
+// KVKK/GDPR hakları: verilerin bir kopyası ve hesabın kalıcı silinmesi.
+function privacySection(app) {
+  const { user } = app.state;
+  const remove = h('button', {
+    class: 'btn btn-ghost btn-danger btn-block',
+    type: 'button',
+    onclick: (e) => busy(e.currentTarget, async () => {
+      if (!window.confirm(t('profile.deleteConfirm'))) return;
+      const password = user.isGuest ? '' : window.prompt(t('profile.deletePassword'));
+      if (password === null) return;
+      try {
+        await api.deleteAccount(password);
+        toast(t('profile.deleted'));
+        await app.logout();
+      } catch (err) {
+        toast(errorText(err), { tone: 'error' });
+      }
+    }),
+  }, t('profile.delete'));
+  return h('div', { class: 'stack' },
+    h('h3', { class: 'section-title' }, t('profile.privacy')),
+    h('a', { class: 'btn btn-block', href: '/api/me/export', download: 'overheard-verilerim.json' }, `⬇️ ${t('profile.export')}`),
+    remove);
+}
+
 export async function openProfile(app) {
   const { state } = app;
   const langSelect = h('select', {
@@ -131,6 +156,11 @@ export async function openProfile(app) {
       h('h3', { class: 'section-title' }, t('profile.pilot')),
       cities,
       h('label', { class: 'field field-inline' }, h('span', { class: 'field-label' }, t('profile.language')), langSelect),
-      state.user ? h('button', { class: 'btn btn-ghost btn-block', type: 'button', onclick: () => app.logout() }, t('profile.logout')) : null),
+      state.user ? h('button', { class: 'btn btn-ghost btn-block', type: 'button', onclick: () => app.logout() }, t('profile.logout')) : null,
+      state.user ? privacySection(app) : null,
+      h('p', { class: 'legal' },
+        h('a', { href: '/privacy.html', target: '_blank', rel: 'noopener' }, t('legal.privacy')),
+        ' · ',
+        h('a', { href: '/terms.html', target: '_blank', rel: 'noopener' }, t('legal.terms')))),
   });
 }
