@@ -125,10 +125,44 @@ Model bu araçları kendi kararıyla çağırır. `[onay]` işaretliler izin ist
 | Hesap | `calculate` (kendi güvenli çözümleyicisi — `eval` yok) |
 | Web | `web_search`, `http_fetch` `[onay]`, `open_url` `[onay]` |
 | Cihaz | `device_info`, `geolocate` `[onay]`, `clipboard_write`, `share` `[onay]`, `notify`, `speak`, `vibrate` |
+| Araştırma | `matrix_run` — matrAIx PR koşusu (aşağıda) |
 | Etkileşim | `ask_user` — bilgi eksikse uydurmaz, sorar |
 
 Yeni araç eklemek: `js/tools.js` içinde bir `def({name, desc, params, run})` bloğu.
 Sistem mesajındaki katalog otomatik güncellenir, başka hiçbir yere dokunmak gerekmez.
+
+## matrAIx — pazar ve SEO araştırması
+
+Bir ürün brifinden satın alma güdüsünü en çok tetikleyen anahtar kelimeleri çıkarır.
+Bir "PR koşusu" üç model çağrısından oluşur:
+
+1. **Müşteri analizi** — persona, satın alma güdüleri, engeller, keşif kanalları, bölge farkları
+2. **Kombinasyon üretimi** — N tane (varsayılan 15, en fazla 40) ana terim + niteleyici birleşimi.
+   Tekrarlar ayıklanır; eksik gelirse bir tur daha tamamlatılır
+3. **Eleştirmen puanlaması** — her kelimeye niyet, güdü, uyum, rekabet (1-10)
+
+Sıralama modele bırakılmaz, kodda hesaplanır:
+`puan = 10 × (0.4·niyet + 0.3·güdü + 0.2·uyum + 0.1·(11 − rekabet))` → 10-100.
+Puanlar modelin niteliksel tahminidir, **arama hacmi değildir**; yayından önce Keyword Planner /
+Ahrefs / Semrush ile doğrula.
+
+Üç yoldan çalıştırılır:
+
+- **matrAIx sekmesi** — formu doldur, **▶ PR koşusunu başlat**. Koşular cihazda saklanır;
+  rapor markdown olarak kopyalanır ya da nota kaydedilir.
+- **Sohbetten** — *"matrAIx'i çalıştır, 15 kombinasyon dene: premium mikrolot kahve, Avrupa ve ABD,
+  genç profesyoneller"*. Ajan `matrix_run` aracını çağırır.
+- **Komut satırından** — tarayıcı gerekmez, anahtar yalnızca ortam değişkeninden okunur:
+
+```bash
+GROQ_API_KEY=... npm run matraix -- \
+  --product "premium mikrolot karışımı kahve" --regions "Avrupa, ABD" \
+  --audience "genç profesyoneller" --count 15 --out rapor.md --json rapor.json
+# başka sağlayıcı: --provider gemini --model gemini-2.5-flash  (GEMINI_API_KEY)
+```
+
+Motor (`js/matrix.js`) DOM'a ve depoya dokunmaz; model çağrısı dışarıdan verilir, bu yüzden
+tarayıcıda ve Node'da aynı kod çalışır.
 
 ## Nasıl çalışıyor
 
@@ -154,6 +188,7 @@ metin cevap olarak gösterilir — kırılmaz, sadece araçsız çalışır.
 js/providers.js  → 4 tür API'yi tek arayüze indirger (openai · gemini · anthropic · ollama)
 js/tools.js      → araç kayıt defteri
 js/agent.js      → plan/çalıştır döngüsü ve sistem mesajı
+js/matrix.js     → matrAIx araştırma motoru (analiz → üretim → puanlama → rapor)
 js/store.js      → localStorage kalıcılığı
 js/voice.js      → eller serbest durum makinesi (uyandırma, sesli onay, yerel komutlar)
 js/speech.js     → ses tanıma ve okuma ilkelleri
@@ -170,12 +205,14 @@ npm install      # yalnızca playwright (dev bağımlılığı)
 npm test         # gerçek Chromium'da, mobil ekran boyutunda koşar
 ```
 
-Üç paket:
+Dört paket:
 
 - `tests/smoke.test.mjs` — açılış, sekmeler, uçtan uca ajan döngüsü (plan kartı → araç
   kartları → sonuç), kalıcılık, yeniden yükleme, riskli araç onayı, API hata yolu, konsol temizliği
 - `tests/providers.test.mjs` — dört adaptörün (openai · gemini · anthropic · ollama) istek
   gövdesi, kimlik başlıkları, akış çözümlemesi, model listeleme ve yedeğe geçiş davranışı
+- `tests/matrix.test.mjs` — matrAIx motoru (normalize, tekrar ayıklama, puanlama, sıralama,
+  eksik tamamlama, bozuk JSON'da yeniden deneme), sekme akışı ve sohbetten `matrix_run`
 - `tests/voice.test.mjs` — eller serbest döngüsü: uyandırma kelimesi kapısı, sesli komut →
   ajan → sesli cevap → tekrar dinleme, sesle onay ve soru cevaplama, yerel komutlar
 

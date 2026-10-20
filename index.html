@@ -76,6 +76,39 @@
     </div>
   </section>
 
+  <!-- ================= MATRAIX ================= -->
+  <section class="view" id="view-matrix">
+    <div class="pad">
+      <p class="muted small">
+        <strong>matrAIx</strong> — PR koşusu: müşteri analizi → anahtar kelime kombinasyonları →
+        eleştirmen puanlaması → sıralı rapor. API sekmesindeki bağlantıları kullanır.
+      </p>
+      <label>Ürün
+        <input id="mxProduct" placeholder="ör. premium mikrolot karışımı kahve">
+      </label>
+      <label>Hedef bölgeler (virgülle)
+        <input id="mxRegions" placeholder="Avrupa, ABD">
+      </label>
+      <label>Hedef kitle
+        <input id="mxAudience" placeholder="genç profesyoneller">
+      </label>
+      <label>Amaç
+        <input id="mxGoal" placeholder="SEO: satın alma güdüsünü en çok tetikleyen anahtar kelimeler">
+      </label>
+      <div class="row gap">
+        <label style="flex:1">Kombinasyon sayısı
+          <input id="mxCount" type="number" min="1" max="40" step="1" value="15">
+        </label>
+        <label style="flex:1">Anahtar kelime dili
+          <input id="mxKwLang" value="en">
+        </label>
+      </div>
+      <button class="btn primary wide" id="btnMxRun">▶ PR koşusunu başlat</button>
+      <div class="muted small" id="mxStatus"></div>
+      <div id="mxRuns" class="list"></div>
+    </div>
+  </section>
+
   <!-- ================= CONNECTIONS ================= -->
   <section class="view" id="view-conn">
     <div class="pad">
@@ -161,6 +194,7 @@
   <button data-view="chat" class="active"><span>💬</span>Sohbet</button>
   <button data-view="tasks"><span>✔</span>Görevler</button>
   <button data-view="notes"><span>📝</span>Notlar</button>
+  <button data-view="matrix"><span>▦</span>matrAIx</button>
   <button data-view="conn"><span>🔌</span>API</button>
   <button data-view="settings"><span>⚙</span>Ayarlar</button>
 </nav>

@@ -1,5 +1,5 @@
 // Çevrimdışı kabuk. Uygulama dosyalarını önbelleğe alır; API çağrılarına dokunmaz.
-const CACHE = 'nexus-v1.0.0';
+const CACHE = 'nexus-v1.1.0';
 const SHELL = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const SHELL = [
   './js/agent.js',
   './js/providers.js',
   './js/tools.js',
+  './js/matrix.js',
   './js/store.js',
   './js/ui.js',
   './js/util.js',

@@ -4,6 +4,8 @@
 
 import * as S from './store.js';
 import { calcExpression, parseWhen, fmtDate, truncate } from './util.js';
+import { chatWithFallback } from './providers.js';
+import { runMatrix, DEFAULT_COUNT, MAX_COUNT } from './matrix.js';
 
 const T = {};
 const def = (t) => { T[t.name] = t; return t; };
@@ -394,6 +396,42 @@ def({
   run: async (a, ctx) => {
     const ans = await ctx.ask(String(a.question || '?'), Array.isArray(a.options) ? a.options : []);
     return { answer: ans };
+  },
+});
+
+/* ---------------- matrAIx ---------------- */
+
+/** PR koşusunu kullanıcının API bağlantı zinciriyle yürütür ve sonucu depoya yazar. */
+export async function runMatrixWithChain(brief, { onStage, signal } = {}) {
+  const st = S.settings();
+  const llm = async ({ system, messages, temperature }) => (await chatWithFallback(S.profileChain(), {
+    system, messages, temperature, maxTokens: 4096, proxy: st.proxy, signal,
+  })).text;
+  return S.addMatrixRun(await runMatrix(brief, { llm, onStage, signal }));
+}
+
+def({
+  name: 'matrix_run',
+  desc: 'matrAIx PR koşusu: ürün için müşteri analizi yapar, N anahtar kelime kombinasyonu üretir, '
+    + 'satın alma güdüsüne göre puanlayıp sıralar. "matrAIx\'i çalıştır", "PR koşusu", SEO/anahtar kelime '
+    + 'araştırması isteklerinde kullan. Tam rapor matrAIx sekmesine kaydedilir.',
+  params: {
+    product: 'string (zorunlu) — satılacak ürün',
+    regions: 'string — hedef bölgeler, virgülle (ör. "Avrupa, ABD")',
+    audience: 'string — hedef kitle',
+    goal: 'string — araştırmanın amacı (varsayılan: SEO, satın alma güdüsü)',
+    count: `number — kombinasyon sayısı (varsayılan ${DEFAULT_COUNT}, en fazla ${MAX_COUNT})`,
+    keywordLang: 'string — anahtar kelime dili (varsayılan en)',
+  },
+  run: async (a) => {
+    const r = await runMatrixWithChain(a);
+    return {
+      runId: r.id,
+      count: r.combos.length,
+      analysis: { summary: r.analysis.summary, motivations: r.analysis.motivations, barriers: r.analysis.barriers },
+      ranked: r.combos.map((c) => ({ rank: c.rank, keyword: c.keyword, intent: c.intent, score: c.score, trigger: c.trigger })),
+      note: 'Puanlar niteliksel tahmindir, arama hacmi değildir. Tam rapor matrAIx sekmesinde.',
+    };
   },
 });
 

@@ -5,9 +5,10 @@ import * as UI from './ui.js';
 import * as Speech from './speech.js';
 import { PRESETS, listModels, testProfile, kindOf } from './providers.js';
 import { runAgent } from './agent.js';
+import { runMatrixWithChain } from './tools.js';
 import { Voice } from './voice.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 let busy = false;
 let abortCtrl = null;
 
@@ -17,6 +18,7 @@ function showView(name) {
   $$('#tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   if (name === 'tasks') renderTasks();
   if (name === 'notes') renderNotes();
+  if (name === 'matrix') renderMatrix();
   if (name === 'conn') renderConnections();
   if (name === 'settings') renderSettings();
 }
@@ -226,7 +228,7 @@ async function send(text) {
           $('#activeProfileLabel').textContent = `${p.name} · ${p.model} (yedek)`;
         }
       },
-      onRefresh: () => { renderTasks(); renderNotes(); },
+      onRefresh: () => { renderTasks(); renderNotes(); renderMatrix(); },
       confirm: (m) => UI.confirmDialog(m, { danger: true, external: voiceHook(m, { yesNo: true }) }),
       ask: (q, o) => UI.askDialog(q, o, voiceHook(q, { options: o || [] })),
       notify,
@@ -408,6 +410,120 @@ function renderNotes() {
           },
         }, '🗑'),
       ),
+    ));
+  }
+}
+
+/* ============================ matrAIx ============================ */
+let mxBusy = false;
+let mxOpen = null;   // açık koşunun id'si; varsayılan en yenisi
+
+$('#btnMxRun').addEventListener('click', async () => {
+  if (mxBusy) { abortCtrl?.abort(); return; }
+  const brief = {
+    product: $('#mxProduct').value.trim(),
+    regions: $('#mxRegions').value,
+    audience: $('#mxAudience').value.trim(),
+    goal: $('#mxGoal').value.trim(),
+    count: Number($('#mxCount').value) || 15,
+    keywordLang: $('#mxKwLang').value.trim() || 'en',
+  };
+  if (!brief.product) { UI.toast('Ürünü yaz', 'err'); $('#mxProduct').focus(); return; }
+  if (!S.db().profiles.filter((p) => p.enabled).length) { UI.toast('Önce bir API bağlantısı ekle', 'err'); showView('conn'); return; }
+  if (busy) { UI.toast('Sohbette bir iş sürüyor, bitmesini bekle', 'err'); return; }
+
+  mxBusy = true;
+  abortCtrl = new AbortController();
+  $('#btnMxRun').textContent = '■ Durdur';
+  setStatus('busy');
+  const t0 = Date.now();
+  try {
+    const run = await runMatrixWithChain(brief, {
+      signal: abortCtrl.signal,
+      onStage: (_st, info) => { $('#mxStatus').textContent = `matrAIx: ${info.label}…`; },
+    });
+    mxOpen = run.id;
+    $('#mxStatus').textContent = `✔ ${run.combos.length} kombinasyon · ${run.calls} model çağrısı · ${((Date.now() - t0) / 1000).toFixed(1)} sn`;
+  } catch (e) {
+    $('#mxStatus').textContent = e.name === 'AbortError' ? 'Durduruldu.' : '⚠ ' + (e.message || e);
+  } finally {
+    mxBusy = false;
+    abortCtrl = null;
+    $('#btnMxRun').textContent = '▶ PR koşusunu başlat';
+    setStatus(S.activeProfile() ? 'ok' : 'err');
+    renderMatrix();
+  }
+});
+
+function renderMatrix() {
+  const host = $('#mxRuns');
+  if (!host) return;
+  const runs = S.db().matrix || [];
+  host.innerHTML = '';
+  if (!runs.length) { host.append(el('div', { class: 'empty', text: 'Henüz koşu yok.' })); return; }
+  const openId = mxOpen ?? runs[0].id;
+
+  for (const r of runs) {
+    const a = r.analysis || {};
+    const body = el('div', { class: 'body' + (r.id === openId ? '' : ' hidden') },
+      a.summary ? el('div', { class: 'small', text: a.summary }) : null,
+      a.motivations?.length ? el('div', { class: 'mx-sec', text: 'Satın alma güdüleri' }) : null,
+      a.motivations?.length ? el('div', { class: 'small', text: a.motivations.join(' · ') }) : null,
+      a.barriers?.length ? el('div', { class: 'mx-sec', text: 'Engeller' }) : null,
+      a.barriers?.length ? el('div', { class: 'small', text: a.barriers.join(' · ') }) : null,
+      el('div', { class: 'mx-sec', text: 'Sıralı anahtar kelimeler' }),
+      ...r.combos.map((c) => el('div', { class: 'mx-combo' },
+        el('span', { class: 'rk', text: c.rank }),
+        el('div', { class: 'kw' },
+          el('strong', { text: c.keyword }),
+          el('div', { class: 'meta muted small', text: [c.intent, c.trigger, c.placement].filter(Boolean).join(' · ') }),
+          c.note ? el('div', { class: 'muted small', text: c.note }) : null,
+        ),
+        el('span', {
+          class: 'mx-score' + (c.score >= 75 ? ' hi' : c.score >= 55 ? ' mid' : ''),
+          title: c.scores ? `niyet ${c.scores.intent} · güdü ${c.scores.trigger} · uyum ${c.scores.relevance} · rekabet ${c.scores.competition}` : '',
+          text: c.score ?? '-',
+        }),
+      )),
+      el('p', { class: 'muted small', text: 'Puanlar modelin niteliksel tahminidir, arama hacmi değildir.' }),
+      el('div', { class: 'row gap wrap' },
+        el('button', {
+          class: 'btn tiny',
+          onclick: async () => {
+            try { await navigator.clipboard.writeText(r.report); UI.toast('Rapor (markdown) kopyalandı'); }
+            catch { UI.toast('Kopyalanamadı', 'err'); }
+          },
+        }, '⧉ Raporu kopyala'),
+        el('button', {
+          class: 'btn tiny',
+          onclick: () => { S.addNote({ title: `matrAIx — ${r.brief.product}`, body: r.report }); UI.toast('Notlara kaydedildi'); },
+        }, '📝 Nota kaydet'),
+        el('button', {
+          class: 'btn tiny',
+          onclick: async () => {
+            if (await UI.confirmDialog('Bu koşu silinsin mi?', { okText: 'Sil', danger: true })) {
+              S.removeMatrixRun(r.id); if (mxOpen === r.id) mxOpen = null; renderMatrix();
+            }
+          },
+        }, '🗑'),
+      ),
+    );
+    host.append(el('div', { class: 'item mx-run', 'data-run': r.id },
+      el('div', {
+        class: 'head',
+        onclick: () => { mxOpen = body.classList.contains('hidden') ? r.id : ''; renderMatrix(); },
+      },
+        el('div', { class: 't' },
+          el('strong', { text: r.brief.product }),
+          el('div', { class: 'meta' },
+            el('span', { text: `${r.combos.length} kombinasyon` }),
+            r.brief.regions?.length ? el('span', { text: r.brief.regions.join(', ') }) : null,
+            el('span', { text: fmtDate(r.createdAt) }),
+          ),
+        ),
+        el('span', { class: 'muted small', text: r.id === openId ? '▾' : '▸' }),
+      ),
+      body,
     ));
   }
 }
@@ -634,7 +750,7 @@ $('#btnImport').addEventListener('click', () => {
       if (!(await UI.confirmDialog('Mevcut veriler bu yedekle değiştirilecek. Devam?', { okText: 'Değiştir', danger: true }))) return;
       S.replaceAll(data);
       UI.toast('Yedek yüklendi');
-      restoreChat(); renderTasks(); renderNotes(); renderConnections(); renderSettings(); refreshHeader();
+      restoreChat(); renderTasks(); renderNotes(); renderMatrix(); renderConnections(); renderSettings(); refreshHeader();
     } catch (e) { UI.toast('İçe aktarma başarısız: ' + e.message, 'err'); }
   });
   document.body.append(inp); inp.click(); setTimeout(() => inp.remove(), 1000);
@@ -643,7 +759,7 @@ $('#btnImport').addEventListener('click', () => {
 $('#btnWipe').addEventListener('click', async () => {
   if (!(await UI.confirmDialog('TÜM veriler silinecek: bağlantılar, görevler, notlar, hafıza, sohbet. Geri alınamaz.', { okText: 'Hepsini sil', danger: true }))) return;
   S.wipe();
-  restoreChat(); renderTasks(); renderNotes(); renderConnections(); renderSettings(); refreshHeader();
+  restoreChat(); renderTasks(); renderNotes(); renderMatrix(); renderConnections(); renderSettings(); refreshHeader();
   UI.toast('Her şey silindi');
 });
 

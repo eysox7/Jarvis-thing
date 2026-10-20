@@ -30,6 +30,7 @@ const DEFAULTS = {
   memory: {},     // {anahtar: değer}
   reminders: [],  // {id,at,message,fired}
   chat: [],       // {role,content,ts}
+  matrix: [],     // matrAIx koşuları: {id,brief,analysis,combos,report,calls,createdAt}
 };
 
 let state = load();
@@ -194,3 +195,12 @@ export function pushChat(m) {
   save();
 }
 export function clearChat() { state.chat = []; save(); }
+
+/* ---------------- matrAIx koşuları ---------------- */
+export function addMatrixRun(run) {
+  const r = { id: uid(), ...run };
+  state.matrix = [r, ...(state.matrix || [])].slice(0, 30);
+  save();
+  return r;
+}
+export function removeMatrixRun(id) { state.matrix = (state.matrix || []).filter((x) => x.id !== id); save(); }
