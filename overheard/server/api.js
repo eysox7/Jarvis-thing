@@ -3,6 +3,7 @@ import { HttpError, clientIp, readJson, sendJson, serializeCookie } from './http
 import { HANDLE_RE, createSession, destroySession, hashPassword, verifyPassword } from './auth.js';
 import { CITIES } from './data/cities.js';
 import * as domain from './domain.js';
+import * as venues from './venues.js';
 import { qrMatrix, qrSvg } from './qr.js';
 import { containsSlur } from './moderation.js';
 
@@ -34,6 +35,12 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
     if (length < 2 || length > max || containsSlur(text)) return;
     const verdict = await ai.review(text, kind);
     if (verdict.decision === 'block') throw new HttpError(422, `flagged_${verdict.category}`);
+  };
+
+  // Mekân QR bağlantısı (poster ve kafe fişleri için).
+  const qrUrl = (ctx, placeId) => {
+    const base = config.publicUrl || `${config.secureCookies ? 'https' : 'http'}://${ctx.req.headers.host}`;
+    return `${base}/?qr=${encodeURIComponent(domain.placeQrCode(db, config, placeId))}`;
   };
 
   const isAdmin = (user) => Boolean(user) && config.admins.includes(user.handle.toLowerCase());
@@ -138,6 +145,8 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
       stats: domain.profileStats(db, ctx.user),
       unread: domain.unreadCount(db, ctx.user),
       progress: domain.progress(db, ctx.user),
+      // Personeli olduğun Overheard Kafeler (kafe paneli için).
+      venues: venues.staffVenues(db, ctx.user.id),
     };
   });
 
@@ -312,9 +321,37 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
     requireAdmin(ctx);
     const place = db.prepare('SELECT * FROM places WHERE id = ?').get(ctx.params.id);
     if (!place) throw new HttpError(404, 'place_not_found');
-    const base = config.publicUrl || `${config.secureCookies ? 'https' : 'http'}://${ctx.req.headers.host}`;
-    const url = `${base}/?qr=${encodeURIComponent(domain.placeQrCode(db, config, place.id))}`;
+    const url = qrUrl(ctx, place.id);
     return { place: domain.serializePlace(place), url, svg: qrSvg(url), matrix: qrMatrix(url) };
+  });
+
+  // --- Overheard Kafe (moderatör kurar, personel işletir) ---
+  router.get('/api/admin/venues', (ctx) => {
+    requireAdmin(ctx);
+    return { venues: venues.listVenues(db) };
+  });
+
+  router.post('/api/admin/venues/:id', async (ctx) => {
+    requireAdmin(ctx);
+    return { venue: venues.saveVenue(db, ctx.params.id, await readJson(ctx.req)) };
+  });
+
+  router.delete('/api/admin/venues/:id', (ctx) => {
+    requireAdmin(ctx);
+    venues.removeVenue(db, ctx.params.id);
+    return { ok: true };
+  });
+
+  router.post('/api/admin/venues/:id/staff', async (ctx) => {
+    requireAdmin(ctx);
+    venues.addStaff(db, ctx.params.id, (await readJson(ctx.req)).handle);
+    return { venues: venues.listVenues(db) };
+  });
+
+  router.delete('/api/admin/venues/:id/staff/:handle', (ctx) => {
+    requireAdmin(ctx);
+    venues.removeStaff(db, ctx.params.id, ctx.params.handle);
+    return { venues: venues.listVenues(db) };
   });
 
   router.post('/api/admin/overheards/:id/restore', (ctx) => {
@@ -337,9 +374,66 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
     return { ok: true };
   });
 
+  // --- Kafe paneli ve yazıcı (kafenin personeli) ---
+  // Yazıcı ekranı da personel hesabıyla açıktır; yeni fiş olunca canlı haber alır.
+  const notifyPrinters = (placeId) => {
+    for (const id of venues.staffIds(db, placeId)) events.publish(id, 'print', { placeId });
+  };
+  const venueFor = (ctx) => venues.requireVenue(db, requireUser(ctx), ctx.params.id, { admin: isAdmin(ctx.user) });
+
+  router.get('/api/venues/:id', (ctx) => venues.venueState(db, config, venueFor(ctx)));
+
+  router.post('/api/venues/:id/settings', async (ctx) => {
+    venues.updateSettings(db, venueFor(ctx), await readJson(ctx.req));
+    return venues.venueState(db, config, venueFor(ctx));
+  });
+
+  router.post('/api/venues/:id/tables', async (ctx) => {
+    const venue = venueFor(ctx);
+    limit(`venue:${venue.place_id}`, 600, 3600000);
+    const opened = venues.openTable(db, config, venue, (await readJson(ctx.req)).tableNo);
+    if (opened.queued) notifyPrinters(venue.place_id);
+    return { ...opened, state: venues.venueState(db, config, venue) };
+  });
+
+  router.post('/api/venues/:id/tables/:tableId/print', (ctx) => {
+    const venue = venueFor(ctx);
+    limit(`venue:${venue.place_id}`, 600, 3600000);
+    venues.printAnother(db, config, venue, ctx.params.tableId);
+    notifyPrinters(venue.place_id);
+    return venues.venueState(db, config, venue);
+  });
+
+  router.post('/api/venues/:id/tables/:tableId/close', (ctx) => {
+    const venue = venueFor(ctx);
+    venues.closeTable(db, venue, ctx.params.tableId);
+    return venues.venueState(db, config, venue);
+  });
+
+  router.get('/api/venues/:id/jobs', (ctx) => {
+    const venue = venueFor(ctx);
+    // Fişin altındaki QR: okutan, kafede olduğu doğrulanarak buradaki yerel sözleri açar.
+    const url = qrUrl(ctx, venue.place_id);
+    return { venue: { placeId: venue.place_id, name: venue.name, mode: venue.mode }, jobs: venues.pendingJobs(db, venue), qr: { url, svg: qrSvg(url) } };
+  });
+
+  router.post('/api/venues/:id/jobs/:jobId/printed', (ctx) => {
+    venues.markPrinted(db, venueFor(ctx), ctx.params.jobId);
+    return { ok: true };
+  });
+
   router.get('/api/events', (ctx) => {
     const user = requireUser(ctx);
     events.subscribe(user.id, ctx.req, ctx.res);
     return ctx.STREAMING;
   });
+
+  return {
+    // Dakikada bir: açık masalara sıradaki fişler, yazıcılara canlı haber.
+    tickVenues() {
+      const queued = venues.tickVenues(db, config);
+      for (const placeId of queued.keys()) notifyPrinters(placeId);
+      return queued;
+    },
+  };
 }

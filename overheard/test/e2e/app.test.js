@@ -3,6 +3,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { startTestServer } from '../helpers.js';
+import { addStaff, saveVenue } from '../../server/venues.js';
 
 let chromium = null;
 try {
@@ -505,6 +506,66 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       assert.equal(await visitor.page.locator('#btn-room').isVisible(), true);
       assert.deepEqual(visitor.errors, []);
       await visitor.context.close();
+    });
+  });
+
+  describe('Overheard Kafe', () => {
+    let srv;
+    before(async () => { srv = await startTestServer({ demo: true }); });
+    after(async () => { await srv.close(); });
+
+    test('garson masayı açar, yazıcı ekranı fişi masa numarasıyla basar', async () => {
+      const u = await newUser(browser, srv.base, KADIKOY);
+      await u.page.evaluate(() => fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ handle: 'garson_e2e', password: 'cok-gizli-parola', acceptTerms: true }),
+      }));
+      saveVenue(srv.db, 'ist-bahariye', { mode: 'nearby' });
+      addStaff(srv.db, 'ist-bahariye', 'garson_e2e');
+      const { id: authorId } = srv.db.prepare('SELECT id FROM users LIMIT 1').get();
+      const insert = srv.db.prepare("INSERT INTO overheards (id, user_id, place_id, text, created_at, visibility) VALUES (?, ?, 'ist-kadikoy-iskele', ?, ?, 'public')");
+      insert.run('kafe1', authorId, 'Vapurda biri: "Simit martının, çay benim."', Date.now() - 3600000);
+      insert.run('kafe2', authorId, 'İskelede biri: "Bu vapur da kaçtı, hayat da."', Date.now() - 7200000);
+
+      // Yazıcı ekranı (aynı personel hesabı, ayrı sekme); yazdırma penceresi testte sayılır.
+      const printer = await u.context.newPage();
+      await printer.addInitScript(() => { window.print = () => { window.prints = (window.prints || 0) + 1; }; });
+      const printerErrors = [];
+      printer.on('pageerror', (err) => printerErrors.push(err.message));
+      await printer.goto(`${srv.base}/yazici.html?place=ist-bahariye`);
+      await printer.locator('#printer-status', { hasText: 'Bağlı' }).waitFor();
+      assert.equal(await printer.locator('#printer-title').textContent(), 'Bahariye Caddesi');
+
+      // Kafe paneli: müşteri "overheard istiyorum" dedi, garson masa 7'yi açar.
+      await u.page.reload();
+      await u.page.waitForSelector('body.is-ready');
+      await u.page.locator('[data-nav="profile"]').click();
+      await sheet(u.page).getByRole('button', { name: /Kafe paneli: Bahariye Caddesi/ }).click();
+      await sheet(u.page).getByRole('textbox', { name: 'Masa numarası' }).fill('7');
+      await sheet(u.page).getByRole('button', { name: 'Aç', exact: true }).click();
+      await u.page.locator('.toast', { hasText: 'Masa 7 açıldı' }).waitFor();
+      await sheet(u.page).locator('.venue-table', { hasText: 'Masa 7' }).waitFor();
+
+      // Yazıcı canlı haber alır ve basar; fiş son basılanlarda görünür.
+      const card = printer.locator('.slip-card').first();
+      await card.locator('.slip-table', { hasText: 'MASA 7' }).waitFor();
+      // Demo verisinde yakında başka herkese açık sözler de var: hangisi seçildiyse fişte o yazar.
+      const first = srv.db.prepare('SELECT o.text, p.name FROM print_jobs j JOIN overheards o ON o.id = j.overheard_id JOIN places p ON p.id = o.place_id ORDER BY j.id LIMIT 1').get();
+      assert.equal(await card.locator('.slip-quote').textContent(), `“${first.text}”`);
+      assert.match(await card.locator('.slip-meta').textContent(), new RegExp(first.name));
+      assert.notEqual(first.name, 'Bahariye Caddesi');
+      await card.locator('img.slip-qr').waitFor();
+      assert.equal(await printer.evaluate(() => window.prints), 1);
+
+      // "Bir söz daha": ikinci fiş de basılır; ikisi de basıldı olarak işaretlenir.
+      await sheet(u.page).getByRole('button', { name: /Bir söz daha/ }).click();
+      await printer.waitForFunction(() => window.prints === 2);
+      await printer.waitForFunction(() => document.querySelectorAll('.slip-card').length === 2);
+      assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM print_jobs WHERE printed_at IS NOT NULL').get().n, 2);
+      assert.deepEqual(u.errors, []);
+      assert.deepEqual(printerErrors, []);
+      await u.context.close();
     });
   });
 

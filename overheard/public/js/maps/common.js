@@ -34,7 +34,7 @@ export function placeElement(p) {
   const state = placeState(p);
   return h('div', { class: `oh-place ${state.cls}`, dataset: { id: p.id } },
     h('span', { class: 'oh-place-icon', 'aria-hidden': 'true' }, state.icon),
-    h('span', { class: 'oh-place-name' }, p.name),
+    h('span', { class: 'oh-place-name' }, p.cafe ? `☕ ${p.name}` : p.name),
     p.peopleHere ? h('span', { class: 'oh-place-people', title: t('place.peopleHere', { n: p.peopleHere }) }, `👥${p.peopleHere}`) : null,
     p.count ? h('span', { class: 'oh-place-count' }, String(p.count)) : null);
 }
@@ -59,7 +59,7 @@ const bubbleWidth = (o) => (o.locked
   ? 50 + Math.min(110, 24 + o.length)
   : Math.min(190, 30 + Math.min(44, [...o.text].length) * 6.4 + (o.reactionTotal ? 26 : 0)));
 
-const placeWidth = (p) => 46 + [...p.name].length * 7.2 + (p.count ? 28 : 0) + (p.peopleHere ? 34 : 0);
+const placeWidth = (p) => 46 + ([...p.name].length + (p.cafe ? 3 : 0)) * 7.2 + (p.count ? 28 : 0) + (p.peopleHere ? 34 : 0);
 
 // view: { zoom, project(lat, lng) → {x, y} (ekran pikseli), contains(lat, lng) → bool }
 // Dönen her öğe: { type: 'area' | 'place' | 'overheard', lat, lng, item, element?, full? }

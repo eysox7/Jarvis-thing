@@ -476,11 +476,13 @@ export function cityMap(db, config, viewer, cityId) {
     GROUP BY o.place_id`).all(params).map((r) => [r.place_id, r]));
   const placeRows = db.prepare('SELECT * FROM places WHERE city_id = ? ORDER BY name').all(cityId);
   const people = presenceCounts(db, config, placeRows);
+  const cafes = new Set(db.prepare('SELECT place_id FROM venues').all().map((r) => r.place_id));
   const places = placeRows
     .map((p) => {
       const st = stats.get(p.id);
       return serializePlace(p, {
         peopleHere: people.get(p.id) || 0,
+        cafe: cafes.has(p.id),
         visited: ctx.visited.has(p.id),
         here: ctx.here.has(p.id),
         count: st?.n || 0,

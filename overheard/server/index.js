@@ -24,6 +24,8 @@ const ai = await createAiModerator(config);
 if (ai) console.log(`Yapay zekâ denetimi açık (${config.aiModel})`);
 const app = createApp({ db, config, ai });
 const server = createServer(app.handler);
+// Overheard Kafe: açık masalara sıradaki fişler.
+setInterval(() => app.tickVenues(), 60000).unref();
 
 server.listen(config.port, config.host, () => {
   console.log(`Overheard ${config.demoMode ? '(demo modu) ' : ''}http://localhost:${config.port}`);

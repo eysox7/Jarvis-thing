@@ -12,14 +12,15 @@ export async function openAdmin(app) {
   let items;
   let ai;
   let flagged;
+  let venues;
   try {
-    [{ overheards: items, ai }, { users: flagged }] = await Promise.all([api.adminReports(), api.adminLocationFlags()]);
+    [{ overheards: items, ai }, { users: flagged }, { venues }] = await Promise.all([api.adminReports(), api.adminLocationFlags(), api.adminVenues()]);
   } catch (err) {
     clear(body).append(h('p', { class: 'form-error' }, errorText(err)));
     return;
   }
   clear(body);
-  body.append(h('p', { class: 'muted small' }, ai?.enabled ? t('admin.ai', ai) : t('admin.aiOff')), qrSection(app));
+  body.append(h('p', { class: 'muted small' }, ai?.enabled ? t('admin.ai', ai) : t('admin.aiOff')), venueSection(app, venues), qrSection(app));
   if (flagged.length) {
     body.append(
       h('h3', { class: 'section-title' }, `📍 ${t('admin.locationFlags')}`),
@@ -108,7 +109,17 @@ function qrSection(app) {
           const city = app.state.config.cities.find((c) => c.id === p.cityId)?.name || p.cityId;
           item.append(h('p', { class: 'row-between' },
             h('span', {}, h('strong', {}, p.name), h('span', { class: 'muted small' }, ` · ${city}`)),
-            h('button', { class: 'btn btn-ghost', type: 'button', onclick: (e) => busy(e.currentTarget, () => show(p, item)) }, `📮 ${t('admin.qrShow')}`)));
+            h('span', { class: 'bubble-actions' },
+            h('button', { class: 'btn btn-ghost', type: 'button', onclick: (e) => busy(e.currentTarget, async () => {
+              try {
+                await api.adminSaveVenue(p.id);
+                toast(t('admin.cafeMade', { place: p.name }), { tone: 'success' });
+                await openAdmin(app);
+              } catch (err) {
+                toast(errorText(err), { tone: 'error' });
+              }
+            }) }, `☕ ${t('admin.makeCafe')}`),
+            h('button', { class: 'btn btn-ghost', type: 'button', onclick: (e) => busy(e.currentTarget, () => show(p, item)) }, `📮 ${t('admin.qrShow')}`))));
           return item;
         }))
         : h('p', { class: 'muted' }, t('admin.qrNone')));
@@ -124,4 +135,36 @@ function qrSection(app) {
     h('p', { class: 'muted small' }, t('admin.qrHint')),
     form,
     results);
+}
+
+// Overheard Kafeler: personel (garson/kasa hesapları) ve kafeliği kaldırma. Yeni kafe, aşağıdaki
+// mekân aramasından "Kafe yap" ile eklenir.
+function venueSection(app, venues) {
+  const act = (fn) => (e) => busy(e.currentTarget, async () => {
+    try {
+      await fn();
+      await openAdmin(app);
+    } catch (err) {
+      toast(errorText(err), { tone: 'error' });
+    }
+  });
+  return h('section', { class: 'stack' },
+    h('h3', { class: 'section-title' }, `☕ ${t('admin.cafes')}`),
+    venues.length
+      ? h('ul', { class: 'list' }, venues.map((v) => {
+        const handle = h('input', { name: 'staff', placeholder: t('admin.staffHandle'), 'aria-label': t('admin.staffHandle'), autocomplete: 'off' });
+        const add = h('button', { class: 'btn', type: 'submit' }, t('admin.addStaff'));
+        return h('li', { class: 'admin-item' },
+          h('p', { class: 'row-between' },
+            h('strong', {}, v.name),
+            h('span', { class: 'muted small' }, t(`venue.mode.${v.mode}`))),
+          h('div', { class: 'bubble-badges' }, v.staff.length
+            ? v.staff.map((s) => h('span', { class: 'chip' }, `@${s} `,
+              h('button', { class: 'chip-x', type: 'button', 'aria-label': t('admin.removeStaff', { handle: s }), onclick: act(() => api.adminRemoveStaff(v.placeId, s)) }, '✕')))
+            : h('span', { class: 'muted small' }, t('admin.noStaff'))),
+          h('form', { class: 'qr-search', onsubmit: (e) => { e.preventDefault(); if (handle.value.trim()) act(() => api.adminAddStaff(v.placeId, handle.value.trim()))({ currentTarget: add }); } }, handle, add),
+          h('div', { class: 'bubble-actions' },
+            h('button', { class: 'btn btn-ghost btn-danger', type: 'button', onclick: act(() => api.adminRemoveVenue(v.placeId)) }, t('admin.removeCafe'))));
+      }))
+      : h('p', { class: 'muted small' }, t('admin.noCafes')));
 }

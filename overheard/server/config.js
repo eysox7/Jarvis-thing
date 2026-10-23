@@ -53,6 +53,10 @@ export function loadConfig(overrides = {}) {
     stickyPresenceMs: 3 * 60 * 60 * 1000,
     stickyMarginM: 100,
     stickyMaxAccuracyM: 1000,
+    // Overheard Kafe: kafe içi sözler yazanı ele vermesin diye en az bu kadar eskiyse basılır...
+    venueInsideDelayMs: 20 * 60 * 1000,
+    // ...ve kapatılması unutulan masalar bu süreden sonra kendiliğinden kapanır.
+    venueTableMaxMs: 6 * 60 * 60 * 1000,
     // Mekân QR kodu: okutulduğunda kaba konum mekâna bu kadar yakın olmalı (metre)...
     qrMaxDistanceM: 1000,
     // ...ve konum doğruluğu bundan kötü olmamalı (kapalı alanda GPS zayıf; Wi-Fi/baz konumu yeter).

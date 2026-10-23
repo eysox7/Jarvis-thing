@@ -202,6 +202,40 @@ export const MIGRATIONS = [
   INSERT INTO presence_anchors (user_id, place_id, source, at) SELECT user_id, place_id, 'qr', at FROM qr_presence;
   DROP TABLE qr_presence;
   `,
+  // v12: Overheard Kafe: personel, sözü isteyen masalar ve kafenin yazıcısına giden fişler.
+  `
+  CREATE TABLE venues (
+    place_id    TEXT PRIMARY KEY REFERENCES places(id) ON DELETE CASCADE,
+    mode        TEXT NOT NULL DEFAULT 'inside',
+    nearby_m    INTEGER NOT NULL DEFAULT 1500,
+    every_min   INTEGER NOT NULL DEFAULT 15,
+    per_table   INTEGER NOT NULL DEFAULT 4,
+    created_at  INTEGER NOT NULL
+  );
+  CREATE TABLE venue_staff (
+    place_id  TEXT NOT NULL REFERENCES venues(place_id) ON DELETE CASCADE,
+    user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (place_id, user_id)
+  );
+  CREATE TABLE venue_tables (
+    id         INTEGER PRIMARY KEY,
+    place_id   TEXT NOT NULL REFERENCES venues(place_id) ON DELETE CASCADE,
+    table_no   TEXT NOT NULL,
+    opened_at  INTEGER NOT NULL,
+    closed_at  INTEGER
+  );
+  CREATE INDEX venue_tables_open ON venue_tables(place_id, closed_at);
+  CREATE TABLE print_jobs (
+    id            INTEGER PRIMARY KEY,
+    table_id      INTEGER NOT NULL REFERENCES venue_tables(id) ON DELETE CASCADE,
+    place_id      TEXT NOT NULL REFERENCES venues(place_id) ON DELETE CASCADE,
+    overheard_id  TEXT NOT NULL REFERENCES overheards(id) ON DELETE CASCADE,
+    created_at    INTEGER NOT NULL,
+    printed_at    INTEGER
+  );
+  CREATE INDEX print_jobs_place ON print_jobs(place_id, printed_at);
+  CREATE INDEX print_jobs_table ON print_jobs(table_id);
+  `,
 ];
 
 export function openDb(path) {

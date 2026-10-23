@@ -30,6 +30,8 @@ insanları yürümeye hem de tanışmaya teşvik eder.
   <img src="docs/screenshots/8-qr-poster.png" width="180" alt="Mekânın girişine asılan QR posteri">
   <img src="docs/screenshots/9-qr-giris.png" width="180" alt="QR ile mekâna giriş">
   <img src="docs/screenshots/10-yapay-zeka-denetimi.png" width="180" alt="Kişiyi tanınır kılan söz yapay zekâ denetiminde reddedildi">
+  <img src="docs/screenshots/11-kafe-paneli.png" width="180" alt="Overheard Kafe paneli: açık masalar">
+  <img src="docs/screenshots/13-kafe-fis.png" width="180" alt="Masaya giden fiş">
 </p>
 
 <sub>Ekran görüntüleri harita karolarına erişimi olmayan bir test ortamında alındı; gerçek kullanımda
@@ -58,6 +60,15 @@ balonların altında sokak haritası görünür.</sub>
   içi) için: girişe asılan QR'ı okutan kişi kaba konumla (Wi-Fi/baz istasyonu, 1 km yakınlık) girer
   ve 2 saate kadar orada kalır. Kod, mekân kimliğinin sunucu sırrıyla imzasıdır (tahmin edilemez);
   posteri moderatör panelinden indirilir, mekân kendisi basıp asar.
+- **Overheard Kafe.** Müşteri girişte garsona "overheard istiyorum" der; garson kafe panelinden
+  masayı açar, gerisini uygulama yapar: rastgele bir söz seçer, masa numarasıyla kafenin fiş
+  yazıcısına gönderir, masa açık kaldıkça (varsayılan 15 dk'da bir, en fazla 4 fiş) yenisini basar.
+  İki mod: **kafede yazılanlar** (yazanı ele vermemek için en az 20 dk eski sözler, rastgele
+  masalara) ya da **yakın çevreden** (kafe içi yazılmaz; 1,5 km içindeki mekânların herkese açık
+  sözleri). Fişte yazar adı yok, saat yalnızca kabaca ("dün akşam") yazılır; altındaki QR okutan
+  kafeye girer ve buradaki yerel sözleri açar. Yazıcı ekranı (`/yazici.html`) kafedeki bir
+  cihazda personel hesabıyla açık durur; Chrome `--kiosk-printing` ile pencere açmadan basar.
+  Kafeyi ve personelini moderatör panelinden yönetirsin.
 - **Şu an burada ve mekân odası.** Her mekânda o an kaç kişinin bulunduğu (isimsiz) görünür. Bir
   mekândaysan oradakilerle grup sohbetine katılabilirsin; oda yalnızca oradayken görünür,
   mesajlar 12 saat sonra silinir.
@@ -257,6 +268,9 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | `POST /api/overheards/:id/block-author` · `POST /api/users/:handle/block` | Engelleme |
 | `GET /api/admin/reports` · `POST …/overheards/:id/restore` · `DELETE …/overheards/:id` · `POST …/users/:handle/ban` | Moderasyon (yalnızca `OVERHEARD_ADMINS`) |
 | `GET /api/admin/places?q=` · `GET /api/admin/places/:id/qr` | Mekân arama ve QR kodu (`url`, `svg`, `matrix`) |
+| `GET/POST/DELETE /api/admin/venues/:placeId` · `POST/DELETE …/staff` | Overheard Kafe kurma, personel (yalnızca moderatör) |
+| `GET /api/venues/:placeId` · `POST …/settings` · `POST …/tables` · `POST …/tables/:id/print` · `POST …/tables/:id/close` | Kafe paneli (personel): mod, masa açma, bir fiş daha, kapatma |
+| `GET /api/venues/:placeId/jobs` · `POST …/jobs/:id/printed` | Yazıcı kuyruğu (fişler + kafe QR'ı); yeni fişte personele SSE `print` |
 | `GET /api/events` | SSE akışı (`dm`, `reveal`, `room` olayları) |
 
 ## Testler

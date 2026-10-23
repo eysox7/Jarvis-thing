@@ -127,6 +127,15 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       girilmez; belirsiz konum yeni mekân açmaz. Uygulama açıkken bir mekândaysan konum 5 dk'da
       bir sessizce tazelenir. QR kayıtları da aynı tabloya taşındı (QR artık isteğe bağlı bir
       ek). Şema v11.
+- [x] **22. Overheard Kafe** — Girişte "overheard istiyorum" diyen müşterinin masasını garson
+      kafe panelinden açar; sistem rastgele söz seçip masa numarasıyla fiş yazıcısına gönderir, masa
+      açık kaldıkça aralıklarla (varsayılan 15 dk, en fazla 4 fiş) yenisini basar; unutulan masa 6
+      saatte kapanır. Modlar: kafede yazılanlar (en az 20 dk eski, rastgele masalara) ya da yakın
+      çevreden (1,5 km içindeki herkese açık sözler; başka mekânın yerel sözü basılmaz). Gizlenen,
+      şikâyet alan, süresi dolan ve yasaklı yazarın sözleri basılmaz; aynı masaya aynı söz iki kez
+      gitmez. Fişte yazar yok, saat kaba; altında kafenin QR'ı. Yazıcı ekranı canlı (SSE) dinler,
+      `--kiosk-printing` ile sessiz basar. Haritada ☕ işareti. Moderatör kafeyi ve personeli yönetir.
+      Şema v12.
 
 ## Kalite turları (tüm adımlar bitince)
 

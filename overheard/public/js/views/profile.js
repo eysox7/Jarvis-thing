@@ -3,6 +3,7 @@ import { t, getLang, setLang, languages, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { openSheet, closeSheet, field, formError, busy, toast } from '../ui.js';
 import { openAdmin } from './admin.js';
+import { openVenue } from './venue.js';
 
 const LANG_NAMES = { tr: 'Türkçe', en: 'English' };
 
@@ -120,8 +121,9 @@ export async function openProfile(app) {
   if (state.user) {
     let stats = state.stats;
     let progress = null;
+    let venues = [];
     try {
-      ({ stats, progress } = await api.me());
+      ({ stats, progress, venues = [] } = await api.me());
     } catch {
       // Eldeki istatistiklerle devam et.
     }
@@ -134,6 +136,7 @@ export async function openProfile(app) {
           state.user.isGuest ? h('p', { class: 'muted small' }, t('profile.guestNote')) : null,
           state.user.banned ? h('p', { class: 'form-error' }, t('profile.bannedNote')) : null)),
       state.user.isAdmin ? h('button', { class: 'btn btn-block', type: 'button', onclick: () => openAdmin(app) }, `🛡️ ${t('admin.open')}`) : null,
+      ...venues.map((v) => h('button', { class: 'btn btn-block', type: 'button', onclick: () => openVenue(app, v) }, `☕ ${t('venue.panel', { name: v.name })}`)),
       state.user.isGuest ? upgradeForm(app) : null,
       h('div', { class: 'stats' },
         stat(stats?.places, t('profile.places')),

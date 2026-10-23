@@ -19,6 +19,7 @@ export async function startTestServer({ demo = false, ai = null, ...overrides } 
     db,
     config,
     events: app.events,
+    tickVenues: app.tickVenues,
     async close() {
       app.close();
       server.closeAllConnections?.();

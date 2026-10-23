@@ -64,7 +64,7 @@ export function createApp({ db, config, ai = null }) {
   const router = new Router();
   const events = createEventHub();
   const rateLimit = createRateLimiter();
-  registerApi(router, { db, config, events, rateLimit, ai });
+  const api = registerApi(router, { db, config, events, rateLimit, ai });
   const headers = securityHeaders(config);
 
   async function serveStatic(req, res, pathname) {
@@ -154,5 +154,5 @@ export function createApp({ db, config, ai = null }) {
     }
   }
 
-  return { handler, events, close: () => events.close() };
+  return { handler, events, tickVenues: api.tickVenues, close: () => events.close() };
 }

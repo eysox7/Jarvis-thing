@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yazıcı · Overheard Kafe</title>
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/printer.css">
+</head>
+<body class="doc-page printer-page">
+  <!-- Kafenin kasasındaki/arkasındaki cihazda, personel hesabıyla açık durur. Yeni fiş gelince
+       fiş yazıcısına basar. Sessiz yazdırma için Chrome'u --kiosk-printing ile açın. -->
+  <main class="printer-screen">
+    <header class="printer-head">
+      <div>
+        <p class="printer-brand"><span class="slip-mark" aria-hidden="true">“</span>overheard</p>
+        <h1 id="printer-title" class="printer-title"></h1>
+      </div>
+      <label class="check"><input type="checkbox" id="auto-print"> <span id="auto-label"></span></label>
+    </header>
+    <p id="printer-status" class="printer-status" role="status" aria-live="polite"></p>
+    <button class="btn btn-primary" id="print-now" type="button" hidden></button>
+    <h2 class="section-title" id="recent-title"></h2>
+    <div id="recent" class="printer-recent"></div>
+  </main>
+  <div id="print-area" class="print-area"></div>
+  <script type="module" src="/js/printer.js"></script>
+</body>
+</html>
