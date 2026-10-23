@@ -4,6 +4,7 @@ import { HANDLE_RE, createSession, destroySession, hashPassword, verifyPassword 
 import { CITIES } from './data/cities.js';
 import * as domain from './domain.js';
 import * as venues from './venues.js';
+import * as p2p from './p2p.js';
 import { qrMatrix, qrSvg } from './qr.js';
 import { containsSlur } from './moderation.js';
 
@@ -226,6 +227,32 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
     }
     const { result, newBadges } = domain.withBadges(db, user, () => domain.createOfflineOverheard(db, config, user, body));
     return { overheard: result, newBadges };
+  });
+
+  // Kulaktan kulağa: cihazın imza anahtarının açık yarısı (bağlıyken bir kez kaydedilir).
+  router.post('/api/me/device-keys', async (ctx) => {
+    const user = requireUser(ctx);
+    limit(`devkey:${user.id}`, 20, 3600000);
+    return { keyId: await p2p.registerDeviceKey(db, user, (await readJson(ctx.req)).jwk) };
+  });
+
+  // Kulaktan kulağa taşınan söz: yazarın cihazında imzalanmıştır; taşıyan (ctx.user) yalnızca ulaştırır.
+  router.post('/api/overheards/relay', async (ctx) => {
+    const carrier = requireActive(ctx);
+    limit(`relay:${carrier.id}`, 60, 3600000);
+    const { author, body } = await p2p.openRelay(db, (await readJson(ctx.req)).p);
+    if (author.banned) throw new HttpError(403, 'banned');
+    const known = db.prepare('SELECT 1 FROM overheards WHERE user_id = ? AND client_id = ?').get(author.id, String(body.clientId ?? ''));
+    if (!known) {
+      limit(`post:${author.id}`, 10, 3600000);
+      await aiGuard(body.text, 'overheard', domain.LIMITS.textMax);
+    }
+    const result = domain.createOfflineOverheard(db, config, author, body, { relayedBy: carrier.id === author.id ? null : carrier.id });
+    if (!result.duplicate && carrier.id !== author.id) {
+      events.publish(author.id, 'relayed', { overheardId: result.id, placeName: result.placeName, carrier: carrier.handle });
+    }
+    // Taşıyana kendi gözünden söz: yerel ve o artık orada değilse metin dönmez.
+    return { overheard: domain.getOverheard(db, config, carrier, result.id), duplicate: Boolean(result.duplicate), newBadges: [] };
   });
 
   router.get('/api/overheards/:id', (ctx) => ({ overheard: domain.getOverheard(db, config, ctx.user, ctx.params.id) }));

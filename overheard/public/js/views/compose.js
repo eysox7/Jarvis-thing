@@ -111,7 +111,7 @@ export async function openCompose(app) {
     const place = app.state.data?.places.find((p) => p.id === choice.placeId);
     const fix = app.state.lastFix;
     const id = newClientId();
-    await app.saveOffline({
+    const item = {
       id,
       clientId: id,
       author: app.state.user.handle,
@@ -123,9 +123,11 @@ export async function openCompose(app) {
       ephemeral: ephemeral.checked,
       heardAt: Date.now(),
       fix: fix ? [fix.lat, fix.lng, fix.accuracy, fix.at] : null,
-    });
+    };
+    await app.saveOffline(item);
     closeSheet();
-    toast(t('offline.saved'), { tone: 'success', timeout: 7000 });
+    // İnternet yokken yanındakine geçir: hanginiz önce bağlanırsa o gönderir.
+    toast(t('offline.saved'), { tone: 'success', timeout: 9000, action: `📡 ${t('p2p.pass')}`, onAction: () => app.p2p.show(item) });
   }
 
   const form = h('form', {

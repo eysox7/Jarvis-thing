@@ -156,6 +156,7 @@ export async function openProfile(app) {
     body: h('div', { class: 'stack' },
       account,
       howItWorks(),
+      h('button', { class: 'btn btn-block', type: 'button', onclick: () => app.p2p.list() }, `📡 ${t('p2p.list')}`),
       h('h3', { class: 'section-title' }, t('profile.pilot')),
       cities,
       h('label', { class: 'field field-inline' }, h('span', { class: 'field-label' }, t('profile.language')), langSelect),

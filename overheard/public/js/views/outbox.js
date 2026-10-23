@@ -12,6 +12,7 @@ export async function openOutbox(app) {
     const items = await app.offline.pending();
     clear(body).append(
       h('p', { class: 'muted small' }, navigator.onLine ? t('outbox.online') : t('offline.note')),
+      h('button', { class: 'btn btn-block', type: 'button', onclick: () => app.p2p.list() }, `📡 ${t('p2p.list')}`),
       items.length
         ? h('ul', { class: 'list' }, items.map((item) => h('li', { class: 'admin-item' },
           h('blockquote', { class: 'chat-quote' }, item.kind === 'relay' ? truncate(item.preview || '', 140) : item.text),

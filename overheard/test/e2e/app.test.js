@@ -642,6 +642,66 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
     });
   });
 
+  describe('Kulaktan kulağa', () => {
+    let srv;
+    before(async () => { srv = await startTestServer({ demo: true }); });
+    after(async () => { await srv.close(); });
+
+    test('internetsiz: A sözünü QR ile geçirir, B okur ve bağlanınca sunucuya ulaştırır', async () => {
+      const a = await newUser(browser, srv.base, KADIKOY);
+      const b = await newUser(browser, srv.base, MODA);
+      await loginAsGuest(a.page);
+      await loginAsGuest(b.page);
+      // A bağlıyken cihaz anahtarı kaydedilir; sonra vapurda/metroda bağlantı gider.
+      assert.ok(await a.page.evaluate(() => window.overheard.app.p2p.ensureKey().then(Boolean)));
+      await a.page.evaluate(() => window.overheard.app.teleport({ lat: 40.9925, lng: 29.0236 }));
+      await a.page.locator('.toast', { hasText: 'Kadıköy İskelesi: buradasın' }).waitFor();
+      // Ekrandaki kodu doğrulamak için QR okuyucu bağlantı varken yüklenir.
+      await a.page.addScriptTag({ url: '/vendor/jsqr/jsQR.js' });
+      await a.context.setOffline(true);
+      await b.context.setOffline(true);
+
+      await a.page.locator('[data-nav="post"]').click();
+      await sheet(a.page).locator('textarea[name="text"]').fill('Vapurda biri: "İnternet yok ama martılar hâlâ simit istiyor."');
+      await sheet(a.page).getByText('Kadıköy İskelesi').waitFor();
+      await sheet(a.page).getByRole('button', { name: /Bırak/ }).click();
+      await a.page.locator('.toast', { hasText: 'sözün cihazında bekliyor' }).getByRole('button', { name: /Kulaktan kulağa/ }).click();
+      await sheet(a.page).locator('canvas.p2p-qr').waitFor();
+      const link = await sheet(a.page).locator('input.qr-url').inputValue();
+      assert.match(link, /\/#p2p=[\w-]+\.[\w-]+\.[\w-]+$/);
+      // Ekrandaki QR gerçekten bu bağlantıyı taşıyor.
+      const decoded = await a.page.evaluate(() => {
+        const canvas = document.querySelector('canvas.p2p-qr');
+        const frame = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+        return window.jsQR(frame.data, frame.width, frame.height)?.data ?? null;
+      });
+      assert.equal(decoded, link);
+
+      // B kodu okuttu (kamera uygulaması bağlantıyı açar): internet olmadan sözü okur.
+      await b.page.evaluate((url) => { location.hash = new URL(url).hash; }, link);
+      await sheet(b.page).getByText('Kulaktan kulağa geldi').waitFor();
+      await sheet(b.page).getByText('martılar hâlâ simit istiyor').waitFor();
+      assert.equal(await b.page.evaluate(() => location.hash), '');
+
+      // B'ye bağlantı geldi: sözü A adına sunucuya o ulaştırır.
+      await b.context.setOffline(false);
+      await b.page.locator('.toast', { hasText: 'taşıdığın söz ulaştı' }).waitFor();
+      const row = srv.db.prepare("SELECT u.handle AS author, c.handle AS carrier, o.offline FROM overheards o JOIN users u ON u.id = o.user_id JOIN users c ON c.id = o.relayed_by WHERE o.text LIKE '%martılar hâlâ simit%'").get();
+      assert.match(row.author, /^misafir_/);
+      assert.notEqual(row.author, row.carrier);
+      assert.equal(row.offline, 1);
+
+      // A sonra bağlanınca kendi kuyruğundaki söz tekrar kaydedilmez.
+      await a.context.setOffline(false);
+      await a.page.locator('#offline-chip').waitFor({ state: 'hidden' });
+      assert.equal(srv.db.prepare("SELECT COUNT(*) AS n FROM overheards WHERE text LIKE '%martılar hâlâ simit%'").get().n, 1);
+      assert.deepEqual(a.errors, []);
+      assert.deepEqual(b.errors, []);
+      await a.context.close();
+      await b.context.close();
+    });
+  });
+
   describe('Yoğun bölge', () => {
     let srv;
     before(async () => {

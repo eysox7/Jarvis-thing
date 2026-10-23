@@ -39,10 +39,29 @@ describe('QR kodu üreticisi', () => {
     }
   });
 
+  test('büyük sürümler ve L düzeyi (ekrandan okutma, kulaktan kulağa) da okunur; 23. sürüm atlanır', () => {
+    const seen = new Set();
+    for (const ecl of ['L', 'M']) {
+      for (let len = 200; len <= 2200; len = Math.ceil(len * 1.25)) {
+        const text = Array.from({ length: len }, (_, i) => 'abcXYZ0123-_.~'[(i * 7) % 14]).join('');
+        const rows = qrMatrix(text, { ecl });
+        const ver = (rows.length - 17) / 4;
+        seen.add(ver);
+        assert.notEqual(ver, 23);
+        assert.equal(decode(rows, 3), text, `${ecl} uzunluk ${len} (sürüm ${ver})`);
+      }
+    }
+    assert.ok(Math.max(...seen) >= 35);
+    // Aynı veri L düzeyinde daha küçük bir koda sığar.
+    const long = 'x'.repeat(600);
+    assert.ok(qrMatrix(long, { ecl: 'L' }).length < qrMatrix(long, { ecl: 'M' }).length);
+    assert.throws(() => qrMatrix('x', { ecl: 'Q' }), /qr_bad_ecl/);
+  });
+
   test('SVG beyaz zeminli ve kare', () => {
     const svg = qrSvg('merhaba');
     assert.match(svg, /^<svg xmlns="http:\/\/www.w3.org\/2000\/svg" viewBox="0 0 29 29"/);
-    assert.throws(() => qrMatrix('x'.repeat(400)), /qr_data_too_long/);
+    assert.throws(() => qrMatrix('x'.repeat(3000)), /qr_data_too_long/);
   });
 });
 

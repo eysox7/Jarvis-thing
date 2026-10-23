@@ -49,6 +49,7 @@ export const api = {
     anonymous: item.anonymous, ephemeral: item.ephemeral, heardAt: item.heardAt, fix: item.fix,
   }),
   relay: (payload) => request('POST', '/api/overheards/relay', payload),
+  registerDeviceKey: (jwk) => request('POST', '/api/me/device-keys', { jwk }),
   myPlaces: () => request('GET', '/api/me/places'),
   overheard: (id) => request('GET', `/api/overheards/${enc(id)}`),
   post: (payload) => request('POST', '/api/overheards', payload),

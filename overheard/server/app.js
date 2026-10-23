@@ -52,7 +52,8 @@ function securityHeaders(config) {
     ].join('; '),
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'strict-origin-when-cross-origin',
-    'permissions-policy': 'geolocation=(self), camera=(), microphone=()',
+    // Kamera yalnızca kulaktan kulağa QR okutmak için (uygulamanın kendisi).
+    'permissions-policy': 'geolocation=(self), camera=(self), microphone=()',
     // HTTPS arkasında tarayıcı bir yıl boyunca yalnızca HTTPS kullansın.
     ...(config.secureCookies ? { 'strict-transport-security': 'max-age=31536000; includeSubDomains' } : {}),
   };

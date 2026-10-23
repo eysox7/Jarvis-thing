@@ -155,6 +155,24 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
 - [x] **26. Kafe sakin semtlerde** — Kafe içi söz bekleme süresi kafe başına (10–240 dk; herkesin
       birbirini tanıdığı semtlerde uzatmak için). Boş bölge kartı en yakın Overheard Kafe'yi gösterir.
 
+## Bağlantısız yerler (beşinci tur)
+
+- [x] **27. Çevrimdışı söz** — Bağlantı yokken (ya da tünelde konum alınamazken) söz cihazdaki kuyruğa
+      (IndexedDB) yazılır; bağlantı gelince, uygulama açılınca ve arka planda eşitlemeyle gönderilir.
+      Sunucu o sırada orada olunduğunu zamanında yapılmış giriş/biniş ya da cihazın o anki iyi
+      konumuyla doğrular; söz yazıldığı anın saatiyle kaydedilir, en geç 6 saat, aynı söz bir kez.
+      Bekleyenler çipi ve listesi; çevrimdışı açılışta son görülen harita (2 saatten eski yerel sözler
+      kilitli). Şema v14.
+- [x] **28. Kulaktan kulağa (eşten eşe)** — Çevrimdışı söz ekranda QR (L düzeyi, sürüm 1–40;
+      QR üreticisi artık sunucu ve tarayıcıda ortak) ya da AirDrop/Quick Share ile yanındakine geçer;
+      o internetsiz okur ve taşır, kim önce bağlanırsa sunucuya o ulaştırır. Yazarın cihaz anahtarı
+      (ECDSA P-256, WebCrypto; özel anahtar dışa aktarılamaz) imzalar, sunucu doğrular; taşıyan
+      değiştiremez, başkası adına söz uyduramaz. Uygulama içi kamera okuyucu (BarcodeDetector ya da
+      jsQR); yazara "ulaştı" bildirimi.
+- [ ] **29. Yerli uygulama ile kendiliğinden eşten eşe** — Capacitor sarmalayıcı + iOS Multipeer
+      Connectivity / Android Nearby Connections: aynı vagondaki telefonlar imzalı sözleri (28'deki
+      paket biçimi) kendiliğinden birbirine aktarır.
+
 ## Kalite turları (tüm adımlar bitince)
 
 Erişilebilirlik denetimi, mobil Safari uyumluluğu, performans profili, hata mesajları, kopya

@@ -75,6 +75,17 @@ balonların altında sokak haritası görünür.</sub>
   2 saate kadar hattasın; inip uzaklaşınca çıkarsın. Hat sözlerini yalnızca o an aynı hatta
   olanlar okur, hattın odasında yazışır. Haritada hattın güzergâhı çizilir, sözler güzergâh
   boyunca durur; kilitli hat sözünde yol tarifi en yakın durağa.
+- **Çevrimdışı söz (metro, tünel).** Bağlantı yokken ya da tünelde konum alınamazken yazılan söz
+  cihazda bekler; bağlantı gelince (uygulama açıkken hemen, destekleyen tarayıcılarda kapalıyken de
+  arka planda) gönderilir. Sunucu o sırada orada olduğunu zamanında yapılmış bir giriş/biniş ya da
+  cihazın o anki iyi konumuyla doğrular; söz yazıldığı anın saatiyle görünür, en geç 6 saat bekler,
+  iki kez kaydedilmez. Uygulama çevrimdışı açılırsa son görülen harita gösterilir.
+- **Kulaktan kulağa (eşten eşe, internetsiz).** Çevrimdışı sözünü ekranında QR olarak gösterir ya da
+  AirDrop/Quick Share ile gönderirsin; yanındaki telefonun kamerasıyla okutur, sözü internet olmadan
+  hemen okur ve o da taşır. Hanginiz önce bağlantı bulursa sözü sunucuya o ulaştırır (yazar "sözün
+  @x sayesinde ulaştı" bildirimi alır). Söz yazarın cihaz anahtarıyla (ECDSA P-256, özel anahtar
+  cihazdan çıkmaz) imzalanır: taşıyan değiştiremez, kimse başkası adına söz uyduramaz; "o sırada
+  oradaydım" kanıtı yazarındır. Bağlantı adresin `#` sonrasında taşınır, sunucu kayıtlarına düşmez.
 - **Sakin semtler.** Hiç sözün olmadığı bir yerde harita "Bu civarda henüz söz yok, ilkini sen
   bırak" der; yakında bir Overheard Kafe varsa onu da gösterir. Bir mekânın ya da hattın ilk sözünü
   bırakan 🚩 **Öncü** rozetini alır.
@@ -298,6 +309,8 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | `GET/POST/DELETE /api/admin/venues/:placeId` · `POST/DELETE …/staff` | Overheard Kafe kurma, personel (yalnızca moderatör) |
 | `GET /api/venues/:placeId` · `POST …/settings` · `POST …/tables` · `POST …/tables/:id/print` · `POST …/tables/:id/close` | Kafe paneli (personel): mod, masa açma, bir fiş daha, kapatma |
 | `GET /api/venues/:placeId/jobs` · `POST …/jobs/:id/printed` | Yazıcı kuyruğu (fişler + kafe QR'ı); yeni fişte personele SSE `print` |
+| `POST /api/overheards/offline` | `{clientId, text, placeId, heardAt, fix?, …}` → çevrimdışı yazılmış söz (kanıt: o sıradaki giriş ya da `fix`) |
+| `POST /api/me/device-keys` · `POST /api/overheards/relay` | Cihaz imza anahtarı (açık yarı) · kulaktan kulağa taşınan imzalı söz `{p: "<veri>.<anahtar>.<imza>"}`; yazara SSE `relayed` |
 | `GET /api/events` | SSE akışı (`dm`, `reveal`, `room` olayları) |
 
 ## Testler
@@ -333,6 +346,12 @@ denetimler açıktır (`OVERHEARD_ANTI_SPOOF` ile değiştirilebilir):
   Play Integrity) ya da BLE işaretçileri gerekir. Mekân QR kodu kapalı alanlarda yardımcı olur ama
   sabit bir koddur: mekâna bir kez giden biri fotoğrafını alıp 1 km yakınından yeniden okutabilir
   (dönen kod ya da ekranda gösterilen QR bu açığı kapatır).
+- Kulaktan kulağa tarayıcıda kullanıcının bir hamlesiyle (QR okutma, AirDrop/Quick Share) çalışır.
+  Telefonların internetsiz, kendiliğinden birbirini bulması (Bluetooth/Wi-Fi Direct ağı) tarayıcıdan
+  yapılamaz (iOS Safari Bluetooth'a izin vermez, WebRTC bağlantı kurmak için sunucu ister); bunun
+  için yerli uygulama (iOS Multipeer Connectivity, Android Nearby Connections) gerekir. Sunucu
+  tarafı (imzalı paket, aktarma ucu) buna hazırdır. Kodu telefonun kamera uygulamasıyla okutan
+  kişinin tarayıcısı Overheard'ü daha önce açmış olmalı (çevrimdışı kabuk önbellekte).
 - Hız sınırları ve canlı bağlantılar tek süreç içindedir; yatay ölçeklemede paylaşılan bir depo
   (ör. Redis) gerekir.
 - Harita karoları CARTO/OpenStreetMap'ten gelir; yoğun kullanımda kendi karo sunucunuz ya da

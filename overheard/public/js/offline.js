@@ -44,6 +44,7 @@ export function createOffline(app) {
           if (item.kind === 'relay') {
             const got = await store.get('received', item.id);
             if (got) await store.put('received', { ...got, delivered: true });
+            toast(t('p2p.deliveredToast', { text: truncate(item.preview || '', 40) }), { tone: 'success' });
           } else {
             toast(t('offline.sent', { text: truncate(overheard.text, 40) }), { tone: 'success' });
           }

@@ -16,6 +16,7 @@ import { shareOverheard } from './share.js';
 import { openBest } from './views/best.js';
 import { openOutbox } from './views/outbox.js';
 import { createOffline } from './offline.js';
+import { createP2P, takeP2pPayload } from './p2p.js';
 
 const CITY_KEY = 'oh_city';
 const HINT_KEY = 'oh_demo_hint_seen';
@@ -170,6 +171,7 @@ const app = {
     state.user = user;
     await refreshMe();
     connectEvents();
+    app.p2p.ensureKey();
     await app.refresh();
     renderChrome();
   },
@@ -405,6 +407,11 @@ function connectEvents() {
     if (sheetKey() === `chat:${data.conversationId}`) openConversation(app, data.conversationId);
   });
   events.addEventListener('room', (e) => handleRoomMessage(app, JSON.parse(e.data)));
+  // Çevrimdışı sözünü yanındaki biri kulaktan kulağa sunucuya ulaştırdı.
+  events.addEventListener('relayed', (e) => {
+    const data = JSON.parse(e.data);
+    toast(t('p2p.relayed', { carrier: data.carrier, place: data.placeName }), { tone: 'success', timeout: 7000 });
+  });
   events.addEventListener('dm', async (e) => {
     const data = JSON.parse(e.data);
     if (await handleIncoming(app, data)) return;
@@ -675,16 +682,25 @@ async function boot() {
 
   offline = createOffline(app);
   app.offline = offline;
+  app.p2p = createP2P(app);
   bindNav();
   renderChrome();
   const qrCode = takeQrCode();
-  if (!qrCode) maybeShowIntro(app);
+  const p2pPayload = takeP2pPayload();
+  if (!qrCode && !p2pPayload) maybeShowIntro(app);
   showDemoHint();
   connectEvents();
   await app.refresh();
   document.body.classList.add('is-ready');
   offline.render();
   offline.flush();
+  app.p2p.ensureKey();
+  // Kulaktan kulağa bağlantısı (kamerayla okutulan kod, AirDrop): açılışta ya da uygulama açıkken.
+  if (p2pPayload) app.p2p.receive(p2pPayload);
+  window.addEventListener('hashchange', () => {
+    const payload = takeP2pPayload();
+    if (payload) app.p2p.receive(payload);
+  });
   if (qrCode) qrCheckIn(qrCode);
   else autoLocate();
   // "Orada olma" süresi dolunca yerel sözler sunucuda kilitlenir; açık ekran da bunu yakalasın.
