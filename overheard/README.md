@@ -26,6 +26,10 @@ insanları yürümeye hem de tanışmaya teşvik eder.
   <img src="docs/screenshots/3-seni-bekleyen.png" width="180" alt="Seni bekleyen kilitli sözler kartı">
   <img src="docs/screenshots/5-soz-birak.png" width="180" alt="Söz bırakma">
   <img src="docs/screenshots/6-rozetler.png" width="180" alt="Rozetler ve şehir keşfi">
+  <img src="docs/screenshots/7-qr-admin.png" width="180" alt="Moderatör panelinde mekân QR kodu">
+  <img src="docs/screenshots/8-qr-poster.png" width="180" alt="Mekânın girişine asılan QR posteri">
+  <img src="docs/screenshots/9-qr-giris.png" width="180" alt="QR ile mekâna giriş">
+  <img src="docs/screenshots/10-yapay-zeka-denetimi.png" width="180" alt="Kişiyi tanınır kılan söz yapay zekâ denetiminde reddedildi">
 </p>
 
 <sub>Ekran görüntüleri harita karolarına erişimi olmayan bir test ortamında alındı; gerçek kullanımda

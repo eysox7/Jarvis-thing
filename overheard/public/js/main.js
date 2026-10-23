@@ -429,8 +429,9 @@ function coarsePosition() {
 
 async function qrCheckIn(code) {
   if (!state.user) return app.openAuth(() => qrCheckIn(code));
-  toast(t('qr.locating'));
+  const locating = toast(t('qr.locating'), { timeout: 15000 });
   const pos = await coarsePosition();
+  locating();
   if (!pos) return toast(t('qr.needLocation'), { tone: 'error', timeout: 8000 });
   setPosition(pos);
   try {

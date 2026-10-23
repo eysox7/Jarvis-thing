@@ -68,10 +68,13 @@ export function toast(message, { action, onAction, timeout = 4200, tone = 'info'
     action ? h('button', { class: 'toast-action', type: 'button', onclick: () => { onAction?.(); item.remove(); } }, action) : null);
   toasts.append(item);
   while (toasts.children.length > 3) toasts.firstChild.remove();
-  setTimeout(() => {
+  // Erken kapatmak için (ör. "konum alınıyor…" bildirimi iş bitince).
+  const dismiss = () => {
     item.classList.add('is-leaving');
     setTimeout(() => item.remove(), 300);
-  }, timeout);
+  };
+  setTimeout(dismiss, timeout);
+  return dismiss;
 }
 
 export function field(label, input) {
