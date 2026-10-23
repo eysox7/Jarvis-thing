@@ -22,11 +22,16 @@ describe('Keşif ilerlemesi ve rozetler', () => {
     assert.deepEqual(first.data.newBadges, ['first_step']);
     assert.deepEqual((await me.post('/api/checkins', SPOTS.kadikoyIskele)).data.newBadges, []);
 
+    // Kadıköy İskelesi'nin ilk sözü: öncü rozeti de gelir.
     const posted = await me.post('/api/overheards', { text: 'Rozet avcısı iş başında.', ...SPOTS.kadikoyIskele });
-    assert.deepEqual(posted.data.newBadges, ['first_drop']);
+    assert.deepEqual(posted.data.newBadges, ['first_drop', 'pioneer']);
+    assert.equal(posted.data.overheard.pioneer, true);
 
-    // Başkasının sözüne "ben de duydum" ve mesaj.
-    const { id } = (await other.post('/api/overheards', { text: 'Aynı anda buradaydık.', ...SPOTS.kadikoyIskele })).data.overheard;
+    // Başkasının sözüne "ben de duydum" ve mesaj. İkinci söz öncü değildir.
+    const second = (await other.post('/api/overheards', { text: 'Aynı anda buradaydık.', ...SPOTS.kadikoyIskele })).data;
+    assert.equal(second.overheard.pioneer, false);
+    assert.deepEqual(second.newBadges, ['first_step', 'first_drop']);
+    const { id } = second.overheard;
     assert.deepEqual((await me.post(`/api/overheards/${id}/reactions`, { kind: 'same' })).data.newBadges, ['witness']);
     assert.deepEqual((await me.post(`/api/overheards/${id}/messages`, { body: 'Merhaba!' })).data.newBadges, ['connector']);
 

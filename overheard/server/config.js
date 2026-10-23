@@ -53,10 +53,15 @@ export function loadConfig(overrides = {}) {
     stickyPresenceMs: 3 * 60 * 60 * 1000,
     stickyMarginM: 100,
     stickyMaxAccuracyM: 1000,
-    // Overheard Kafe: kafe içi sözler yazanı ele vermesin diye en az bu kadar eskiyse basılır...
-    venueInsideDelayMs: 20 * 60 * 1000,
-    // ...ve kapatılması unutulan masalar bu süreden sonra kendiliğinden kapanır.
+    // Overheard Kafe: kapatılması unutulan masalar bu süreden sonra kendiliğinden kapanır. (Kafe içi
+    // sözlerin bekleme süresi kafe başına ayarlanır, varsayılan 20 dk.)
     venueTableMaxMs: 6 * 60 * 60 * 1000,
+    // Toplu taşıma hattı: bir durağa bu kadar yakın (metre) iyi bir konum hatta "biniş" sayılır...
+    lineBoardM: 150,
+    // ...sonra konum güzergâha lineHoldM (+ belirsizlik) yakın kaldıkça, en fazla linePresenceMs
+    // boyunca hatta sayılırsın (tünelde GPS yokken de).
+    lineHoldM: 500,
+    linePresenceMs: 2 * 60 * 60 * 1000,
     // Mekân QR kodu: okutulduğunda kaba konum mekâna bu kadar yakın olmalı (metre)...
     qrMaxDistanceM: 1000,
     // ...ve konum doğruluğu bundan kötü olmamalı (kapalı alanda GPS zayıf; Wi-Fi/baz konumu yeter).

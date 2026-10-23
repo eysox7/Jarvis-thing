@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { startTestServer } from '../helpers.js';
 import { addStaff, saveVenue } from '../../server/venues.js';
+import { importLines, parseLines } from '../../server/osm.js';
 
 let chromium = null;
 try {
@@ -565,6 +566,42 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM print_jobs WHERE printed_at IS NOT NULL').get().n, 2);
       assert.deepEqual(u.errors, []);
       assert.deepEqual(printerErrors, []);
+      await u.context.close();
+    });
+  });
+
+  describe('Sakin semt ve toplu taşıma hattı', () => {
+    let srv;
+    before(async () => {
+      srv = await startTestServer({ demo: true });
+      // Sentetik bir hat (test verisi) ve bir Overheard Kafe.
+      const json = JSON.parse(await readFile(new URL('../fixtures/overpass-lines.json', import.meta.url), 'utf8'));
+      importLines(srv.db, parseLines(json, { cityId: 'istanbul' }));
+      srv.db.prepare("INSERT INTO places (id, city_id, name, kind, lat, lng, radius_m, created_at) VALUES ('ist-test-kafe', 'istanbul', 'Test Semt Kafesi', 'spot', 40.9750, 29.2550, 60, ?)").run(Date.now());
+      saveVenue(srv.db, 'ist-test-kafe', { mode: 'nearby' });
+    });
+    after(async () => { await srv.close(); });
+
+    test('boş bölgede ilk sözü bırakmaya ve en yakın kafeye çağrı; durakta binince hat açılır', async () => {
+      // Hiç sözün olmadığı bir semtte, hattın bir durağının yakınında.
+      const u = await newUser(browser, srv.base, { latitude: 40.9703, longitude: 29.2503, accuracy: 15 });
+      await loginAsGuest(u.page);
+      await u.page.locator('#btn-locate').click();
+      await u.page.locator('.toast', { hasText: 'T9 Test A–Test D: hattasın' }).waitFor();
+      const nudge = u.page.locator('#nudge');
+      await nudge.getByText('Bu civarda henüz söz yok').waitFor();
+      await nudge.getByText(/En yakın Overheard Kafe: Test Semt Kafesi/).waitFor();
+      // Hat güzergâhı haritada; hattasın, bu yüzden dolu çizgi.
+      await u.page.locator('path.oh-line.is-open').first().waitFor({ state: 'attached' });
+
+      // İlk sözü bırak: hatta (öncü).
+      await nudge.getByRole('button', { name: 'İlk sözü bırak' }).click();
+      await sheet(u.page).locator('textarea[name="text"]').fill('Vagonda biri: "Bu hat da benim gibi sabahları geç kalıyor."');
+      await sheet(u.page).getByText('T9 Test A–Test D').waitFor();
+      await sheet(u.page).getByRole('button', { name: /Bırak/ }).click();
+      await u.page.locator('.toast', { hasText: 'ilk sözünü sen bıraktın' }).waitFor();
+      await u.page.locator('.toast', { hasText: 'Yeni rozet: Öncü' }).waitFor();
+      assert.deepEqual(u.errors, []);
       await u.context.close();
     });
   });

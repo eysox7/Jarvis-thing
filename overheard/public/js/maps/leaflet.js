@@ -31,6 +31,15 @@ export function createLeafletMap(el, handlers) {
       contains: (lat, lng) => bounds.contains([lat, lng]),
     });
     for (const m of plan) {
+      if (m.type === 'line') {
+        L.polyline(m.points, {
+          interactive: false,
+          color: m.item.color || '#8b86a3',
+          weight: 4,
+          className: `oh-line ${m.item.here ? 'is-open' : 'is-locked'}`,
+        }).addTo(layer);
+        continue;
+      }
       if (m.type === 'area') {
         L.circle([m.lat, m.lng], {
           radius: m.item.radius,

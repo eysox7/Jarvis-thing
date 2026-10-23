@@ -138,6 +138,23 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       Şema v12. Sakin semtler için genişleyen arama: yakında söz yoksa 5 km, 15 km, sonra şehrin
       geneli (kafe içi modda da kafenin kendi sözleri bitince yakın çevreye geçilir).
 
+## Sakin semtler (dördüncü tur)
+
+- [x] **23. OpenStreetMap aktarımı** — `npm run import:osm`: ilçe ilçe gündelik buluşma noktaları
+      (istasyon, otogar, iskele, semt pazarı, AVM, meydan, park, halı saha, kampüs; alanlı olanlarda
+      yarıçap gerçek büyüklükten) ve raylı sistem/metrobüs hatları. Hassas yerler (okul, hastane,
+      ibadethane, karakol, cezaevi) alınmaz; var olan mekânla çakışan atlanır; tekrar çalıştırılabilir;
+      `--dry-run`, `--from-file`. İstanbul pilot yarıçapı 80 km'ye çıktı (Silivri, Şile dahil).
+- [x] **24. Toplu taşıma hatları** — Hat bir mekân (duraklar sırayla, şema v13). Durağa 150 m
+      yakın iyi konum biniş; güzergâha 500 m (+belirsizlik) yakın kaldıkça 2 saate kadar hattasın,
+      çelişen konum çıkarır. Hat sözleri güzergâh boyunca yerleşir, kişi sayısı ve hat odası var.
+      Haritada güzergâh (Leaflet ve Google), kilitli hat sözünde en yakın durağa yol tarifi, biniş
+      bildirimi. Hat kafe olamaz; istasyonun yanında yeni mekân açılabilir.
+- [x] **25. Semtin ilk sözü** — Hiç sözün olmadığı yerde "Bu civarda henüz söz yok, ilkini sen bırak"
+      kartı; bir mekânın ilk sözüne 🚩 Öncü rozeti ve bildirimi.
+- [x] **26. Kafe sakin semtlerde** — Kafe içi söz bekleme süresi kafe başına (10–240 dk; herkesin
+      birbirini tanıdığı semtlerde uzatmak için). Boş bölge kartı en yakın Overheard Kafe'yi gösterir.
+
 ## Kalite turları (tüm adımlar bitince)
 
 Erişilebilirlik denetimi, mobil Safari uyumluluğu, performans profili, hata mesajları, kopya

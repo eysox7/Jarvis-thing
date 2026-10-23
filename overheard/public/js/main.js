@@ -200,6 +200,8 @@ const app = {
 
   startMessage: (o, to) => openNewMessage(app, o, to),
 
+  compose: () => openCompose(app),
+
   async share(o) {
     const city = state.config.cities.find((c) => c.id === o.cityId);
     const result = await shareOverheard(o, city?.name);
@@ -268,7 +270,7 @@ const app = {
     if (result.city && result.city !== state.city.id) await app.selectCity(result.city, { keepView: true });
     else if (arrived.length || left.length) await app.refresh();
     for (const p of arrived) {
-      toast(t(p.qr ? 'qr.arrived' : 'toast.arrived', { place: p.name }), { tone: 'success', timeout: 6000, action: t('room.enter'), onAction: () => openRoom(app, p) });
+      toast(t(p.qr ? 'qr.arrived' : p.line ? 'toast.boarded' : 'toast.arrived', { place: p.name }), { tone: 'success', timeout: 6000, action: t('room.enter'), onAction: () => openRoom(app, p) });
     }
     closeRoomIfLeft(left);
     for (const p of left) if (p.localCount) toast(t('toast.left', { place: p.name }));

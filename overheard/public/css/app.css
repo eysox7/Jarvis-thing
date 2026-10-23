@@ -331,6 +331,10 @@ button { cursor: pointer; }
 .oh-place-area { stroke-width: 1.5; fill-opacity: 0.07; }
 .oh-place-area.is-open { stroke: var(--open); fill: var(--open); }
 .oh-place-area.is-locked { stroke: var(--locked); fill: var(--locked); stroke-dasharray: 5 6; }
+/* Toplu taşıma hattı güzergâhı: hattaysan dolu, değilsen soluk ve kesik. */
+.oh-line { stroke-linecap: round; stroke-linejoin: round; }
+.oh-line.is-open { stroke-opacity: 0.9; }
+.oh-line.is-locked { stroke-opacity: 0.45; stroke-dasharray: 1 9; }
 
 .oh-me-marker { overflow: visible; }
 .oh-me-dot {

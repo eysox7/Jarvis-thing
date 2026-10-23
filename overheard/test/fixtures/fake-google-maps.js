@@ -139,6 +139,11 @@
     setRadius(r) { this.opts.radius = r; }
   }
 
+  class Polyline {
+    constructor(opts) { this.opts = opts; this.setMap(opts.map); }
+    setMap(map) { this.map = map; }
+  }
+
   class InfoWindow {
     constructor(opts = {}) {
       this.opts = opts;
@@ -170,6 +175,7 @@
       Map,
       OverlayView,
       Circle,
+      Polyline,
       InfoWindow,
       LatLng,
       LatLngBounds,

@@ -4,6 +4,9 @@ import { toast, sheetKey } from '../ui.js';
 
 // Bu mesafedeki en yakın kilitli (ve sözü olan) mekân kartta gösterilir.
 const MAX_DISTANCE_M = 5000;
+// Bu yarıçapta hiç söz yoksa "sakin bölge": ilk sözü bırakmaya ve en yakın Overheard Kafe'ye çağırır.
+const QUIET_RADIUS_M = 1500;
+const CAFE_DISTANCE_M = 8000;
 // Keşif modunda yaklaştıkça verilen ipuçlarının eşikleri.
 const HOT_THRESHOLDS_M = [300, 100];
 
@@ -23,12 +26,19 @@ export function createNudge(app) {
   function update() {
     const { position, data } = app.state;
     if (!position || !data) return hide();
+    // Hatlarda uzaklık ve yol tarifi en yakın durağa.
+    const point = (p) => (p.line && p.stops?.length
+      ? p.stops.map(([lat, lng]) => ({ lat, lng })).reduce((a, b) => (distanceM(position.lat, position.lng, a.lat, a.lng) <= distanceM(position.lat, position.lng, b.lat, b.lng) ? a : b))
+      : p);
     const nearest = data.places
       .filter((p) => !p.here && p.localCount > 0 && !dismissed.has(p.id))
-      .map((p) => ({ ...p, distance: distanceM(position.lat, position.lng, p.lat, p.lng) }))
+      .map((p) => {
+        const at = point(p);
+        return { ...p, goal: at, distance: distanceM(position.lat, position.lng, at.lat, at.lng) };
+      })
       .filter((p) => p.distance <= MAX_DISTANCE_M)
       .sort((a, b) => a.distance - b.distance)[0];
-    if (!nearest) return hide();
+    if (!nearest) return quiet(position, data);
     if (el.dataset.place !== nearest.id) delete el.dataset.hot;
     el.dataset.place = nearest.id;
 
@@ -37,7 +47,7 @@ export function createNudge(app) {
       h('button', { class: 'nudge-main', type: 'button', onclick: () => app.goToPlace(nearest) },
         h('span', { class: 'nudge-title' }, t('nudge.waiting', { n: nearest.localCount })),
         h('span', { class: 'nudge-sub' }, `🚶 ${formatDistance(nearest.distance)} · ${nearest.name}`)),
-      h('a', { class: 'btn btn-primary nudge-go', href: directionsUrl(nearest), target: '_blank', rel: 'noopener' }, t('bubble.directions')),
+      h('a', { class: 'btn btn-primary nudge-go', href: directionsUrl(nearest.goal), target: '_blank', rel: 'noopener' }, t('bubble.directions')),
       h('button', {
         class: 'icon-btn',
         type: 'button',
@@ -59,6 +69,40 @@ export function createNudge(app) {
         toast(t('nudge.hot', { place: nearest.name, d: formatDistance(nearest.distance) }), { tone: 'success' });
       }
     }
+  }
+
+  // Sakin bölge (Sultanbeyli, Sancaktepe gibi henüz sözü olmayan yerler): boş harita bir eksik değil,
+  // bir davet. Yakında bir Overheard Kafe varsa o da gösterilir (sözler masana fiş olarak gelir).
+  function quiet(position, data) {
+    const near = (p, max) => distanceM(position.lat, position.lng, p.lat, p.lng) <= max;
+    if (dismissed.has('quiet') || data.places.some((p) => p.count > 0 && !p.line && near(p, QUIET_RADIUS_M))) return hide();
+    const cafe = data.places
+      .filter((p) => p.cafe)
+      .map((p) => ({ ...p, distance: distanceM(position.lat, position.lng, p.lat, p.lng) }))
+      .filter((p) => p.distance <= CAFE_DISTANCE_M)
+      .sort((a, b) => a.distance - b.distance)[0];
+    delete el.dataset.hot;
+    el.dataset.place = 'quiet';
+    clear(el).append(
+      h('span', { class: 'nudge-icon', 'aria-hidden': 'true' }, '🌱'),
+      h('button', { class: 'nudge-main', type: 'button', onclick: () => app.compose() },
+        h('span', { class: 'nudge-title' }, t('nudge.quiet')),
+        h('span', { class: 'nudge-sub' }, cafe ? `☕ ${t('nudge.cafe', { place: cafe.name, d: formatDistance(cafe.distance) })}` : t('nudge.quietSub'))),
+      cafe
+        ? h('a', { class: 'btn nudge-go', href: directionsUrl(cafe), target: '_blank', rel: 'noopener' }, t('bubble.directions'))
+        : null,
+      h('button', { class: 'btn btn-primary nudge-go', type: 'button', onclick: () => app.compose() }, t('nudge.drop')),
+      h('button', {
+        class: 'icon-btn',
+        type: 'button',
+        'aria-label': t('common.close'),
+        onclick: () => {
+          dismissed.add('quiet');
+          hide();
+        },
+      }, '✕'));
+    el.hidden = false;
+    document.body.classList.add('has-nudge');
   }
 
   return { update };

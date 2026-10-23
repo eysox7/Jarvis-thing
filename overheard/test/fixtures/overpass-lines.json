@@ -1,0 +1,194 @@
+{
+ "version": 0.6,
+ "generator": "test fixture (synthetic)",
+ "elements": [
+  {
+   "type": "relation",
+   "id": 3001,
+   "tags": {
+    "type": "route",
+    "route": "subway",
+    "ref": "T9",
+    "name": "T9: Test A → Test D",
+    "from": "Test A",
+    "to": "Test D",
+    "colour": "#ef3e42"
+   },
+   "members": [
+    {
+     "type": "node",
+     "ref": 4001,
+     "role": "stop"
+    },
+    {
+     "type": "node",
+     "ref": 4006,
+     "role": "stop_entry_only"
+    },
+    {
+     "type": "node",
+     "ref": 4005,
+     "role": "platform"
+    },
+    {
+     "type": "way",
+     "ref": 9001,
+     "role": ""
+    },
+    {
+     "type": "node",
+     "ref": 4002,
+     "role": "stop"
+    },
+    {
+     "type": "node",
+     "ref": 4003,
+     "role": "stop"
+    },
+    {
+     "type": "node",
+     "ref": 4004,
+     "role": "stop_exit_only"
+    }
+   ]
+  },
+  {
+   "type": "relation",
+   "id": 3002,
+   "tags": {
+    "type": "route",
+    "route": "subway",
+    "ref": "T9",
+    "name": "T9: Test D → Test B"
+   },
+   "members": [
+    {
+     "type": "node",
+     "ref": 4004,
+     "role": "stop"
+    },
+    {
+     "type": "node",
+     "ref": 4003,
+     "role": "stop"
+    },
+    {
+     "type": "node",
+     "ref": 4002,
+     "role": "stop"
+    }
+   ]
+  },
+  {
+   "type": "relation",
+   "id": 3003,
+   "tags": {
+    "type": "route",
+    "route": "bus",
+    "ref": "34T",
+    "name": "34T Test Metrobüs",
+    "colour": "kırmızı"
+   },
+   "members": [
+    {
+     "type": "node",
+     "ref": 4007,
+     "role": "platform"
+    },
+    {
+     "type": "node",
+     "ref": 4008,
+     "role": "platform"
+    }
+   ]
+  },
+  {
+   "type": "relation",
+   "id": 3004,
+   "tags": {
+    "type": "route",
+    "route": "tram",
+    "ref": "T0"
+   },
+   "members": [
+    {
+     "type": "node",
+     "ref": 4001,
+     "role": "stop"
+    }
+   ]
+  },
+  {
+   "type": "node",
+   "id": 4001,
+   "lat": 40.97,
+   "lon": 29.24,
+   "tags": {
+    "name": "Test A"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4006,
+   "lat": 40.97003,
+   "lon": 29.24005,
+   "tags": {
+    "name": "Test A"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4005,
+   "lat": 40.97006,
+   "lon": 29.24008,
+   "tags": {
+    "name": "Test A peron"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4002,
+   "lat": 40.97,
+   "lon": 29.25,
+   "tags": {
+    "name": "Test B"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4003,
+   "lat": 40.97,
+   "lon": 29.26,
+   "tags": {
+    "name": "Test C"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4004,
+   "lat": 40.97,
+   "lon": 29.27,
+   "tags": {
+    "name": "Test D"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4007,
+   "lat": 40.98,
+   "lon": 29.24,
+   "tags": {
+    "name": "Test Durak 1"
+   }
+  },
+  {
+   "type": "node",
+   "id": 4008,
+   "lat": 40.98,
+   "lon": 29.26,
+   "tags": {
+    "name": "Test Durak 2"
+   }
+  }
+ ]
+}

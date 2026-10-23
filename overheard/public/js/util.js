@@ -67,7 +67,7 @@ export const displayName = (handle) => (handle ? `@${handle}` : t('anon.name'));
 
 export const BADGE_EMOJI = {
   first_step: '👣', explorer: '🧭', cartographer: '🗺️', two_cities: '✈️', first_drop: '🎈',
-  storyteller: '📚', witness: '👂', connector: '🤝', streak: '🔥',
+  storyteller: '📚', witness: '👂', connector: '🤝', streak: '🔥', pioneer: '🚩',
 };
 
 export const REACTION_EMOJI = { lol: '😂', wow: '😮', same: '👂', heart: '❤️' };

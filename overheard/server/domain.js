@@ -7,7 +7,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { transaction } from './db.js';
 import { newId } from './auth.js';
 import { HttpError } from './http.js';
-import { boundingBox, distanceM, isValidCoord, scatterInPlace } from './geo.js';
+import { boundingBox, distanceM, distanceToPolylineM, isValidCoord, scatterInPlace, scatterOnLine } from './geo.js';
 import { CITIES, CITY_BY_ID } from './data/cities.js';
 import { moderatePublicText, moderatePrivateText } from './moderation.js';
 
@@ -41,12 +41,13 @@ export function cityAt(lat, lng) {
   return best?.city || null;
 }
 
-// Noktayı içine alan mekânlar, en yakından uzağa.
+// Noktayı içine alan mekânlar, en yakından uzağa. Hatlar (kind = 'line') dairesel değildir; onlara
+// duraktan binilir (linesNear).
 export function placesContaining(db, config, { lat, lng, accuracy }) {
   const bonus = Math.min(accuracy || 0, config.maxAccuracyBonusM);
   const box = boundingBox(lat, lng, 1000);
   const rows = db.prepare(`
-    SELECT * FROM places WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?`)
+    SELECT * FROM places WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ? AND kind != 'line'`)
     .all(box.minLat, box.maxLat, box.minLng, box.maxLng);
   return rows
     .map((p) => ({ ...p, distance: distanceM(lat, lng, p.lat, p.lng) }))
@@ -55,6 +56,40 @@ export function placesContaining(db, config, { lat, lng, accuracy }) {
 }
 
 export const VISIBILITIES = ['local', 'public'];
+
+// --- Toplu taşıma hatları ----------------------------------------------------
+// Metro, Marmaray, tramvay, metrobüs: hattın kendisi bir mekândır. Bir durağa yakın iyi bir konum
+// "biniş" sayılır; sonra konum güzergâha yakın kaldıkça (tünelde GPS yokken de) hattasın. Hat
+// sözlerini yalnızca o an aynı hatta olanlar okur.
+
+export function lineStops(db, placeId) {
+  return db.prepare('SELECT name, lat, lng FROM line_stops WHERE place_id = ? ORDER BY seq').all(placeId);
+}
+
+// Hat satırlarına durakları ekler (çağrı başına önbellekli).
+function withStops(db, rows) {
+  const cache = new Map();
+  for (const r of rows) {
+    if (r.kind !== 'line') continue;
+    if (!cache.has(r.id)) cache.set(r.id, lineStops(db, r.id));
+    r.stops = cache.get(r.id);
+  }
+  return rows;
+}
+
+// Durağına yakın olduğun hatlar, en yakından uzağa.
+export function linesNear(db, config, { lat, lng, accuracy }) {
+  const reach = config.lineBoardM + Math.min(accuracy || 0, config.maxAccuracyBonusM);
+  const box = boundingBox(lat, lng, reach);
+  const best = new Map();
+  for (const s of db.prepare('SELECT place_id, lat, lng FROM line_stops WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?')
+    .all(box.minLat, box.maxLat, box.minLng, box.maxLng)) {
+    const d = distanceM(lat, lng, s.lat, s.lng);
+    if (d <= reach && d < (best.get(s.place_id) ?? Infinity)) best.set(s.place_id, d);
+  }
+  const place = db.prepare("SELECT * FROM places WHERE id = ? AND kind = 'line'");
+  return [...best].map(([id, distance]) => ({ ...place.get(id), distance })).filter((p) => p.id).sort((a, b) => a.distance - b.distance);
+}
 
 // QR ile girilen mekâna yakınlık (kaba konum yeter).
 const nearVenue = (config, coords, place) =>
@@ -68,19 +103,23 @@ const nearVenue = (config, coords, place) =>
 // - qr: mekânın QR kodu (isteğe bağlı, ortak mekânlar için); kapıda bile GPS yoksa.
 // Çelişen bir konum gelince (açıkça dışarıda) çapa silinir: çıkan kişi belirsiz konumla geri giremez.
 
-const PRESENCE_ANCHOR_MAX_MS = (config) => Math.max(config.stickyPresenceMs, config.qrPresenceMs);
+const PRESENCE_ANCHOR_MAX_MS = (config) => Math.max(config.stickyPresenceMs, config.qrPresenceMs, config.linePresenceMs);
 
+// place.stops hat çapaları için gerekir (withStops).
 function anchorHolds(config, anchor, coords, place, now) {
   if (anchor.source === 'qr') return now - anchor.at <= config.qrPresenceMs && nearVenue(config, coords, place);
+  if (anchor.source === 'line') {
+    return now - anchor.at <= config.linePresenceMs
+      && distanceToPolylineM(coords.lat, coords.lng, place.stops || []) <= config.lineHoldM + Math.min(coords.accuracy || 0, config.stickyMaxAccuracyM);
+  }
   return now - anchor.at <= config.stickyPresenceMs
     && distanceM(coords.lat, coords.lng, place.lat, place.lng) <= place.radius_m + config.stickyMarginM + Math.min(coords.accuracy || 0, config.stickyMaxAccuracyM);
 }
 
 // Verilen konumla hâlâ geçerli çapalar (mekân satırı + source).
 function activeAnchors(db, config, userId, coords, now) {
-  return db.prepare('SELECT a.source, a.at AS anchor_at, p.* FROM presence_anchors a JOIN places p ON p.id = a.place_id WHERE a.user_id = ?')
-    .all(userId)
-    .filter((a) => anchorHolds(config, { source: a.source, at: a.anchor_at }, coords, a, now));
+  return withStops(db, db.prepare('SELECT p.*, a.source AS anchor_source, a.at AS anchor_at FROM presence_anchors a JOIN places p ON p.id = a.place_id WHERE a.user_id = ?').all(userId))
+    .filter((a) => anchorHolds(config, { source: a.anchor_source, at: a.anchor_at }, coords, a, now));
 }
 
 function setAnchor(db, userId, placeId, source, now) {
@@ -93,7 +132,7 @@ function setAnchor(db, userId, placeId, source, now) {
 
 // Yeni konumla çelişen ya da süresi dolan çapaları siler.
 function pruneAnchors(db, config, userId, coords, now) {
-  const rows = db.prepare('SELECT a.place_id, a.source, a.at AS anchor_at, p.lat, p.lng, p.radius_m FROM presence_anchors a JOIN places p ON p.id = a.place_id WHERE a.user_id = ?').all(userId);
+  const rows = withStops(db, db.prepare('SELECT a.place_id, a.source, a.at AS anchor_at, p.id, p.kind, p.lat, p.lng, p.radius_m FROM presence_anchors a JOIN places p ON p.id = a.place_id WHERE a.user_id = ?').all(userId));
   const remove = db.prepare('DELETE FROM presence_anchors WHERE user_id = ? AND place_id = ?');
   for (const a of rows) if (!anchorHolds(config, { source: a.source, at: a.anchor_at }, coords, a, now)) remove.run(userId, a.place_id);
 }
@@ -123,13 +162,15 @@ function presentUsers(db, config, places, now) {
     SELECT user_id, lat, lng, accuracy FROM location_reports
     WHERE at > ? AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?`)
     .all(now - config.presenceTtlMs, Math.min(...lats) - pad, Math.max(...lats) + pad, Math.min(...lngs) - pad, Math.max(...lngs) + pad);
+  const circles = places.filter((p) => p.kind !== 'line');
   for (const r of reports) {
     const bonus = Math.min(r.accuracy || 0, config.maxAccuracyBonusM);
-    for (const p of places) {
+    for (const p of circles) {
       if (distanceM(r.lat, r.lng, p.lat, p.lng) <= p.radius_m + bonus) byPlace.get(p.id).add(r.user_id);
     }
   }
-  const placeById = new Map(places.map((p) => [p.id, p]));
+  // Hatlarda bulunanlar yalnızca çapalarıyla (binişle) sayılır.
+  const placeById = new Map(withStops(db, places.map((p) => ({ ...p }))).map((p) => [p.id, p]));
   for (const a of db.prepare(`
     SELECT a.user_id, a.place_id, a.source, a.at, r.lat, r.lng, r.accuracy FROM presence_anchors a JOIN location_reports r ON r.user_id = a.user_id
     WHERE a.at > ? AND r.at > ?`).all(now - PRESENCE_ANCHOR_MAX_MS(config), now - config.presenceTtlMs)) {
@@ -167,6 +208,7 @@ export function serializePlace(p, extra = {}) {
     lng: p.lng,
     radius: p.radius_m,
     userCreated: p.created_by != null,
+    ...(p.kind === 'line' ? { line: true, color: p.color || null } : {}),
     ...extra,
   };
 }
@@ -236,7 +278,10 @@ export function checkIn(db, config, user, coords, { qrPlace = null } = {}) {
     setAnchor(db, user.id, qrPlace.id, 'qr', now);
   }
   const precise = coords.accuracy <= config.maxAccuracyM;
-  const found = precise || !config.antiSpoofing ? placesContaining(db, config, coords).filter((p) => p.id !== qrPlace?.id) : [];
+  // Mekânlar ve durağına yakın olduğun hatlar (biniş).
+  const found = precise || !config.antiSpoofing
+    ? [...placesContaining(db, config, coords), ...linesNear(db, config, coords)].filter((p) => p.id !== qrPlace?.id)
+    : [];
   if (qrPlace) found.unshift({ ...qrPlace, distance: distanceM(coords.lat, coords.lng, qrPlace.lat, qrPlace.lng), viaQr: true });
   const lastAt = db.prepare('SELECT MAX(at) AS at FROM checkins WHERE user_id = ? AND place_id = ?');
   const insert = db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)');
@@ -257,7 +302,7 @@ export function checkIn(db, config, user, coords, { qrPlace = null } = {}) {
       unlocksLeft -= 1;
     }
     if (at == null || now - at >= config.checkinCooldownMs) insert.run(user.id, p.id, now);
-    if (precise && !p.viaQr) setAnchor(db, user.id, p.id, 'gps', now);
+    if (precise && !p.viaQr) setAnchor(db, user.id, p.id, p.kind === 'line' ? 'line' : 'gps', now);
     // arrived: az önce burada değildin (yerel sözler şimdi açıldı); firstVisit: ilk kez geldin.
     return [serializePlace(p, {
       visited: true, here: true, arrived: !before.has(p.id), firstVisit: at == null, distance: Math.round(p.distance), ...(p.viaQr ? { qr: true } : {}),
@@ -271,7 +316,7 @@ export function checkIn(db, config, user, coords, { qrPlace = null } = {}) {
     if (listed.has(a.id)) continue;
     places.push(serializePlace(a, {
       visited: true, here: true, arrived: false, firstVisit: false, held: true,
-      distance: Math.round(distanceM(coords.lat, coords.lng, a.lat, a.lng)), ...(a.source === 'qr' ? { qr: true } : {}),
+      distance: Math.round(distanceM(coords.lat, coords.lng, a.lat, a.lng)), ...(a.anchor_source === 'qr' ? { qr: true } : {}),
     }));
   }
   // Ayrıldığın mekânlar: oradaki yerel sözler yeniden kilitlendi.
@@ -333,7 +378,7 @@ export function searchPlaces(db, query) {
 
 const OVERHEARD_SELECT = `
   SELECT o.id, o.user_id, o.place_id, o.text, o.created_at, o.hidden, o.anonymous, o.visibility, o.expires_at,
-         u.handle, p.name AS place_name, p.city_id, p.lat AS place_lat, p.lng AS place_lng, p.radius_m
+         u.handle, p.name AS place_name, p.city_id, p.lat AS place_lat, p.lng AS place_lng, p.radius_m, p.kind AS place_kind
   FROM overheards o
   JOIN users u ON u.id = o.user_id
   JOIN places p ON p.id = o.place_id`;
@@ -359,6 +404,8 @@ function buildContext(db, config, viewer, rows) {
     checkins: new Map(),
     mutual: new Map(),
     witnesses: new Map(),
+    // Hat sözleri güzergâh boyunca yerleşir.
+    lineStops: new Map([...new Set(rows.filter((r) => r.place_kind === 'line').map((r) => r.place_id))].map((id) => [id, lineStops(db, id)])),
   };
   if (!ids.length) return ctx;
 
@@ -411,7 +458,8 @@ function canReadRow(ctx, row) {
 function serializeOverheard(row, ctx) {
   const reactions = ctx.reactions.get(row.id) || {};
   const total = Object.values(reactions).reduce((a, b) => a + b, 0);
-  const position = scatterInPlace(row.id, { lat: row.place_lat, lng: row.place_lng, radius_m: row.radius_m });
+  const stops = row.place_kind === 'line' ? ctx.lineStops.get(row.place_id) : null;
+  const position = stops?.length ? scatterOnLine(row.id, stops) : scatterInPlace(row.id, { lat: row.place_lat, lng: row.place_lng, radius_m: row.radius_m });
   const base = {
     id: row.id,
     placeId: row.place_id,
@@ -422,6 +470,7 @@ function serializeOverheard(row, ctx) {
     reactionTotal: total,
     visibility: row.visibility,
     expiresAt: row.expires_at ?? null,
+    onLine: row.place_kind === 'line',
   };
   if (!canReadRow(ctx, row)) {
     // Kilitli yerel söz: metin sunucudan hiç çıkmaz, yalnızca uzunluğu ipucu olarak verilir.
@@ -477,10 +526,17 @@ export function cityMap(db, config, viewer, cityId) {
   const placeRows = db.prepare('SELECT * FROM places WHERE city_id = ? ORDER BY name').all(cityId);
   const people = presenceCounts(db, config, placeRows);
   const cafes = new Set(db.prepare('SELECT place_id FROM venues').all().map((r) => r.place_id));
+  // Hatların güzergâhı haritada çizilir.
+  const routes = new Map();
+  for (const s of db.prepare("SELECT s.place_id, s.lat, s.lng FROM line_stops s JOIN places p ON p.id = s.place_id WHERE p.city_id = ? ORDER BY s.place_id, s.seq").all(cityId)) {
+    if (!routes.has(s.place_id)) routes.set(s.place_id, []);
+    routes.get(s.place_id).push([s.lat, s.lng]);
+  }
   const places = placeRows
     .map((p) => {
       const st = stats.get(p.id);
       return serializePlace(p, {
+        ...(p.kind === 'line' ? { stops: routes.get(p.id) || [] } : {}),
         peopleHere: people.get(p.id) || 0,
         cafe: cafes.has(p.id),
         visited: ctx.visited.has(p.id),
@@ -575,6 +631,7 @@ export function createOverheard(db, config, user, body) {
     let place;
     const containing = placesContaining(db, config, coords);
     for (const a of held) if (!containing.some((p) => p.id === a.id)) containing.push(a);
+    if (coords.accuracy <= config.maxAccuracyM) for (const l of linesNear(db, config, coords)) if (!containing.some((p) => p.id === l.id)) containing.push(l);
     if (body.placeId) {
       place = containing.find((p) => p.id === body.placeId);
       if (!place) {
@@ -585,7 +642,9 @@ export function createOverheard(db, config, user, body) {
     } else if (body.newPlaceName !== undefined) {
       const name = moderatePublicText(cleanText(body.newPlaceName)).text;
       if ([...name].length < LIMITS.placeNameMin || [...name].length > LIMITS.placeNameMax) throw new HttpError(400, 'bad_place_name');
-      if (containing.length) throw new HttpError(409, 'place_exists', { place: serializePlace(containing[0]) });
+      // Yakındaki bir hat yeni mekân açmaya engel değildir (istasyonun yanındaki kafe).
+      const existing = containing.find((p) => p.kind !== 'line');
+      if (existing) throw new HttpError(409, 'place_exists', { place: serializePlace(existing) });
       const city = cityAt(coords.lat, coords.lng);
       if (!city) throw new HttpError(403, 'outside_pilot');
       const id = `${city.id}-${newId(6)}`;
@@ -599,12 +658,14 @@ export function createOverheard(db, config, user, body) {
     }
 
     const id = newId();
+    // Öncü: bu mekânın ilk sözü.
+    const pioneer = !db.prepare('SELECT 1 FROM overheards WHERE place_id = ? LIMIT 1').get(place.id);
     db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)').run(user.id, place.id, now);
     // İsteğe bağlı 24 saatlik söz: süresi dolunca haritadan kalkar (konuşmalar sürer).
     const expiresAt = body.ephemeral ? now + config.ephemeralMs : null;
     db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous, visibility, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(id, user.id, place.id, text, now, body.anonymous ? 1 : 0, visibility, expiresAt);
-    return { ...getOverheard(db, config, user, id), masked };
+    return { ...getOverheard(db, config, user, id), masked, pioneer };
   });
 }
 
@@ -870,6 +931,8 @@ export const BADGES = [
   { id: 'witness', metric: 'witnessed', of: 1 },
   { id: 'connector', metric: 'conversations', of: 1 },
   { id: 'streak', metric: 'streak', of: 3 },
+  // Bir mekânın (ya da hattın) ilk sözünü bırakmak: sakin semtlerde boş haritayı dolduranlar.
+  { id: 'pioneer', metric: 'pioneered', of: 1 },
 ];
 
 // Üst üste kaç haftadır en az bir mekânda bulunuldu (bu hafta henüz yoksa geçen haftadan sayılır).
@@ -893,6 +956,8 @@ function metrics(db, user) {
     witnessed: one("SELECT COUNT(*) AS n FROM reactions WHERE user_id = ? AND kind = 'same'"),
     conversations: db.prepare('SELECT COUNT(*) AS n FROM conversations WHERE owner_id = ? OR starter_id = ?').get(user.id, user.id).n,
     streak: weeklyStreak(db, user.id),
+    pioneered: one(`SELECT COUNT(*) AS n FROM overheards o WHERE o.user_id = ?
+      AND NOT EXISTS (SELECT 1 FROM overheards x WHERE x.place_id = o.place_id AND x.created_at < o.created_at)`),
     weekPlaces: one(`SELECT COUNT(*) AS n FROM (SELECT place_id, MIN(at) AS first FROM checkins WHERE user_id = ? GROUP BY place_id) WHERE first >= ?`, Date.now() - WEEK_MS),
   };
 }

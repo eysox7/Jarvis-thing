@@ -34,7 +34,7 @@ export function placeElement(p) {
   const state = placeState(p);
   return h('div', { class: `oh-place ${state.cls}`, dataset: { id: p.id } },
     h('span', { class: 'oh-place-icon', 'aria-hidden': 'true' }, state.icon),
-    h('span', { class: 'oh-place-name' }, p.cafe ? `☕ ${p.name}` : p.name),
+    h('span', { class: 'oh-place-name' }, `${p.line ? '🚇 ' : p.cafe ? '☕ ' : ''}${p.name}`),
     p.peopleHere ? h('span', { class: 'oh-place-people', title: t('place.peopleHere', { n: p.peopleHere }) }, `👥${p.peopleHere}`) : null,
     p.count ? h('span', { class: 'oh-place-count' }, String(p.count)) : null);
 }
@@ -59,14 +59,21 @@ const bubbleWidth = (o) => (o.locked
   ? 50 + Math.min(110, 24 + o.length)
   : Math.min(190, 30 + Math.min(44, [...o.text].length) * 6.4 + (o.reactionTotal ? 26 : 0)));
 
-const placeWidth = (p) => 46 + ([...p.name].length + (p.cafe ? 3 : 0)) * 7.2 + (p.count ? 28 : 0) + (p.peopleHere ? 34 : 0);
+const placeWidth = (p) => 46 + ([...p.name].length + (p.cafe || p.line ? 3 : 0)) * 7.2 + (p.count ? 28 : 0) + (p.peopleHere ? 34 : 0);
 
 // view: { zoom, project(lat, lng) → {x, y} (ekran pikseli), contains(lat, lng) → bool }
-// Dönen her öğe: { type: 'area' | 'place' | 'overheard', lat, lng, item, element?, full? }
+// Dönen her öğe: { type: 'line' | 'area' | 'place' | 'overheard', lat, lng, item, element?, full?, points? }
 export function planMarkers(data, view) {
   if (!data) return [];
   const fits = createLayout();
   const plan = [];
+
+  // Toplu taşıma hatlarının güzergâhı her yakınlıkta çizilir (durakları görünen hatlar).
+  for (const p of data.places) {
+    if (p.line && p.stops?.length > 1 && p.stops.some(([lat, lng]) => view.contains(lat, lng))) {
+      plan.push({ type: 'line', lat: p.lat, lng: p.lng, item: p, points: p.stops });
+    }
+  }
 
   if (view.zoom < DETAIL_ZOOM) {
     const ranked = data.places
@@ -83,7 +90,7 @@ export function planMarkers(data, view) {
   }
 
   for (const p of data.places) {
-    if (view.contains(p.lat, p.lng)) plan.push({ type: 'area', lat: p.lat, lng: p.lng, item: p });
+    if (!p.line && view.contains(p.lat, p.lng)) plan.push({ type: 'area', lat: p.lat, lng: p.lng, item: p });
   }
   // Sözler en yeniden eskiye sıralı gelir; yeniler tam baloncuk için önceliklidir.
   for (const o of data.overheards) {

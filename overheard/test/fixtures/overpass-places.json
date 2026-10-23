@@ -1,0 +1,141 @@
+{
+ "version": 0.6,
+ "generator": "test fixture (synthetic)",
+ "elements": [
+  {
+   "type": "node",
+   "id": 1001,
+   "lat": 40.97,
+   "lon": 29.26,
+   "tags": {
+    "railway": "station",
+    "name": "Test İstasyonu"
+   }
+  },
+  {
+   "type": "way",
+   "id": 2001,
+   "center": {
+    "lat": 40.97005,
+    "lon": 29.26003
+   },
+   "tags": {
+    "public_transport": "station",
+    "name": "Test İstasyonu"
+   }
+  },
+  {
+   "type": "way",
+   "id": 2002,
+   "center": {
+    "lat": 40.965,
+    "lon": 29.27
+   },
+   "bounds": {
+    "minlat": 40.9645,
+    "minlon": 29.2693,
+    "maxlat": 40.9655,
+    "maxlon": 29.2707
+   },
+   "tags": {
+    "amenity": "marketplace",
+    "name": "Test Semt Pazarı"
+   }
+  },
+  {
+   "type": "way",
+   "id": 2003,
+   "center": {
+    "lat": 40.96,
+    "lon": 29.265
+   },
+   "bounds": {
+    "minlat": 40.956,
+    "minlon": 29.26,
+    "maxlat": 40.964,
+    "maxlon": 29.27
+   },
+   "tags": {
+    "leisure": "park",
+    "name": "Test Millet Bahçesi"
+   }
+  },
+  {
+   "type": "node",
+   "id": 1003,
+   "lat": 40.962,
+   "lon": 29.255,
+   "tags": {
+    "leisure": "pitch",
+    "sport": "soccer",
+    "name": "Test Halı Saha"
+   }
+  },
+  {
+   "type": "way",
+   "id": 2004,
+   "center": {
+    "lat": 40.963,
+    "lon": 29.25
+   },
+   "tags": {
+    "leisure": "pitch",
+    "sport": "soccer",
+    "amenity": "school",
+    "name": "Test Okulu Sahası"
+   }
+  },
+  {
+   "type": "node",
+   "id": 1004,
+   "lat": 40.964,
+   "lon": 29.245,
+   "tags": {
+    "shop": "mall"
+   }
+  },
+  {
+   "type": "node",
+   "id": 1005,
+   "lat": 40.966,
+   "lon": 29.248,
+   "tags": {
+    "amenity": "place_of_worship",
+    "name": "Test Camii"
+   }
+  },
+  {
+   "type": "node",
+   "id": 1006,
+   "lat": 40.0,
+   "lon": 30.0,
+   "tags": {
+    "amenity": "marketplace",
+    "name": "Uzak Pazar"
+   }
+  },
+  {
+   "type": "node",
+   "id": 1007,
+   "lat": 40.99252,
+   "lon": 29.02362,
+   "tags": {
+    "amenity": "ferry_terminal",
+    "name": "Kadıköy Vapur İskelesi"
+   }
+  },
+  {
+   "type": "way",
+   "id": 2005,
+   "center": {
+    "lat": 40.958,
+    "lon": 29.275
+   },
+   "tags": {
+    "shop": "mall",
+    "name:tr": "Test AVM",
+    "name": "Test Mall"
+   }
+  }
+ ]
+}

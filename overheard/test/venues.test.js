@@ -96,6 +96,15 @@ describe('Overheard Kafe', () => {
     assert.match(r.data.qr.svg, /^<svg/);
   });
 
+  test('kafe içi bekleme süresi kafe başına ayarlanır (sakin semtlerde uzatılabilir)', async () => {
+    const s = await staff.post(`/api/venues/${CAFE}/settings`, { insideDelayMin: 90 });
+    assert.equal(s.data.venue.insideDelayMin, 90);
+    // ic1 (60 dk) artık beklemede, ic2 (120 dk) uygun: 1 + şehrin 3 herkese açık sözü.
+    assert.equal(s.data.available, 4);
+    assert.equal((await staff.post(`/api/venues/${CAFE}/settings`, { insideDelayMin: 5 })).data.venue.insideDelayMin, 10);
+    assert.equal((await staff.post(`/api/venues/${CAFE}/settings`, { insideDelayMin: 20 })).data.venue.insideDelayMin, 20);
+  });
+
   test('basılan fiş kuyruktan düşer; masa kapanınca bekleyenler iptal olur', async () => {
     const [first] = await jobs();
     await staff.post(`/api/venues/${CAFE}/jobs/${first.id}/printed`);

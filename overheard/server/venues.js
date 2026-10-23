@@ -2,8 +2,8 @@
 // rastgele bir söz seçip masa numarasıyla kafenin yazıcısına gönderir, garson fişi masaya götürür.
 // Masa açık kaldıkça belli aralıklarla yeni fişler basılır.
 // İki mod:
-// - inside: bu kafede yazılan sözler. Yazanı ele vermemek için en az venueInsideDelayMs eski
-//   sözler, rastgele masalara gider.
+// - inside: bu kafede yazılan sözler. Yazanı ele vermemek için en az inside_delay_min dakika eski
+//   sözler, rastgele masalara gider. Herkesin birbirini tanıdığı semtlerde kafe bu süreyi uzatabilir.
 // - nearby: yakın mekânların herkese açık sözleri; "kafe içini yazmak müşteriyi rahatsız eder"
 //   diyen işletmeler için. Başka mekânların yerel sözleri basılmaz ("yalnızca orada okunur").
 import { HttpError } from './http.js';
@@ -11,7 +11,7 @@ import { boundingBox, distanceM } from './geo.js';
 import { cleanText } from './domain.js';
 
 export const VENUE_MODES = ['inside', 'nearby'];
-const RANGES = { everyMin: [5, 120], perTable: [1, 20], nearbyM: [200, 3000] };
+const RANGES = { everyMin: [5, 120], perTable: [1, 20], nearbyM: [200, 3000], insideDelayMin: [10, 240] };
 const TABLE_NO_MAX = 12;
 
 const clampInt = (value, [min, max], fallback) => {
@@ -23,7 +23,9 @@ const VENUE_SELECT = `
   SELECT v.*, p.name, p.city_id, p.lat, p.lng FROM venues v JOIN places p ON p.id = v.place_id`;
 
 function serializeVenue(v) {
-  return { placeId: v.place_id, name: v.name, cityId: v.city_id, mode: v.mode, nearbyM: v.nearby_m, everyMin: v.every_min, perTable: v.per_table };
+  return {
+    placeId: v.place_id, name: v.name, cityId: v.city_id, mode: v.mode, nearbyM: v.nearby_m, everyMin: v.every_min, perTable: v.per_table, insideDelayMin: v.inside_delay_min,
+  };
 }
 
 // --- Yönetim (moderatör) ---
@@ -40,18 +42,21 @@ function readSettings(body, current = {}) {
     nearbyM: clampInt(body.nearbyM ?? current.nearby_m, RANGES.nearbyM, 1500),
     everyMin: clampInt(body.everyMin ?? current.every_min, RANGES.everyMin, 15),
     perTable: clampInt(body.perTable ?? current.per_table, RANGES.perTable, 4),
+    insideDelayMin: clampInt(body.insideDelayMin ?? current.inside_delay_min, RANGES.insideDelayMin, 20),
   };
 }
 
 // Bir mekânı Overheard Kafe yapar ya da ayarlarını günceller.
 export function saveVenue(db, placeId, body = {}) {
-  if (!db.prepare('SELECT 1 FROM places WHERE id = ?').get(placeId)) throw new HttpError(404, 'place_not_found');
+  const place = db.prepare('SELECT kind FROM places WHERE id = ?').get(placeId);
+  if (!place) throw new HttpError(404, 'place_not_found');
+  if (place.kind === 'line') throw new HttpError(400, 'line_not_venue');
   const current = db.prepare('SELECT * FROM venues WHERE place_id = ?').get(placeId);
   const s = readSettings(body, current);
-  db.prepare(`INSERT INTO venues (place_id, mode, nearby_m, every_min, per_table, created_at) VALUES (?, ?, ?, ?, ?, ?)
+  db.prepare(`INSERT INTO venues (place_id, mode, nearby_m, every_min, per_table, inside_delay_min, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
               ON CONFLICT(place_id) DO UPDATE SET mode = excluded.mode, nearby_m = excluded.nearby_m,
-                every_min = excluded.every_min, per_table = excluded.per_table`)
-    .run(placeId, s.mode, s.nearbyM, s.everyMin, s.perTable, Date.now());
+                every_min = excluded.every_min, per_table = excluded.per_table, inside_delay_min = excluded.inside_delay_min`)
+    .run(placeId, s.mode, s.nearbyM, s.everyMin, s.perTable, s.insideDelayMin, Date.now());
   return serializeVenue(db.prepare(`${VENUE_SELECT} WHERE v.place_id = ?`).get(placeId));
 }
 
@@ -119,7 +124,7 @@ const FALLBACK_RADII_M = [5000, 15000];
 function tiers(db, config, venue, now) {
   const radii = [venue.nearby_m, ...FALLBACK_RADII_M.filter((r) => r > venue.nearby_m)];
   return [
-    ...(venue.mode === 'inside' ? [{ sql: 'o.place_id = :place AND o.created_at <= :cutoff', params: { cutoff: now - config.venueInsideDelayMs } }] : []),
+    ...(venue.mode === 'inside' ? [{ sql: 'o.place_id = :place AND o.created_at <= :cutoff', params: { cutoff: now - venue.inside_delay_min * 60000 } }] : []),
     ...radii.map((r) => nearbyPlaceIds(db, venue, r)).filter((ids) => ids.length).map((ids) => ({
       sql: `o.place_id IN (${ids.map((_, i) => `:p${i}`).join(',')}) AND o.visibility = 'public'`,
       params: Object.fromEntries(ids.map((id, i) => [`p${i}`, id])),
@@ -171,7 +176,7 @@ export function venueState(db, config, venue, now = Date.now()) {
 function countAvailable(db, config, venue, now) {
   const own = venue.mode === 'inside'
     ? db.prepare(`SELECT COUNT(*) AS n FROM overheards o WHERE o.place_id = ? AND o.created_at <= ? AND ${PRINTABLE.replaceAll(':now', '?')}`)
-      .get(venue.place_id, now - config.venueInsideDelayMs, now).n
+      .get(venue.place_id, now - venue.inside_delay_min * 60000, now).n
     : 0;
   const city = db.prepare(`SELECT COUNT(*) AS n FROM overheards o JOIN places p ON p.id = o.place_id
     WHERE p.city_id = ? AND o.place_id != ? AND o.visibility = 'public' AND ${PRINTABLE.replaceAll(':now', '?')}`)

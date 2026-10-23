@@ -44,7 +44,7 @@ function render(body, placeId, state) {
         }
       },
     }),
-    h('span', { class: 'place-option-name' }, t(`venue.mode.${value}`), h('span', { class: 'muted small option-hint' }, t(`venue.mode.${value}Hint`, { km: (venue.nearbyM / 1000).toLocaleString() }))));
+    h('span', { class: 'place-option-name' }, t(`venue.mode.${value}`), h('span', { class: 'muted small option-hint' }, t(`venue.mode.${value}Hint`, { km: (venue.nearbyM / 1000).toLocaleString(), min: venue.insideDelayMin }))));
 
   const tableInput = h('input', { name: 'tableNo', maxlength: 12, placeholder: t('venue.tablePlaceholder'), 'aria-label': t('venue.tableNo'), autocomplete: 'off', required: true });
   const openButton = h('button', { class: 'btn btn-primary', type: 'submit' }, t('venue.open'));
@@ -75,6 +75,20 @@ function render(body, placeId, state) {
     h('p', { class: available ? 'muted small' : 'form-error' }, available ? t('venue.available', { n: available }) : t('venue.noContent')),
     h('h3', { class: 'section-title' }, t('venue.modeTitle')),
     h('div', { class: 'place-options', role: 'radiogroup' }, modeOption('inside'), modeOption('nearby')),
+    venue.mode === 'inside' ? h('label', { class: 'field field-inline' },
+      h('span', { class: 'field-label' }, t('venue.delay')),
+      h('select', {
+        name: 'insideDelayMin',
+        onchange: async (e) => {
+          try {
+            rerender(await api.venueSettings(placeId, { insideDelayMin: Number(e.currentTarget.value) }));
+            toast(t('venue.modeSaved'));
+          } catch (err) {
+            toast(errorText(err), { tone: 'error' });
+          }
+        },
+      }, [...new Set([20, 45, 60, 120, 240, venue.insideDelayMin])].sort((a, b) => a - b).map((m) => h('option', { value: m, selected: m === venue.insideDelayMin }, t('venue.delayMin', { min: m }))))) : null,
+    venue.mode === 'inside' ? h('p', { class: 'muted small' }, t('venue.delayHint')) : null,
     h('p', { class: 'muted small' }, t('venue.every', { min: venue.everyMin, n: venue.perTable })),
     h('a', { class: 'btn btn-block', href: `/yazici.html?place=${encodeURIComponent(placeId)}`, target: '_blank', rel: 'noopener' }, `🖨️ ${t('venue.printer')}`),
     h('p', { class: 'muted small' }, t('venue.printerHint')));

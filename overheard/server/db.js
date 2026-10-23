@@ -236,6 +236,22 @@ export const MIGRATIONS = [
   CREATE INDEX print_jobs_place ON print_jobs(place_id, printed_at);
   CREATE INDEX print_jobs_table ON print_jobs(table_id);
   `,
+  // v13: Toplu taşıma hatları (metro, Marmaray, tramvay, metrobüs) mekân olarak: duraklar sırayla
+  // saklanır. Mekânın kökeni (ör. 'osm') ve hat rengi. Kafe başına kafe içi söz bekleme süresi.
+  `
+  CREATE TABLE line_stops (
+    place_id  TEXT NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+    seq       INTEGER NOT NULL,
+    name      TEXT,
+    lat       REAL NOT NULL,
+    lng       REAL NOT NULL,
+    PRIMARY KEY (place_id, seq)
+  );
+  CREATE INDEX line_stops_geo ON line_stops(lat, lng);
+  ALTER TABLE places ADD COLUMN color TEXT;
+  ALTER TABLE places ADD COLUMN origin TEXT;
+  ALTER TABLE venues ADD COLUMN inside_delay_min INTEGER NOT NULL DEFAULT 20;
+  `,
 ];
 
 export function openDb(path) {

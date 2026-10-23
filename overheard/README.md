@@ -70,6 +70,14 @@ balonların altında sokak haritası görünür.</sub>
   kafeye girer ve buradaki yerel sözleri açar. Yazıcı ekranı (`/yazici.html`) kafedeki bir
   cihazda personel hesabıyla açık durur; Chrome `--kiosk-printing` ile pencere açmadan basar.
   Kafeyi ve personelini moderatör panelinden yönetirsin.
+- **Toplu taşıma hatları.** Metro, Marmaray, tramvay ve metrobüs hatları mekândır: bir durağa iyi
+  bir konumla yaklaşınca hatta "binersin", konum güzergâha yakın kaldıkça (tünelde GPS yokken de)
+  2 saate kadar hattasın; inip uzaklaşınca çıkarsın. Hat sözlerini yalnızca o an aynı hatta
+  olanlar okur, hattın odasında yazışır. Haritada hattın güzergâhı çizilir, sözler güzergâh
+  boyunca durur; kilitli hat sözünde yol tarifi en yakın durağa.
+- **Sakin semtler.** Hiç sözün olmadığı bir yerde harita "Bu civarda henüz söz yok, ilkini sen
+  bırak" der; yakında bir Overheard Kafe varsa onu da gösterir. Bir mekânın ya da hattın ilk sözünü
+  bırakan 🚩 **Öncü** rozetini alır.
 - **Şu an burada ve mekân odası.** Her mekânda o an kaç kişinin bulunduğu (isimsiz) görünür. Bir
   mekândaysan oradakilerle grup sohbetine katılabilirsin; oda yalnızca oradayken görünür,
   mesajlar 12 saat sonra silinir.
@@ -126,7 +134,7 @@ Her şehir için başlangıç mekânları `server/data/places.js` içinde. Yeni 
 
 ## Çalıştırma
 
-Gereken tek şey **Node.js 22.13+** (yerleşik `node:sqlite` kullanılır; çalışma zamanı bağımlılığı yok).
+Gereken tek şey **Node.js 22.13+** (yerleşik `node:sqlite` kullanılır; tek isteğe bağlı bağımlılık yapay zekâ denetimi için Anthropic SDK'sı).
 
 ```bash
 cd overheard
@@ -134,6 +142,24 @@ npm start            # http://localhost:8787
 npm test             # API testleri
 npm run test:e2e     # tarayıcıda uçtan uca testler (Playwright + Chromium)
 ```
+
+### Semtlere mekân ve hat aktarma (OpenStreetMap)
+
+Hazır gelen mekânlar şehir merkezindedir. Sultanbeyli, Sancaktepe, Sultangazi gibi turistik
+olmayan semtlerde haritayı gündelik buluşma noktalarıyla (istasyon, otogar, iskele, semt pazarı,
+AVM, meydan, park, halı saha, kampüs) doldurmak ve raylı sistem ile metrobüs hatlarını eklemek için:
+
+```bash
+npm run import:osm -- --city istanbul --district Sultanbeyli --district Sancaktepe --district Sultangazi
+npm run import:osm -- --city istanbul --all-districts          # 39 ilçenin hepsi
+npm run import:osm -- --city istanbul --lines --bus-ref 34,34A,34AS,34BZ,34C,34G,34Z
+npm run import:osm -- --city istanbul --district Sultanbeyli --dry-run   # yazmadan önizle
+```
+
+Okullar, hastaneler, ibadethaneler, karakol ve cezaevleri bilerek alınmaz. Var olan bir mekânla
+aynı yerdekiler atlanır; tekrar çalıştırmak güvenlidir. Veri Overpass API'den gelir (ağ erişimi
+gerekir; vekil arkasında `NODE_USE_ENV_PROXY=1`). Ağsız ortamda başka yerde indirilmiş bir Overpass
+yanıtı `--from-file` ile aktarılabilir. Veri © OpenStreetMap katkıcıları, ODbL.
 
 ### Google Maps
 

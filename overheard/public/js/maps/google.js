@@ -143,6 +143,17 @@ export function createGoogleMap(el, handlers) {
     const open = cssVar('--open');
     const locked = cssVar('--locked');
     for (const m of plan) {
+      if (m.type === 'line') {
+        drawn.push(new maps.Polyline({
+          map,
+          path: m.points.map(([lat, lng]) => ({ lat, lng })),
+          clickable: false,
+          strokeColor: m.item.color || locked,
+          strokeOpacity: m.item.here ? 0.9 : 0.5,
+          strokeWeight: 4,
+        }));
+        continue;
+      }
       if (m.type === 'area') {
         const color = m.item.here ? open : locked;
         drawn.push(new maps.Circle({

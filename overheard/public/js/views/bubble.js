@@ -3,6 +3,15 @@ import { t } from '../i18n.js';
 
 const directionsUrl = (o) => `https://www.google.com/maps/dir/?api=1&destination=${o.lat},${o.lng}&travelmode=walking`;
 
+// Hat sözünde hedef sözün yeri değil, hattın sana en yakın durağıdır (oradan binilir).
+function target(o, app) {
+  const stops = o.onLine ? app.state.data?.places.find((p) => p.id === o.placeId)?.stops : null;
+  if (!stops?.length) return { lat: o.lat, lng: o.lng };
+  const from = app.state.position || o;
+  const [lat, lng] = stops.reduce((best, s) => (distanceM(from.lat, from.lng, s[0], s[1]) < distanceM(from.lat, from.lng, best[0], best[1]) ? s : best));
+  return { lat, lng };
+}
+
 // Kilitli sözün yerine, uzunluğuna göre bulanık "hayalet" satırlar.
 function ghostLines(length) {
   const lines = Math.max(1, Math.min(4, Math.ceil(length / 48)));
@@ -16,18 +25,19 @@ const peopleHere = (app, o) => app.state.data?.places.find((p) => p.id === o.pla
 
 function lockedCard(o, app) {
   const { state } = app;
-  const distance = state.position ? distanceM(state.position.lat, state.position.lng, o.lat, o.lng) : null;
+  const goal = target(o, app);
+  const distance = state.position ? distanceM(state.position.lat, state.position.lng, goal.lat, goal.lng) : null;
   return h('div', { class: 'bubble-card is-locked' },
     h('div', { class: 'bubble-ghost', 'aria-hidden': 'true' }, h('span', { class: 'bubble-lock-icon' }, '🔒'), h('div', { class: 'ghost-lines' }, ghostLines(o.length))),
-    h('p', { class: 'bubble-where' }, t('bubble.lockedWhere', { place: o.placeName })),
+    h('p', { class: 'bubble-where' }, t(o.onLine ? 'bubble.lockedWhereLine' : 'bubble.lockedWhere', { place: o.placeName })),
     peopleHere(app, o) ? h('p', { class: 'bubble-distance' }, `👥 ${t('place.peopleHere', { n: peopleHere(app, o) })}`) : null,
-    h('p', { class: 'bubble-how' }, state.user ? t('bubble.lockedHow') : t('bubble.loginToRead')),
+    h('p', { class: 'bubble-how' }, state.user ? t(o.onLine ? 'bubble.lockedHowLine' : 'bubble.lockedHow') : t('bubble.loginToRead')),
     distance != null ? h('p', { class: 'bubble-distance' }, `🚶 ${t('bubble.distance', { d: formatDistance(distance) })}`) : null,
     h('div', { class: 'bubble-actions' },
-      h('a', { class: 'btn btn-primary', href: directionsUrl(o), target: '_blank', rel: 'noopener' }, `🧭 ${t('bubble.directions')}`),
+      h('a', { class: 'btn btn-primary', href: directionsUrl(goal), target: '_blank', rel: 'noopener' }, `🧭 ${t(o.onLine ? 'bubble.directionsStop' : 'bubble.directions')}`),
       !state.user ? h('button', { class: 'btn', type: 'button', onclick: () => app.openAuth() }, t('auth.login')) : null,
       state.config.demoMode && state.user
-        ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.teleport({ lat: o.lat, lng: o.lng }, o.id) }, `✨ ${t('map.teleport')}`)
+        ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.teleport(goal, o.id) }, `✨ ${t('map.teleport')}`)
         : null));
 }
 
