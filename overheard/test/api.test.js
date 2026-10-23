@@ -460,3 +460,34 @@ describe('Haftanın en iyileri', () => {
     await srv.close();
   });
 });
+
+describe('24 saatlik sözler', () => {
+  test('süresi dolunca haritadan ve aramadan kalkar; konuşma sürer; bakımda silinir', async () => {
+    const { purgeStaleData } = await import('../server/domain.js');
+    const srv = await startTestServer();
+    const author = client(srv.base);
+    const reader = client(srv.base);
+    await author.register('gecici_yazar');
+    await reader.register('gecici_okur');
+    const posted = (await author.post('/api/overheards', { text: 'Yarın bu söz yok.', ephemeral: true, visibility: 'public', ...SPOTS.kadikoyIskele })).data.overheard;
+    const lonely = (await author.post('/api/overheards', { text: 'Kimse yazmadı bana.', ephemeral: true, ...SPOTS.kadikoyIskele })).data.overheard;
+    const forever = (await author.post('/api/overheards', { text: 'Ben kalıcıyım.', ...SPOTS.kadikoyIskele })).data.overheard;
+    assert.ok(posted.expiresAt > Date.now() + 23 * 3600000);
+    assert.equal(forever.expiresAt, null);
+    const conv = (await reader.post(`/api/overheards/${posted.id}/messages`, { body: 'Kaybolmadan yazayım!' })).data.conversationId;
+
+    srv.db.prepare('UPDATE overheards SET expires_at = ? WHERE expires_at IS NOT NULL').run(Date.now() - 1000);
+    const ids = (await reader.get('/api/cities/istanbul/map')).data.overheards.map((o) => o.id);
+    assert.ok(!ids.includes(posted.id) && !ids.includes(lonely.id));
+    assert.ok(ids.includes(forever.id));
+    assert.equal((await reader.get(`/api/overheards/${posted.id}`)).status, 404);
+    assert.ok(!(await reader.get('/api/cities/istanbul/best')).data.overheards.some((o) => o.id === posted.id));
+    assert.equal((await reader.get(`/api/conversations/${conv}`)).data.conversation.overheard.text, 'Yarın bu söz yok.', 'konuşma bağlamı kalır');
+
+    const purged = purgeStaleData(srv.db, srv.config);
+    assert.equal(purged.expired, 1, 'yalnızca konuşması olmayan süresi dolmuş söz silinir');
+    assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM overheards WHERE id = ?').get(lonely.id).n, 0);
+    assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM overheards WHERE id = ?').get(posted.id).n, 1);
+    await srv.close();
+  });
+});

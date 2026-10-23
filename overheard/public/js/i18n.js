@@ -240,6 +240,8 @@ const STRINGS = {
     'best.title': '{city}: haftanın en iyileri',
     'best.hint': 'Son 7 günde en çok tepki alan herkese açık sözler. Yerel sözler yerinde kalır.',
     'best.empty': 'Bu hafta henüz herkese açık söz yok. İlkini sen bırak!',
+    'compose.ephemeral': '24 saat sonra kaybolsun',
+    'bubble.expires': '{n} sa sonra kaybolacak',
   },
   en: {
     'app.tagline': 'Drop what you heard. Local ones can only be read by people who are there right now.',
@@ -482,6 +484,8 @@ const STRINGS = {
     'best.title': '{city}: best of the week',
     'best.hint': 'Public overheards with the most reactions in the last 7 days. Local ones stay where they are.',
     'best.empty': 'No public overheards this week yet. Drop the first one!',
+    'compose.ephemeral': 'Disappear after 24 hours',
+    'bubble.expires': 'disappears in {n}h',
   },
 };
 

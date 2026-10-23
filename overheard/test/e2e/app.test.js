@@ -199,8 +199,10 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await sheet(a.page).locator('textarea[name="text"]').fill('Herkese duyurulur: iskelede çay 20 lira olmuş.');
       await sheet(a.page).getByText('Kadıköy İskelesi').waitFor();
       await sheet(a.page).getByText('Herkese açık').click();
+      await sheet(a.page).locator('input[name="ephemeral"]').check();
       await sheet(a.page).getByRole('button', { name: /Bırak/ }).click();
       await a.page.locator('.leaflet-popup .chip', { hasText: 'Herkese açık' }).waitFor();
+      await a.page.locator('.leaflet-popup .chip', { hasText: '24 sa sonra kaybolacak' }).waitFor();
       const publicId = await a.page.evaluate(() => window.overheard.openBubbleId);
 
       // Austin'deki biri herkese açık sözü okur; yerel olanları okuyamaz.

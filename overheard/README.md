@@ -60,6 +60,7 @@ balonların altında sokak haritası görünür.</sub>
 - **"Ben de duydum" tanıkları.** 👂 yalnızca söz söylendiği sırada orada olanlara açıktır;
   basanlar balonda tanık olarak listelenir. Söz sahibi ve tanıklar birbirine yazabilir: aynı anı
   paylaşan yabancılar arasında doğal bir tanışma.
+- **24 saatlik sözler.** İstersen sözün bir gün sonra kendiliğinden kaybolur.
 - **Anonim paylaşım.** İstersen adın görünmez ("Anonim kulak"); biri sana yazarsa kimliğini o
   konuşmada açıp açmamak sana kalır.
 - **Söz üzerinden mesajlaşma.** Her konuşma bir söze bağlıdır; sohbet başlığında sözün kendisi ve
@@ -218,7 +219,7 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | `POST /api/checkins` | `{lat, lng, accuracy}` → şu an bulunduğun mekânlar (`arrived`, `firstVisit`) ve ayrıldıkların (`left`) |
 | `GET /api/me/places` | Uğradığın ve şu an bulunduğun mekânlar |
 | `GET /api/me/export` · `POST /api/me/delete` | Verilerimi indir (JSON) · hesabı sil (`{password}`) |
-| `POST /api/overheards` | `{text, lat, lng, visibility: local\|public, anonymous?, placeId?, newPlaceName?}` |
+| `POST /api/overheards` | `{text, lat, lng, visibility: local\|public, anonymous?, ephemeral?, placeId?, newPlaceName?}` |
 | `GET/DELETE /api/overheards/:id` | |
 | `POST /api/overheards/:id/reactions` · `report` | `kind: same` yalnızca o sırada orada olanlara |
 | `POST /api/overheards/:id/messages` | `{body, to?}`: sahibine ya da (`to`) bir tanığa yazar |

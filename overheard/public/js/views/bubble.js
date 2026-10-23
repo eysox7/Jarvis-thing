@@ -54,6 +54,7 @@ function openCard(o, app) {
     o.visibility === 'public'
       ? h('span', { class: 'chip' }, `🌍 ${t('visibility.public')}`)
       : h('span', { class: 'chip' }, `📍 ${t('visibility.local')}`),
+    o.expiresAt ? h('span', { class: 'chip' }, `⏳ ${t('bubble.expires', { n: Math.max(1, Math.ceil((o.expiresAt - Date.now()) / 3600000)) })}`) : null,
     o.sameTime ? h('span', { class: 'chip chip-hot' }, `👂 ${t('bubble.sameTime')}`) : null,
     o.mutualPlaces ? h('span', { class: 'chip' }, `📍 ${t('bubble.mutual', { n: o.mutualPlaces })}`) : null,
   ].filter(Boolean);

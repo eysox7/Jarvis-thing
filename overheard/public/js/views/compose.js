@@ -18,6 +18,7 @@ export async function openCompose(app) {
   const where = h('div', { class: 'where' }, h('p', { class: 'muted' }, t('compose.locating')));
   const submit = h('button', { class: 'btn btn-primary btn-block', type: 'submit', disabled: true }, `🎈 ${t('compose.submit')}`);
   const anonymous = h('input', { type: 'checkbox', name: 'anonymous' });
+  const ephemeral = h('input', { type: 'checkbox', name: 'ephemeral' });
   const visibilityOption = (value, icon, checked) => h('label', { class: 'place-option' },
     h('input', { type: 'radio', name: 'visibility', value, checked }),
     h('span', { class: 'place-option-name' }, `${icon} ${t(`visibility.${value}`)}`, h('span', { class: 'muted small option-hint' }, t(`visibility.${value}Hint`))));
@@ -88,6 +89,7 @@ export async function openCompose(app) {
           lng: position.lng,
           accuracy: position.accuracy,
           anonymous: anonymous.checked,
+          ephemeral: ephemeral.checked,
           visibility: form.querySelector('input[name="visibility"]:checked')?.value || 'local',
         };
         if (choice?.placeId) payload.placeId = choice.placeId;
@@ -117,6 +119,7 @@ export async function openCompose(app) {
   h('p', { class: 'field-label' }, t('compose.who')),
   visibility,
   h('label', { class: 'check' }, anonymous, h('span', {}, `🎭 ${t('compose.anonymous')}`)),
+  h('label', { class: 'check' }, ephemeral, h('span', {}, `⏳ ${t('compose.ephemeral')}`)),
   error.el,
   submit);
 

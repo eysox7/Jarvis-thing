@@ -172,6 +172,10 @@ export const MIGRATIONS = [
   );
   CREATE INDEX room_messages_place ON room_messages(place_id, id);
   `,
+  // v9: İsteğe bağlı 24 saatlik sözler.
+  `
+  ALTER TABLE overheards ADD COLUMN expires_at INTEGER;
+  `,
 ];
 
 export function openDb(path) {

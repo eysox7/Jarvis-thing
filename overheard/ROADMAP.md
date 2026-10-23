@@ -99,7 +99,9 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
 - [x] **17. Haftanın en iyileri** — `/api/cities/:id/best`: son 7 günde en çok tepki alan herkese açık
       sözler (yereller hariç, girişsiz de görülür). Şehir şeridinin başındaki 🏆 ile açılır; her
       söz haritada açılabilir ve paylaşılabilir.
-- [ ] **18. 24 saatlik sözler** — İsteğe bağlı, bir gün sonra kaybolan sözler.
+- [x] **18. 24 saatlik sözler** — Söz bırakırken "24 saat sonra kaybolsun"; süresi dolan söz
+      haritadan, aramadan ve haftanın en iyilerinden kalkar, tepki/yeni konuşma alamaz. Üzerinden
+      konuşma başlamışsa sohbet bağlamı için saklanır, başlamamışsa saatlik bakımda silinir. Şema v9.
 
 ## Kalite turları (tüm adımlar bitince)
 

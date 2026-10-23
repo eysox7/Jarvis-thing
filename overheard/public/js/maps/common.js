@@ -17,6 +17,7 @@ export function bubbleElement(o) {
   }
   return h('div', { class: classes, dataset: { id: o.id } },
     o.visibility === 'public' ? h('span', { class: 'oh-bubble-globe', title: t('visibility.public') }, '🌍') : null,
+    o.expiresAt ? h('span', { class: 'oh-bubble-globe', 'aria-hidden': 'true' }, '⏳') : null,
     h('span', { class: 'oh-bubble-text' }, `“${truncate(o.text, 44)}”`),
     o.reactionTotal ? h('span', { class: 'oh-bubble-count' }, String(o.reactionTotal)) : null);
 }

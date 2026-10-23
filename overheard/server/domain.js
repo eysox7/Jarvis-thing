@@ -192,7 +192,7 @@ export function checkIn(db, config, user, coords) {
 // --- Sözler ---------------------------------------------------------------
 
 const OVERHEARD_SELECT = `
-  SELECT o.id, o.user_id, o.place_id, o.text, o.created_at, o.hidden, o.anonymous, o.visibility,
+  SELECT o.id, o.user_id, o.place_id, o.text, o.created_at, o.hidden, o.anonymous, o.visibility, o.expires_at,
          u.handle, p.name AS place_name, p.city_id, p.lat AS place_lat, p.lng AS place_lng, p.radius_m
   FROM overheards o
   JOIN users u ON u.id = o.user_id
@@ -202,6 +202,9 @@ const NOT_BLOCKED = `
   NOT EXISTS (SELECT 1 FROM blocks b
               WHERE (b.blocker_id = :viewer AND b.blocked_id = o.user_id)
                  OR (b.blocker_id = o.user_id AND b.blocked_id = :viewer))`;
+
+// Görünen sözler: engelleme yok ve (24 saatlikse) süresi dolmamış. :viewer ve :now parametreleri gerekir.
+const VISIBLE = `${NOT_BLOCKED} AND (o.expires_at IS NULL OR o.expires_at > :now)`;
 
 // Bir grup söz için görüntüleyene özel bağlamı (reaksiyonlar, ortak mekânlar...) tek seferde hazırlar.
 function buildContext(db, config, viewer, rows) {
@@ -278,6 +281,7 @@ function serializeOverheard(row, ctx) {
     createdAt: row.created_at,
     reactionTotal: total,
     visibility: row.visibility,
+    expiresAt: row.expires_at ?? null,
   };
   if (!canReadRow(ctx, row)) {
     // Kilitli yerel söz: metin sunucudan hiç çıkmaz, yalnızca uzunluğu ipucu olarak verilir.
@@ -318,9 +322,9 @@ const MAX_BBOX_SPAN_DEG = 0.6;
 
 export function cityMap(db, config, viewer, cityId) {
   if (!CITY_BY_ID.has(cityId)) throw new HttpError(404, 'city_not_found');
-  const params = { city: cityId, viewer: viewer?.id ?? -1 };
+  const params = { city: cityId, viewer: viewer?.id ?? -1, now: Date.now() };
   const rows = db.prepare(`${OVERHEARD_SELECT}
-    WHERE p.city_id = :city AND o.hidden = 0 AND ${NOT_BLOCKED}
+    WHERE p.city_id = :city AND o.hidden = 0 AND ${VISIBLE}
     ORDER BY o.created_at DESC LIMIT ${CITY_OVERHEARD_LIMIT}`).all(params);
   const ctx = buildContext(db, config, viewer, rows);
   const overheards = rows.map((r) => serializeOverheard(r, ctx));
@@ -328,7 +332,7 @@ export function cityMap(db, config, viewer, cityId) {
   const stats = new Map(db.prepare(`
     SELECT o.place_id, COUNT(*) AS n, SUM(o.visibility = 'local') AS local_n, MAX(o.created_at) AS last_at
     FROM overheards o JOIN places p ON p.id = o.place_id
-    WHERE p.city_id = :city AND o.hidden = 0 AND ${NOT_BLOCKED}
+    WHERE p.city_id = :city AND o.hidden = 0 AND ${VISIBLE}
     GROUP BY o.place_id`).all(params).map((r) => [r.place_id, r]));
   const placeRows = db.prepare('SELECT * FROM places WHERE city_id = ? ORDER BY name').all(cityId);
   const people = presenceCounts(db, config, placeRows);
@@ -356,10 +360,10 @@ export function bestOfWeek(db, config, viewer, cityId, { days = 7, limit = 10 } 
   const rows = db.prepare(`
     SELECT * FROM (
       ${OVERHEARD_SELECT}
-      WHERE p.city_id = :city AND o.visibility = 'public' AND o.hidden = 0 AND o.created_at > :since AND ${NOT_BLOCKED}
+      WHERE p.city_id = :city AND o.visibility = 'public' AND o.hidden = 0 AND o.created_at > :since AND ${VISIBLE}
     ) x
     ORDER BY (SELECT COUNT(*) FROM reactions r WHERE r.overheard_id = x.id) DESC, x.created_at DESC
-    LIMIT :limit`).all({ city: cityId, since: Date.now() - days * 86400000, viewer: viewer?.id ?? -1, limit });
+    LIMIT :limit`).all({ city: cityId, since: Date.now() - days * 86400000, viewer: viewer?.id ?? -1, limit, now: Date.now() });
   const ctx = buildContext(db, config, viewer, rows);
   return { city: CITY_BY_ID.get(cityId), days, overheards: rows.map((r) => serializeOverheard(r, ctx)) };
 }
@@ -373,15 +377,15 @@ export function overheardsInBox(db, config, viewer, bbox) {
   if (maxLat - minLat > MAX_BBOX_SPAN_DEG || maxLng - minLng > MAX_BBOX_SPAN_DEG) throw new HttpError(400, 'bbox_too_large');
   const rows = db.prepare(`${OVERHEARD_SELECT}
     WHERE p.lat BETWEEN :minLat AND :maxLat AND p.lng BETWEEN :minLng AND :maxLng
-      AND o.hidden = 0 AND ${NOT_BLOCKED}
+      AND o.hidden = 0 AND ${VISIBLE}
     ORDER BY o.created_at DESC LIMIT ${BBOX_OVERHEARD_LIMIT}`)
-    .all({ minLat, maxLat, minLng, maxLng, viewer: viewer?.id ?? -1 });
+    .all({ minLat, maxLat, minLng, maxLng, viewer: viewer?.id ?? -1, now: Date.now() });
   const ctx = buildContext(db, config, viewer, rows);
   return { overheards: rows.map((r) => serializeOverheard(r, ctx)), truncated: rows.length === BBOX_OVERHEARD_LIMIT };
 }
 
 function loadOverheardRow(db, id, viewerId) {
-  const row = db.prepare(`${OVERHEARD_SELECT} WHERE o.id = :id AND ${NOT_BLOCKED}`).get({ id, viewer: viewerId ?? -1 });
+  const row = db.prepare(`${OVERHEARD_SELECT} WHERE o.id = :id AND ${VISIBLE}`).get({ id, viewer: viewerId ?? -1, now: Date.now() });
   if (!row || (row.hidden && row.user_id !== viewerId)) throw new HttpError(404, 'overheard_not_found');
   return row;
 }
@@ -451,8 +455,10 @@ export function createOverheard(db, config, user, body) {
 
     const id = newId();
     db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)').run(user.id, place.id, now);
-    db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous, visibility) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(id, user.id, place.id, text, now, body.anonymous ? 1 : 0, visibility);
+    // İsteğe bağlı 24 saatlik söz: süresi dolunca haritadan kalkar (konuşmalar sürer).
+    const expiresAt = body.ephemeral ? now + config.ephemeralMs : null;
+    db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous, visibility, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, user.id, place.id, text, now, body.anonymous ? 1 : 0, visibility, expiresAt);
     return { ...getOverheard(db, config, user, id), masked };
   });
 }
@@ -860,12 +866,16 @@ export function deleteAccount(db, user) {
   db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
 }
 
-// Saklama süreleri: kesin konum 24 saat, mekân odası mesajları 12 saat, şüpheli konum kayıtları 90 gün.
+// Saklama süreleri: kesin konum 24 saat, mekân odası mesajları 12 saat, 24 saatlik sözler süresi
+// dolunca, şüpheli konum kayıtları 90 gün.
 export function purgeStaleData(db, config, now = Date.now()) {
   const locations = db.prepare('DELETE FROM location_reports WHERE at < ?').run(now - config.locationRetentionMs).changes;
   const rooms = db.prepare('DELETE FROM room_messages WHERE created_at < ?').run(now - config.roomRetentionMs).changes;
+  // Süresi dolan 24 saatlik sözler silinir; üzerinden konuşma başlamışsa sohbet bağlamı için kalır.
+  const expired = db.prepare(`DELETE FROM overheards WHERE expires_at IS NOT NULL AND expires_at < ?
+    AND NOT EXISTS (SELECT 1 FROM conversations c WHERE c.overheard_id = overheards.id)`).run(now).changes;
   const flags = db.prepare('DELETE FROM location_flags WHERE at < ?').run(now - config.flagRetentionMs).changes;
-  return { locations: Number(locations), rooms: Number(rooms), flags: Number(flags) };
+  return { locations: Number(locations), rooms: Number(rooms), expired: Number(expired), flags: Number(flags) };
 }
 
 // --- Mekân odası -----------------------------------------------------------
