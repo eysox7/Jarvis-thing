@@ -130,6 +130,8 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   // --- Harita ve mekânlar ---
   router.get('/api/cities/:id/map', (ctx) => domain.cityMap(db, config, ctx.user, ctx.params.id));
 
+  router.get('/api/cities/:id/best', (ctx) => domain.bestOfWeek(db, config, ctx.user, ctx.params.id));
+
   // Görünür alan: ?bbox=minLng,minLat,maxLng,maxLat
   router.get('/api/overheards', (ctx) => domain.overheardsInBox(db, config, ctx.user, ctx.url.searchParams.get('bbox')));
 

@@ -394,6 +394,19 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await u.context.close();
     });
 
+    test('haftanın en iyileri listesi ve haritada açma', async () => {
+      const u = await newUser(browser, srv.base, KADIKOY);
+      await u.page.locator('.best-chip').click();
+      await sheet(u.page).getByText('İstanbul: haftanın en iyileri').waitFor();
+      const first = sheet(u.page).locator('.best-item').first();
+      await first.waitFor();
+      const quote = (await first.locator('.best-quote').textContent()).replace(/[“”]/g, '');
+      await first.locator('.best-main').click();
+      await u.page.locator('.leaflet-popup .bubble-quote', { hasText: quote.slice(0, 20) }).last().waitFor();
+      assert.deepEqual(u.errors, []);
+      await u.context.close();
+    });
+
     test('İngilizce arayüze geçiş', async () => {
       const u = await newUser(browser, srv.base, KADIKOY);
       await u.page.locator('[data-nav="profile"]').click();

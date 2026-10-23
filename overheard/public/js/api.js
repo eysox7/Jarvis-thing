@@ -39,6 +39,7 @@ export const api = {
   upgrade: (handle, password) => request('POST', '/api/auth/upgrade', { handle, password }),
   logout: () => request('POST', '/api/auth/logout', {}),
   cityMap: (cityId) => request('GET', `/api/cities/${enc(cityId)}/map`),
+  best: (cityId) => request('GET', `/api/cities/${enc(cityId)}/best`),
   overheardsInBox: (bbox) => request('GET', `/api/overheards?bbox=${bbox.map((n) => n.toFixed(5)).join(',')}`),
   checkIn: (pos) => request('POST', '/api/checkins', pos),
   myPlaces: () => request('GET', '/api/me/places'),

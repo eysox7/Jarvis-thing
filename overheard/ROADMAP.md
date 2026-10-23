@@ -96,7 +96,9 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
 - [x] **16. Paylaşılabilir kartlar** — Herkese açık sözden 1080×1920 hikâye görseli (konuşma balonu,
       yer, logo; yazar adı yok). Telefonda sistem paylaşım menüsü, masaüstünde indirme. Yerel
       sözlerde paylaş düğmesi yok.
-- [ ] **17. Haftanın en iyileri** — Şehir başına en çok tepki alan herkese açık sözler.
+- [x] **17. Haftanın en iyileri** — `/api/cities/:id/best`: son 7 günde en çok tepki alan herkese açık
+      sözler (yereller hariç, girişsiz de görülür). Şehir şeridinin başındaki 🏆 ile açılır; her
+      söz haritada açılabilir ve paylaşılabilir.
 - [ ] **18. 24 saatlik sözler** — İsteğe bağlı, bir gün sonra kaybolan sözler.
 
 ## Kalite turları (tüm adımlar bitince)

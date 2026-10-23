@@ -236,6 +236,10 @@ const STRINGS = {
     'share.button': 'Paylaş',
     'share.footer': 'Ne duydun? overheard\'de bırak.',
     'share.downloaded': 'Paylaşım görseli indirildi 📤',
+    'best.open': 'Haftanın en iyileri',
+    'best.title': '{city}: haftanın en iyileri',
+    'best.hint': 'Son 7 günde en çok tepki alan herkese açık sözler. Yerel sözler yerinde kalır.',
+    'best.empty': 'Bu hafta henüz herkese açık söz yok. İlkini sen bırak!',
   },
   en: {
     'app.tagline': 'Drop what you heard. Local ones can only be read by people who are there right now.',
@@ -474,6 +478,10 @@ const STRINGS = {
     'share.button': 'Share',
     'share.footer': 'Heard something? Drop it on overheard.',
     'share.downloaded': 'Share image downloaded 📤',
+    'best.open': 'Best of the week',
+    'best.title': '{city}: best of the week',
+    'best.hint': 'Public overheards with the most reactions in the last 7 days. Local ones stay where they are.',
+    'best.empty': 'No public overheards this week yet. Drop the first one!',
   },
 };
 

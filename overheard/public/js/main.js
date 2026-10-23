@@ -13,6 +13,7 @@ import { createNudge } from './views/nudge.js';
 import { maybeShowIntro } from './views/intro.js';
 import { openRoom, handleRoomMessage, closeRoomIfLeft } from './views/room.js';
 import { shareOverheard } from './share.js';
+import { openBest } from './views/best.js';
 
 const CITY_KEY = 'oh_city';
 const HINT_KEY = 'oh_demo_hint_seen';
@@ -417,7 +418,8 @@ function onLongPress(latlng) {
 // --- Arayüz iskeleti ---
 function renderCities() {
   const nav = document.getElementById('cities');
-  clear(nav).append(...state.config.cities.map((c) => h('button', {
+  const best = h('button', { class: 'city-chip best-chip', type: 'button', title: t('best.open'), 'aria-label': t('best.open'), onclick: () => openBest(app) }, '🏆');
+  clear(nav).append(best, ...state.config.cities.map((c) => h('button', {
     class: `city-chip${c.id === state.city.id ? ' is-active' : ''}`,
     type: 'button',
     'aria-pressed': c.id === state.city.id ? 'true' : 'false',

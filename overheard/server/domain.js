@@ -349,6 +349,21 @@ export function cityMap(db, config, viewer, cityId) {
   return { city: CITY_BY_ID.get(cityId), places, overheards, truncated: rows.length === CITY_OVERHEARD_LIMIT };
 }
 
+// Haftanın en iyileri: şehirde son 7 günde en çok tepki alan herkese açık sözler.
+// Yerel sözler yerinde kalır; bu liste yalnızca herkese açık sözlerden oluşur.
+export function bestOfWeek(db, config, viewer, cityId, { days = 7, limit = 10 } = {}) {
+  if (!CITY_BY_ID.has(cityId)) throw new HttpError(404, 'city_not_found');
+  const rows = db.prepare(`
+    SELECT * FROM (
+      ${OVERHEARD_SELECT}
+      WHERE p.city_id = :city AND o.visibility = 'public' AND o.hidden = 0 AND o.created_at > :since AND ${NOT_BLOCKED}
+    ) x
+    ORDER BY (SELECT COUNT(*) FROM reactions r WHERE r.overheard_id = x.id) DESC, x.created_at DESC
+    LIMIT :limit`).all({ city: cityId, since: Date.now() - days * 86400000, viewer: viewer?.id ?? -1, limit });
+  const ctx = buildContext(db, config, viewer, rows);
+  return { city: CITY_BY_ID.get(cityId), days, overheards: rows.map((r) => serializeOverheard(r, ctx)) };
+}
+
 // Görünür alandaki sözler (mekân merkezine göre), en yeniden eskiye.
 export function overheardsInBox(db, config, viewer, bbox) {
   const parts = String(bbox || '').split(',').map(Number);

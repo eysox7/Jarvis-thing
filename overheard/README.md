@@ -49,6 +49,8 @@ balonların altında sokak haritası görünür.</sub>
   mesajlar 12 saat sonra silinir.
 - **Seni bekleyen sözler.** Haritanın altındaki kart en yakın, yerel sözü olan mekânı ve orada kaç
   sözün beklediğini gösterir; keşif modunda yaklaştıkça "Sıcak!" ipuçları gelir.
+- **Haftanın en iyileri.** Şehir şeridindeki 🏆, son 7 günün en çok güldüren herkese açık sözlerini
+  listeler.
 - **Paylaşılabilir kartlar.** Herkese açık bir sözü tek dokunuşla Instagram hikâyesi boyutunda
   bir görsele çevirip paylaş (yazar adı görselde yer almaz; yerel sözler paylaşılamaz).
 - **Söz bırakma.** Yalnızca o mekândayken. Yakında kayıtlı mekân yoksa yeriyle birlikte yeni
@@ -211,6 +213,7 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | `POST /api/auth/register` · `login` · `guest` · `upgrade` · `logout` | Hesap (`upgrade`: misafiri kalıcı hesaba çevirir) |
 | `GET /api/me` | Kullanıcı, istatistikler, okunmamış mesaj sayısı |
 | `GET /api/cities/:id/map` | Şehrin mekânları (söz sayılarıyla) ve en yeni 300 sözü (görüntüleyene göre kilitli/açık) |
+| `GET /api/cities/:id/best` | Haftanın en iyileri (herkese açık sözler) |
 | `GET /api/overheards?bbox=minLng,minLat,maxLng,maxLat` | Görünür alandaki sözler (en fazla 300; alan ≤ 0,6°) |
 | `POST /api/checkins` | `{lat, lng, accuracy}` → şu an bulunduğun mekânlar (`arrived`, `firstVisit`) ve ayrıldıkların (`left`) |
 | `GET /api/me/places` | Uğradığın ve şu an bulunduğun mekânlar |

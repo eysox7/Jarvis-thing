@@ -121,6 +121,14 @@ button { cursor: pointer; }
   box-shadow: var(--shadow-sm);
 }
 .city-chip.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.best-chip { padding: 6px 10px; }
+.best-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.best-item { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 16px; padding: 4px 6px 4px 4px; }
+.best-main { flex: 1; min-width: 0; display: flex; gap: 12px; align-items: flex-start; padding: 10px; border: none; background: none; text-align: left; }
+.best-rank { flex: none; width: 32px; font-size: 22px; font-weight: 800; text-align: center; color: var(--muted); }
+.best-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.best-quote { font: italic 600 16px/1.35 var(--font-quote); overflow-wrap: anywhere; }
+.best-reactions { font-size: 13px; }
 
 /* --- Harita ------------------------------------------------------------- */
 .map {

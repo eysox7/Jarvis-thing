@@ -431,3 +431,32 @@ describe('Şu an burada', () => {
     await srv.close();
   });
 });
+
+describe('Haftanın en iyileri', () => {
+  test('son 7 günün en çok tepki alan herkese açık sözleri, yereller hariç', async () => {
+    const srv = await startTestServer();
+    const author = client(srv.base);
+    await author.register('en_iyi_yazar');
+    const post = async (text, visibility) => (await author.post('/api/overheards', { text, visibility, ...SPOTS.kadikoyIskele })).data.overheard.id;
+    const popular = await post('Herkesin güldüğü söz.', 'public');
+    const quiet = await post('Sessiz ama herkese açık.', 'public');
+    const local = await post('Çok sevilen ama yerel.', 'local');
+    const old = await post('Eskiden çok güldürmüştü.', 'public');
+    srv.db.prepare('UPDATE overheards SET created_at = created_at - ? WHERE id = ?').run(8 * 86400000, old);
+    for (let i = 0; i < 3; i++) {
+      const fan = client(srv.base);
+      await fan.register(`hayran_${i}`);
+      await fan.post('/api/checkins', SPOTS.kadikoyIskele);
+      for (const id of [popular, local, old]) await fan.post(`/api/overheards/${id}/reactions`, { kind: 'lol' });
+    }
+    const best = (await client(srv.base).get('/api/cities/istanbul/best')).data;
+    const ids = best.overheards.map((o) => o.id);
+    assert.deepEqual(ids.slice(0, 2), [popular, quiet]);
+    assert.ok(!ids.includes(local), 'yerel sözler listede yok');
+    assert.ok(!ids.includes(old), '7 günden eski sözler yok');
+    assert.equal(best.overheards[0].reactionTotal, 3);
+    assert.equal(best.overheards[0].locked, false, 'misafir de okur');
+    assert.equal((await client(srv.base).get('/api/cities/atlantis/best')).status, 404);
+    await srv.close();
+  });
+});
