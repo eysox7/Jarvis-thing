@@ -48,11 +48,16 @@ balonların altında sokak haritası görünür.</sub>
   açıkken yürüdükçe otomatik check-in yapılır. Bir mekâna varınca "buradasın, yerel sözler açık",
   ayrılınca "yerel sözler kilitlendi" bildirimi gelir. Konum izni verdiysen uygulamayı açmak bile
   bulunduğun mekânın yerel sözlerini açar.
-- **Mekân QR kodu.** Kafe, kütüphane, kampüs binası gibi kapalı alanlarda GPS zayıftır. Ortak
-  mekânın girişine asılan QR posterini okutan kişi, kaba konumu (Wi-Fi/baz istasyonu, 1 km
-  yakınlık) yeterli sayılarak mekâna girer; içeride konum oynasa da 2 saate kadar orada kalır,
-  uzaklaşınca çıkar. Kod, mekân kimliğinin sunucu sırrıyla imzasıdır (tahmin edilemez); posteri
-  moderatör panelinden indirilir.
+- **Kapalı alanda da orada kalmak (donanımsız).** Kafe, kütüphane, kampüs binası gibi yerlerde
+  GPS içeride zayıflar. Mekâna iyi bir konumla (çoğunlukla kapıda) giren kişi, sonraki konumlar
+  "hâlâ orada olabilir" dedikçe (mekân dairesi + 100 m + konum belirsizliği) 3 saate kadar orada
+  sayılır; uygulama açıkken konum 5 dakikada bir sessizce tazelenir. Açıkça dışarıda gösteren bir
+  konum (ör. 20 m doğrulukla 500 m ötede) çıkarır ve belirsiz konumla geri girilemez. Hiçbir
+  mekâna bir şey asmak gerekmez.
+- **Mekân QR kodu (isteğe bağlı).** Kapıda bile GPS'in olmadığı ortak mekânlar (bodrum kat, AVM
+  içi) için: girişe asılan QR'ı okutan kişi kaba konumla (Wi-Fi/baz istasyonu, 1 km yakınlık) girer
+  ve 2 saate kadar orada kalır. Kod, mekân kimliğinin sunucu sırrıyla imzasıdır (tahmin edilemez);
+  posteri moderatör panelinden indirilir, mekân kendisi basıp asar.
 - **Şu an burada ve mekân odası.** Her mekânda o an kaç kişinin bulunduğu (isimsiz) görünür. Bir
   mekândaysan oradakilerle grup sohbetine katılabilirsin; oda yalnızca oradayken görünür,
   mesajlar 12 saat sonra silinir.
@@ -275,6 +280,8 @@ denetimler açıktır (`OVERHEARD_ANTI_SPOOF` ile değiştirilebilir):
 - 24 saatte 3 şüpheli olaydan sonra check-in'ler 24 saat mekân açmaz.
 - Saatte en fazla 30 yeni mekân açılabilir.
 - Şüpheli hesaplar moderatör panelinde listelenir.
+- Mekâna girmek için iyi bir konum (200 m'den iyi doğruluk) gerekir. Girdikten sonraki belirsiz
+  konumlar yalnızca içeride kalmayı sağlar, yeni mekân açmaz; tutunma 3 saatle sınırlıdır.
 - Mekân QR koduyla girişte konum doğruluğu 3 km'ye kadar kabul edilir ama konum mekâna 1 km
   yakın olmalı: kodun fotoğrafı evden okutulamaz. QR ile içeride kalmak 2 saatle sınırlıdır.
 

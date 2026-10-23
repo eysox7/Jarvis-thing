@@ -189,6 +189,19 @@ export const MIGRATIONS = [
     at        INTEGER NOT NULL
   );
   `,
+  // v11: Mekânda tutunma. Kapalı alanda GPS zayıflayınca da orada sayılmak için, mekâna giriş
+  // kanıtı (iyi bir GPS konumu ya da QR) mekân başına saklanır. QR kayıtları buraya taşınır.
+  `
+  CREATE TABLE presence_anchors (
+    user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    place_id  TEXT NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+    source    TEXT NOT NULL,
+    at        INTEGER NOT NULL,
+    PRIMARY KEY (user_id, place_id)
+  );
+  INSERT INTO presence_anchors (user_id, place_id, source, at) SELECT user_id, place_id, 'qr', at FROM qr_presence;
+  DROP TABLE qr_presence;
+  `,
 ];
 
 export function openDb(path) {

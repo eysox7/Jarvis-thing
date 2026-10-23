@@ -146,7 +146,7 @@ describe('Mekân QR kodu ile giriş', () => {
     srv.db.prepare('UPDATE location_reports SET at = at - ? WHERE user_id = ?').run(60 * 60000, id);
     await c.post('/api/checkins/qr', { code: code(), ...NEAR_GALATA, accuracy: 300 });
     assert.equal((await c.get(`/api/overheards/${overheardId}`)).data.overheard.locked, false);
-    srv.db.prepare('UPDATE qr_presence SET at = at - ? WHERE user_id = ?').run(srv.config.qrPresenceMs + 1000, id);
+    srv.db.prepare('UPDATE presence_anchors SET at = at - ? WHERE user_id = ?').run(srv.config.qrPresenceMs + 1000, id);
     assert.equal((await c.get(`/api/overheards/${overheardId}`)).data.overheard.locked, true);
   });
 
@@ -166,7 +166,7 @@ describe('Mekân QR kodu ile giriş', () => {
     const { c } = await newUser('dokum');
     await c.post('/api/checkins/qr', { code: code(), ...GALATA, accuracy: 30 });
     const data = (await c.get('/api/me/export')).data;
-    assert.equal(data.lastQrCheckin.place, 'Galata Kulesi');
+    assert.deepEqual(data.presenceAnchors.map((a) => [a.place, a.via]), [['Galata Kulesi', 'qr']]);
   });
 
   test('ayrı bir sır verilirse kodlar değişir', () => {

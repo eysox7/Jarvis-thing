@@ -46,6 +46,13 @@ export function loadConfig(overrides = {}) {
     // Bu kadar şikâyet alan söz otomatik gizlenir.
     reportHideThreshold: 3,
     newPlaceRadiusM: 120,
+    // Mekânda tutunma: iyi bir konumla (maxAccuracyM) mekâna giren, içeride GPS zayıflasa da
+    // bu kadar süre orada sayılır; yeter ki yeni konumlar "hâlâ orada olabilir" desin: mekân
+    // dairesi + stickyMarginM + konum belirsizliği (en fazla stickyMaxAccuracyM). Net biçimde
+    // dışarıda gösteren bir konum (ör. 20 m doğrulukla 500 m ötede) mekândan çıkarır.
+    stickyPresenceMs: 3 * 60 * 60 * 1000,
+    stickyMarginM: 100,
+    stickyMaxAccuracyM: 1000,
     // Mekân QR kodu: okutulduğunda kaba konum mekâna bu kadar yakın olmalı (metre)...
     qrMaxDistanceM: 1000,
     // ...ve konum doğruluğu bundan kötü olmamalı (kapalı alanda GPS zayıf; Wi-Fi/baz konumu yeter).

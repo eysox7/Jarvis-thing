@@ -120,6 +120,13 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       sınırında kelime listesiyle yayımlanır. Yalnızca metin gider. Yazar kategoriye göre neden
       görür; moderatör panelinde sayaçlar. Testler sahte istemciyle; istek biçimi gerçek SDK ile
       yerel bir sahte sunucuya karşı doğrulandı.
+- [x] **21. Mekânda tutunma (QR'sız kapalı alan)** — Her mekâna QR asmak pahalı; asıl ihtiyaç
+      içeride zayıflayan GPS. Mekâna iyi bir konumla girince bir "çapa" saklanır; sonraki belirsiz
+      konumlar çapayla çelişmedikçe (mekân dairesi + 100 m + belirsizlik, en fazla 1 km) 3 saate
+      kadar orada sayılırsın. Açıkça dışarıda gösteren konum çapayı siler, belirsiz konumla geri
+      girilmez; belirsiz konum yeni mekân açmaz. Uygulama açıkken bir mekândaysan konum 5 dk'da
+      bir sessizce tazelenir. QR kayıtları da aynı tabloya taşındı (QR artık isteğe bağlı bir
+      ek). Şema v11.
 
 ## Kalite turları (tüm adımlar bitince)
 

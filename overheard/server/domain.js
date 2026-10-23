@@ -56,34 +56,63 @@ export function placesContaining(db, config, { lat, lng, accuracy }) {
 
 export const VISIBILITIES = ['local', 'public'];
 
-// QR ile girilen mekânda kalmak için konum mekâna yakın olmalı (kaba konum yeter).
+// QR ile girilen mekâna yakınlık (kaba konum yeter).
 const nearVenue = (config, coords, place) =>
   distanceM(coords.lat, coords.lng, place.lat, place.lng) <= config.qrMaxDistanceM + Math.min(coords.accuracy || 0, config.qrMaxDistanceM / 2);
 
-// Kullanıcının QR ile girdiği ve hâlâ içinde sayıldığı mekân: okutmanın üzerinden qrPresenceMs
-// geçmemiş ve verilen konum mekâna yakın. Uzaklaşan ya da süresi dolan kişi çıkmış sayılır.
-function activeQrPlace(db, config, userId, coords, now) {
-  const qr = db.prepare('SELECT q.at, p.* FROM qr_presence q JOIN places p ON p.id = q.place_id WHERE q.user_id = ?').get(userId);
-  if (!qr || now - qr.at > config.qrPresenceMs || !nearVenue(config, coords, qr)) return null;
-  return qr;
+// --- Mekânda tutunma -------------------------------------------------------
+// Kapalı alanda GPS zayıflar: kafeye girince konum 300 m oynayabilir, doğruluk 800 m'ye düşebilir.
+// Bu yüzden mekâna giriş kanıtı (bir "çapa") saklanır ve sonraki belirsiz konumlar giriş kanıtıyla
+// çelişmediği sürece kişi orada sayılır. Çapa iki yoldan atılır:
+// - gps: mekânın içinde iyi doğruluklu (maxAccuracyM) bir konum. Her mekânda, donanımsız.
+// - qr: mekânın QR kodu (isteğe bağlı, ortak mekânlar için); kapıda bile GPS yoksa.
+// Çelişen bir konum gelince (açıkça dışarıda) çapa silinir: çıkan kişi belirsiz konumla geri giremez.
+
+const PRESENCE_ANCHOR_MAX_MS = (config) => Math.max(config.stickyPresenceMs, config.qrPresenceMs);
+
+function anchorHolds(config, anchor, coords, place, now) {
+  if (anchor.source === 'qr') return now - anchor.at <= config.qrPresenceMs && nearVenue(config, coords, place);
+  return now - anchor.at <= config.stickyPresenceMs
+    && distanceM(coords.lat, coords.lng, place.lat, place.lng) <= place.radius_m + config.stickyMarginM + Math.min(coords.accuracy || 0, config.stickyMaxAccuracyM);
+}
+
+// Verilen konumla hâlâ geçerli çapalar (mekân satırı + source).
+function activeAnchors(db, config, userId, coords, now) {
+  return db.prepare('SELECT a.source, a.at AS anchor_at, p.* FROM presence_anchors a JOIN places p ON p.id = a.place_id WHERE a.user_id = ?')
+    .all(userId)
+    .filter((a) => anchorHolds(config, { source: a.source, at: a.anchor_at }, coords, a, now));
+}
+
+function setAnchor(db, userId, placeId, source, now) {
+  // İyi bir GPS konumu QR çapasını tazeler ama türünü düşürmez.
+  db.prepare(`INSERT INTO presence_anchors (user_id, place_id, source, at) VALUES (?, ?, ?, ?)
+              ON CONFLICT(user_id, place_id) DO UPDATE SET at = excluded.at,
+                source = CASE WHEN presence_anchors.source = 'qr' THEN 'qr' ELSE excluded.source END`)
+    .run(userId, placeId, source, now);
+}
+
+// Yeni konumla çelişen ya da süresi dolan çapaları siler.
+function pruneAnchors(db, config, userId, coords, now) {
+  const rows = db.prepare('SELECT a.place_id, a.source, a.at AS anchor_at, p.lat, p.lng, p.radius_m FROM presence_anchors a JOIN places p ON p.id = a.place_id WHERE a.user_id = ?').all(userId);
+  const remove = db.prepare('DELETE FROM presence_anchors WHERE user_id = ? AND place_id = ?');
+  for (const a of rows) if (!anchorHolds(config, { source: a.source, at: a.anchor_at }, coords, a, now)) remove.run(userId, a.place_id);
 }
 
 // Kullanıcının şu an bulunduğu mekânlar: son bildirilen konum taze (presenceTtlMs) ve mekânın
 // içindeyse, ve kullanıcı orada check-in yapabilmişse (saatlik açma sınırına takılmamışsa).
-// QR ile girilen mekân da, konum taze ve mekâna yakın kaldıkça sayılır.
+// Çapası olan mekânlar da (kapalı alanda belirsizleşen konumla) sayılır.
 export function currentPlaceIds(db, config, userId, now = Date.now()) {
   if (!userId) return new Set();
   const last = db.prepare('SELECT lat, lng, accuracy, at FROM location_reports WHERE user_id = ?').get(userId);
   if (!last || now - last.at > config.presenceTtlMs) return new Set();
   const checked = db.prepare('SELECT 1 FROM checkins WHERE user_id = ? AND place_id = ? LIMIT 1');
   const ids = new Set(placesContaining(db, config, last).filter((p) => checked.get(userId, p.id)).map((p) => p.id));
-  const qr = activeQrPlace(db, config, userId, last, now);
-  if (qr) ids.add(qr.id);
+  for (const a of activeAnchors(db, config, userId, last, now)) ids.add(a.id);
   return ids;
 }
 
 // Şu an mekânlarda bulunanlar, { placeId → Set(userId) }: taze konum bildirimi mekân dairesinin
-// içinde olanlar ve QR ile girip hâlâ yakında olanlar.
+// içinde olanlar ve çapası hâlâ geçerli olanlar.
 function presentUsers(db, config, places, now) {
   const byPlace = new Map(places.map((p) => [p.id, new Set()]));
   if (!places.length) return byPlace;
@@ -101,11 +130,11 @@ function presentUsers(db, config, places, now) {
     }
   }
   const placeById = new Map(places.map((p) => [p.id, p]));
-  for (const q of db.prepare(`
-    SELECT q.user_id, q.place_id, r.lat, r.lng, r.accuracy FROM qr_presence q JOIN location_reports r ON r.user_id = q.user_id
-    WHERE q.at > ? AND r.at > ?`).all(now - config.qrPresenceMs, now - config.presenceTtlMs)) {
-    const place = placeById.get(q.place_id);
-    if (place && nearVenue(config, q, place)) byPlace.get(place.id).add(q.user_id);
+  for (const a of db.prepare(`
+    SELECT a.user_id, a.place_id, a.source, a.at, r.lat, r.lng, r.accuracy FROM presence_anchors a JOIN location_reports r ON r.user_id = a.user_id
+    WHERE a.at > ? AND r.at > ?`).all(now - PRESENCE_ANCHOR_MAX_MS(config), now - config.presenceTtlMs)) {
+    const place = placeById.get(a.place_id);
+    if (place && anchorHolds(config, a, a, place, now)) byPlace.get(place.id).add(a.user_id);
   }
   return byPlace;
 }
@@ -191,19 +220,23 @@ export function checkIn(db, config, user, coords, { qrPlace = null } = {}) {
   const now = Date.now();
   const city = cityAt(coords.lat, coords.lng)?.id || qrPlace?.city_id || null;
   const fail = (reason) => ({ places: [], city, left: [], blocked: reason });
-  // QR ile içeride olan kişinin kapalı alandaki belirsiz konumu da kabul edilir.
-  const qrHeld = qrPlace || activeQrPlace(db, config, user.id, coords, now);
-  const trust = verifyLocation(db, config, user, coords, now, qrHeld ? { maxAccuracyM: config.qrMaxAccuracyM } : {});
+  // Mekâna girmiş (çapası olan) kişinin kapalı alandaki belirsiz konumu da kabul edilir; böyle bir
+  // konum yalnızca içeride kalmayı sağlar, yeni mekân açmaz.
+  const lenient = Boolean(qrPlace) || activeAnchors(db, config, user.id, coords, now).length > 0;
+  const trust = verifyLocation(db, config, user, coords, now, lenient ? { maxAccuracyM: config.qrMaxAccuracyM } : {});
   if (!trust.ok) return fail(trust.reason);
   if (qrPlace && !nearVenue(config, coords, qrPlace)) return fail('qr_too_far');
 
   const before = currentPlaceIds(db, config, user.id, now);
   recordPresence(db, user, coords, now);
+  pruneAnchors(db, config, user.id, coords, now);
   if (qrPlace) {
-    db.prepare(`INSERT INTO qr_presence (user_id, place_id, at) VALUES (?, ?, ?)
-                ON CONFLICT(user_id) DO UPDATE SET place_id = excluded.place_id, at = excluded.at`).run(user.id, qrPlace.id, now);
+    // Yeni bir QR, başka mekânlardaki QR çapalarını geçersiz kılar.
+    db.prepare("DELETE FROM presence_anchors WHERE user_id = ? AND source = 'qr' AND place_id != ?").run(user.id, qrPlace.id);
+    setAnchor(db, user.id, qrPlace.id, 'qr', now);
   }
-  const found = placesContaining(db, config, coords).filter((p) => p.id !== qrPlace?.id);
+  const precise = coords.accuracy <= config.maxAccuracyM;
+  const found = precise || !config.antiSpoofing ? placesContaining(db, config, coords).filter((p) => p.id !== qrPlace?.id) : [];
   if (qrPlace) found.unshift({ ...qrPlace, distance: distanceM(coords.lat, coords.lng, qrPlace.lat, qrPlace.lng), viaQr: true });
   const lastAt = db.prepare('SELECT MAX(at) AS at FROM checkins WHERE user_id = ? AND place_id = ?');
   const insert = db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)');
@@ -224,6 +257,7 @@ export function checkIn(db, config, user, coords, { qrPlace = null } = {}) {
       unlocksLeft -= 1;
     }
     if (at == null || now - at >= config.checkinCooldownMs) insert.run(user.id, p.id, now);
+    if (precise && !p.viaQr) setAnchor(db, user.id, p.id, 'gps', now);
     // arrived: az önce burada değildin (yerel sözler şimdi açıldı); firstVisit: ilk kez geldin.
     return [serializePlace(p, {
       visited: true, here: true, arrived: !before.has(p.id), firstVisit: at == null, distance: Math.round(p.distance), ...(p.viaQr ? { qr: true } : {}),
@@ -231,12 +265,14 @@ export function checkIn(db, config, user, coords, { qrPlace = null } = {}) {
   }));
   if (throttled) flagLocation(db, user.id, 'unlock_burst', { limit: config.maxUnlocksPerHour });
   const after = currentPlaceIds(db, config, user.id, now);
-  // GPS bulamasa da QR ile hâlâ içinde sayıldığın mekân (kapalı alanda konum oynadığında).
+  // Konum belirsizleşse de hâlâ içinde sayıldığın mekânlar (held: çapa sayesinde).
   const listed = new Set(places.map((p) => p.id));
-  for (const id of after) {
-    if (listed.has(id)) continue;
-    const p = db.prepare('SELECT * FROM places WHERE id = ?').get(id);
-    places.push(serializePlace(p, { visited: true, here: true, arrived: false, firstVisit: false, distance: Math.round(distanceM(coords.lat, coords.lng, p.lat, p.lng)), qr: true }));
+  for (const a of activeAnchors(db, config, user.id, coords, now)) {
+    if (listed.has(a.id)) continue;
+    places.push(serializePlace(a, {
+      visited: true, here: true, arrived: false, firstVisit: false, held: true,
+      distance: Math.round(distanceM(coords.lat, coords.lng, a.lat, a.lng)), ...(a.source === 'qr' ? { qr: true } : {}),
+    }));
   }
   // Ayrıldığın mekânlar: oradaki yerel sözler yeniden kilitlendi.
   const left = [...before].filter((id) => !after.has(id));
@@ -526,9 +562,9 @@ export function createOverheard(db, config, user, body) {
   if ([...text].length > LIMITS.textMax) throw new HttpError(400, 'text_too_long');
   const coords = readCoords(body);
   const now = Date.now();
-  // QR ile girilen mekânda kapalı alanın belirsiz konumu da yeter.
-  const qrHeld = activeQrPlace(db, config, user.id, coords, now);
-  const trust = verifyLocation(db, config, user, coords, now, qrHeld ? { maxAccuracyM: config.qrMaxAccuracyM } : {});
+  // Girdiğin (çapası olan) mekânda kapalı alanın belirsiz konumu da yeter.
+  const held = activeAnchors(db, config, user.id, coords, now);
+  const trust = verifyLocation(db, config, user, coords, now, held.length ? { maxAccuracyM: config.qrMaxAccuracyM } : {});
   if (!trust.ok) throw new HttpError(403, trust.reason);
   const visibility = VISIBILITIES.includes(body.visibility) ? body.visibility : 'local';
   recordPresence(db, user, coords, now);
@@ -536,7 +572,7 @@ export function createOverheard(db, config, user, body) {
   return transaction(db, () => {
     let place;
     const containing = placesContaining(db, config, coords);
-    if (qrHeld && !containing.some((p) => p.id === qrHeld.id)) containing.unshift(qrHeld);
+    for (const a of held) if (!containing.some((p) => p.id === a.id)) containing.push(a);
     if (body.placeId) {
       place = containing.find((p) => p.id === body.placeId);
       if (!place) {
@@ -954,10 +990,8 @@ export function exportUserData(db, user) {
     exportedAt: iso(Date.now()),
     user: { handle: u.handle, isGuest: Boolean(u.is_guest), createdAt: iso(u.created_at), termsAcceptedAt: iso(u.terms_accepted_at) },
     lastLocation: last ? { lat: last.lat, lng: last.lng, accuracy: last.accuracy, at: iso(last.at) } : null,
-    lastQrCheckin: (() => {
-      const q = db.prepare('SELECT p.name, q.at FROM qr_presence q JOIN places p ON p.id = q.place_id WHERE q.user_id = ?').get(user.id);
-      return q ? { place: q.name, at: iso(q.at) } : null;
-    })(),
+    presenceAnchors: db.prepare('SELECT p.name, a.source, a.at FROM presence_anchors a JOIN places p ON p.id = a.place_id WHERE a.user_id = ? ORDER BY a.at')
+      .all(user.id).map((a) => ({ place: a.name, via: a.source, at: iso(a.at) })),
     checkins: db.prepare('SELECT p.name, p.city_id, c.at FROM checkins c JOIN places p ON p.id = c.place_id WHERE c.user_id = ? ORDER BY c.at')
       .all(user.id).map((c) => ({ place: c.name, city: c.city_id, at: iso(c.at) })),
     overheards: db.prepare('SELECT o.id, o.text, o.visibility, o.anonymous, o.hidden, o.created_at, p.name FROM overheards o JOIN places p ON p.id = o.place_id WHERE o.user_id = ? ORDER BY o.created_at')
@@ -981,7 +1015,7 @@ export function deleteAccount(db, user) {
 // dolunca, şüpheli konum kayıtları 90 gün.
 export function purgeStaleData(db, config, now = Date.now()) {
   const locations = db.prepare('DELETE FROM location_reports WHERE at < ?').run(now - config.locationRetentionMs).changes
-    + db.prepare('DELETE FROM qr_presence WHERE at < ?').run(now - config.locationRetentionMs).changes;
+    + db.prepare('DELETE FROM presence_anchors WHERE at < ?').run(now - config.locationRetentionMs).changes;
   const rooms = db.prepare('DELETE FROM room_messages WHERE created_at < ?').run(now - config.roomRetentionMs).changes;
   // Süresi dolan 24 saatlik sözler silinir; üzerinden konuşma başlamışsa sohbet bağlamı için kalır.
   const expired = db.prepare(`DELETE FROM overheards WHERE expires_at IS NOT NULL AND expires_at < ?

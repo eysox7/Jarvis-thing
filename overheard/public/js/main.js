@@ -554,6 +554,25 @@ async function autoLocate() {
   );
 }
 
+// Bir mekândaysan açık ekran konumu ara ara sessizce tazeler: içeride oturan kişi "orada olma"
+// süresi (30 dk) dolunca düşmesin. Kapalı alandaki belirsiz konum da yeter (sunucu girişi hatırlar).
+async function heartbeat() {
+  if (!hereNow().length || watchId != null || state.position?.simulated || !('geolocation' in navigator)) return;
+  try {
+    if ((await navigator.permissions?.query({ name: 'geolocation' }))?.state !== 'granted') return;
+  } catch {
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (p) => {
+      setPosition({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy });
+      app.checkIn(state.position, { silent: true }).catch(() => {});
+    },
+    () => {},
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+  );
+}
+
 async function boot() {
   const [config, me] = await Promise.all([api.config(), api.me().catch(() => ({ user: null }))]);
   state.config = config;
@@ -587,7 +606,9 @@ async function boot() {
   else autoLocate();
   // "Orada olma" süresi dolunca yerel sözler sunucuda kilitlenir; açık ekran da bunu yakalasın.
   setInterval(() => {
-    if (document.visibilityState === 'visible') app.refresh();
+    if (document.visibilityState !== 'visible') return;
+    heartbeat();
+    app.refresh();
   }, 5 * 60000);
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
