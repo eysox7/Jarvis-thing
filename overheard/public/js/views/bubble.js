@@ -30,7 +30,7 @@ function lockedCard(o, app) {
   return h('div', { class: 'bubble-card is-locked' },
     h('div', { class: 'bubble-ghost', 'aria-hidden': 'true' }, h('span', { class: 'bubble-lock-icon' }, '🔒'), h('div', { class: 'ghost-lines' }, ghostLines(o.length))),
     h('p', { class: 'bubble-where' }, t(o.onLine ? 'bubble.lockedWhereLine' : 'bubble.lockedWhere', { place: o.placeName })),
-    peopleHere(app, o) ? h('p', { class: 'bubble-distance' }, `👥 ${t('place.peopleHere', { n: peopleHere(app, o) })}`) : null,
+    peopleHere(app, o) ? h('p', { class: 'bubble-distance' }, `👥 ${t(o.onLine ? 'place.peopleOnLine' : 'place.peopleHere', { n: peopleHere(app, o) })}`) : null,
     h('p', { class: 'bubble-how' }, state.user ? t(o.onLine ? 'bubble.lockedHowLine' : 'bubble.lockedHow') : t('bubble.loginToRead')),
     distance != null ? h('p', { class: 'bubble-distance' }, `🚶 ${t('bubble.distance', { d: formatDistance(distance) })}`) : null,
     h('div', { class: 'bubble-actions' },
@@ -60,7 +60,7 @@ function openCard(o, app) {
 
   const place = app.state.data?.places.find((p) => p.id === o.placeId);
   const badges = [
-    place?.peopleHere ? h('span', { class: 'chip' }, `👥 ${t('place.peopleHere', { n: place.peopleHere })}`) : null,
+    place?.peopleHere ? h('span', { class: 'chip' }, `👥 ${t(o.onLine ? 'place.peopleOnLine' : 'place.peopleHere', { n: place.peopleHere })}`) : null,
     o.visibility === 'public'
       ? h('span', { class: 'chip' }, `🌍 ${t('visibility.public')}`)
       : h('span', { class: 'chip' }, `📍 ${t('visibility.local')}`),

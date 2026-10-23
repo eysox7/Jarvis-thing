@@ -23,13 +23,15 @@ export function createNudge(app) {
     document.body.classList.remove('has-nudge');
   }
 
+  // Hatlarda uzaklık ve yol tarifi en yakın durağa.
+  const pointOf = (p, position) => (p.line && p.stops?.length
+    ? p.stops.map(([lat, lng]) => ({ lat, lng })).reduce((a, b) => (distanceM(position.lat, position.lng, a.lat, a.lng) <= distanceM(position.lat, position.lng, b.lat, b.lng) ? a : b))
+    : p);
+
   function update() {
     const { position, data } = app.state;
     if (!position || !data) return hide();
-    // Hatlarda uzaklık ve yol tarifi en yakın durağa.
-    const point = (p) => (p.line && p.stops?.length
-      ? p.stops.map(([lat, lng]) => ({ lat, lng })).reduce((a, b) => (distanceM(position.lat, position.lng, a.lat, a.lng) <= distanceM(position.lat, position.lng, b.lat, b.lng) ? a : b))
-      : p);
+    const point = (p) => pointOf(p, position);
     const nearest = data.places
       .filter((p) => !p.here && p.localCount > 0 && !dismissed.has(p.id))
       .map((p) => {
@@ -74,8 +76,11 @@ export function createNudge(app) {
   // Sakin bölge (Sultanbeyli, Sancaktepe gibi henüz sözü olmayan yerler): boş harita bir eksik değil,
   // bir davet. Yakında bir Overheard Kafe varsa o da gösterilir (sözler masana fiş olarak gelir).
   function quiet(position, data) {
-    const near = (p, max) => distanceM(position.lat, position.lng, p.lat, p.lng) <= max;
-    if (dismissed.has('quiet') || data.places.some((p) => p.count > 0 && !p.line && near(p, QUIET_RADIUS_M))) return hide();
+    const near = (p, max) => {
+      const at = pointOf(p, position);
+      return distanceM(position.lat, position.lng, at.lat, at.lng) <= max;
+    };
+    if (dismissed.has('quiet') || data.places.some((p) => p.count > 0 && near(p, QUIET_RADIUS_M))) return hide();
     const cafe = data.places
       .filter((p) => p.cafe)
       .map((p) => ({ ...p, distance: distanceM(position.lat, position.lng, p.lat, p.lng) }))
@@ -85,12 +90,11 @@ export function createNudge(app) {
     el.dataset.place = 'quiet';
     clear(el).append(
       h('span', { class: 'nudge-icon', 'aria-hidden': 'true' }, '🌱'),
-      h('button', { class: 'nudge-main', type: 'button', onclick: () => app.compose() },
+      h('div', { class: 'nudge-main' },
         h('span', { class: 'nudge-title' }, t('nudge.quiet')),
-        h('span', { class: 'nudge-sub' }, cafe ? `☕ ${t('nudge.cafe', { place: cafe.name, d: formatDistance(cafe.distance) })}` : t('nudge.quietSub'))),
-      cafe
-        ? h('a', { class: 'btn nudge-go', href: directionsUrl(cafe), target: '_blank', rel: 'noopener' }, t('bubble.directions'))
-        : null,
+        cafe
+          ? h('a', { class: 'nudge-sub nudge-link', href: directionsUrl(cafe), target: '_blank', rel: 'noopener' }, `☕ ${t('nudge.cafe', { place: cafe.name, d: formatDistance(cafe.distance) })}`)
+          : h('span', { class: 'nudge-sub' }, t('nudge.quietSub'))),
       h('button', { class: 'btn btn-primary nudge-go', type: 'button', onclick: () => app.compose() }, t('nudge.drop')),
       h('button', {
         class: 'icon-btn',

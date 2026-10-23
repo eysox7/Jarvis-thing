@@ -97,7 +97,7 @@ export async function openCompose(app) {
         try {
           const { overheard, newBadges } = await api.post(payload);
           closeSheet();
-          toast(overheard.pioneer ? t('toast.pioneer', { place: overheard.placeName }) : t('toast.posted'), { tone: 'success', timeout: overheard.pioneer ? 6000 : 4200 });
+          toast(overheard.pioneer ? t(overheard.onLine ? 'toast.pioneerLine' : 'toast.pioneer', { place: overheard.placeName }) : t('toast.posted'), { tone: 'success', timeout: overheard.pioneer ? 6000 : 4200 });
           if (overheard.masked?.length) toast(t('toast.masked'));
           app.celebrate(newBadges);
           await app.refresh();

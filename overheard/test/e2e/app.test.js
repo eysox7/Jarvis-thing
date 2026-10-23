@@ -599,7 +599,9 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await sheet(u.page).locator('textarea[name="text"]').fill('Vagonda biri: "Bu hat da benim gibi sabahları geç kalıyor."');
       await sheet(u.page).getByText('T9 Test A–Test D').waitFor();
       await sheet(u.page).getByRole('button', { name: /Bırak/ }).click();
-      await u.page.locator('.toast', { hasText: 'ilk sözünü sen bıraktın' }).waitFor();
+      await u.page.locator('.toast', { hasText: 'hattının ilk sözünü sen bıraktın' }).waitFor();
+      // Artık civarda bir söz var: boş bölge kartı kalkar.
+      await nudge.getByText('Bu civarda henüz söz yok').waitFor({ state: 'hidden' });
       await u.page.locator('.toast', { hasText: 'Yeni rozet: Öncü' }).waitFor();
       assert.deepEqual(u.errors, []);
       await u.context.close();
