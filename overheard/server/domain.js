@@ -611,13 +611,19 @@ function requireReadable(db, config, viewer, row) {
   }
 }
 
-export function createOverheard(db, config, user, body) {
-  const raw = cleanText(body.text);
+// Söz metnini doğrular ve denetler: nefret söylemi reddedilir; telefon, e-posta, plaka, @kişi ve
+// küfür maskelenir.
+function prepareText(value) {
+  const raw = cleanText(value);
   if ([...raw].length < LIMITS.textMin) throw new HttpError(400, 'text_too_short');
   if ([...raw].length > LIMITS.textMax) throw new HttpError(400, 'text_too_long');
-  // Nefret söylemi reddedilir; telefon, e-posta, plaka, @kişi ve küfür maskelenir.
   const { text, masked } = moderatePublicText(raw);
   if ([...text].length > LIMITS.textMax) throw new HttpError(400, 'text_too_long');
+  return { text, masked };
+}
+
+export function createOverheard(db, config, user, body) {
+  const { text, masked } = prepareText(body.text);
   const coords = readCoords(body);
   const now = Date.now();
   // Girdiğin (çapası olan) mekânda kapalı alanın belirsiz konumu da yeter.
@@ -666,6 +672,68 @@ export function createOverheard(db, config, user, body) {
     db.prepare('INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous, visibility, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(id, user.id, place.id, text, now, body.anonymous ? 1 : 0, visibility, expiresAt);
     return { ...getOverheard(db, config, user, id), masked, pioneer };
+  });
+}
+
+// --- Çevrimdışı söz ------------------------------------------------------------
+// Metroda, tünelde bağlantı yokken yazılan söz cihazda bekler, bağlantı gelince gönderilir. O sırada
+// (heardAt) orada olduğun iki yoldan kanıtlanır: o mekânda/hatta zamanında check-in'in var (biniş,
+// giriş) ya da cihazın o sırada aldığı iyi konum (fix) mekânın içinde / hattın durağında. Kulaktan
+// kulağa taşınan sözde (relayedBy) yazar cihaz imzasıyla doğrulanmıştır; kanıt yine yazarındır.
+
+const CLIENT_ID_RE = /^[\w-]{8,40}$/;
+
+function readFix(value) {
+  if (!Array.isArray(value) || value.length !== 4) return null;
+  const [lat, lng, accuracy, at] = value.map(Number);
+  return isValidCoord(lat, lng) && Number.isFinite(accuracy) && Number.isFinite(at) ? { lat, lng, accuracy: Math.max(0, accuracy), at } : null;
+}
+
+function fixAtPlace(db, config, fix, place) {
+  if (place.kind === 'line') {
+    const reach = config.lineBoardM + Math.min(fix.accuracy, config.maxAccuracyBonusM);
+    return lineStops(db, place.id).some((s) => distanceM(fix.lat, fix.lng, s.lat, s.lng) <= reach);
+  }
+  return distanceM(fix.lat, fix.lng, place.lat, place.lng) <= place.radius_m + Math.min(fix.accuracy, config.maxAccuracyBonusM);
+}
+
+export function createOfflineOverheard(db, config, user, body, { relayedBy = null } = {}) {
+  const clientId = String(body.clientId ?? '');
+  if (!CLIENT_ID_RE.test(clientId)) throw new HttpError(400, 'bad_client_id');
+  const existing = db.prepare('SELECT id FROM overheards WHERE user_id = ? AND client_id = ?').get(user.id, clientId);
+  if (existing) return { ...getOverheard(db, config, user, existing.id), duplicate: true };
+
+  const { text, masked } = prepareText(body.text);
+  const now = Date.now();
+  const heardAt = Math.round(Number(body.heardAt));
+  if (!Number.isFinite(heardAt) || heardAt > now + 60000) throw new HttpError(400, 'bad_heard_at');
+  if (now - heardAt > config.offlineMaxAgeMs) throw new HttpError(400, 'offline_too_old');
+  const place = db.prepare('SELECT * FROM places WHERE id = ?').get(String(body.placeId ?? ''));
+  if (!place) throw new HttpError(404, 'place_not_found');
+  if (config.antiSpoofing) {
+    const { n } = db.prepare('SELECT COUNT(*) AS n FROM location_flags WHERE user_id = ? AND at > ?').get(user.id, now - 86400000);
+    if (n >= config.flagLimitPerDay) throw new HttpError(403, 'location_cooldown');
+  }
+
+  // İçeride kalma (hatta: yolculuk) süresi kadar önceki bir giriş ya da o sıradaki iyi bir konum.
+  const window = place.kind === 'line' ? config.linePresenceMs : config.stickyPresenceMs;
+  const checkedIn = db.prepare('SELECT 1 FROM checkins WHERE user_id = ? AND place_id = ? AND at BETWEEN ? AND ? LIMIT 1')
+    .get(user.id, place.id, heardAt - window, heardAt + config.checkinCooldownMs);
+  const fix = checkedIn ? null : readFix(body.fix);
+  if (!checkedIn && !(fix && fix.accuracy <= config.maxAccuracyM && fix.at <= heardAt + 60000 && heardAt - fix.at <= window
+    && fix.at <= now && fixAtPlace(db, config, fix, place))) {
+    throw new HttpError(403, 'not_there_then', { placeName: place.name });
+  }
+
+  const visibility = VISIBILITIES.includes(body.visibility) ? body.visibility : 'local';
+  return transaction(db, () => {
+    if (fix) db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)').run(user.id, place.id, Math.round(fix.at));
+    const pioneer = !db.prepare('SELECT 1 FROM overheards WHERE place_id = ? LIMIT 1').get(place.id);
+    const id = newId();
+    db.prepare(`INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous, visibility, expires_at, client_id, offline, relayed_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`)
+      .run(id, user.id, place.id, text, heardAt, body.anonymous ? 1 : 0, visibility, body.ephemeral ? heardAt + config.ephemeralMs : null, clientId, relayedBy);
+    return { ...getOverheard(db, config, user, id), masked, pioneer, offline: true };
   });
 }
 

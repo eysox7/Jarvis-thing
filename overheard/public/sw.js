@@ -1,5 +1,5 @@
 // Uygulama kabuğunu önbelleğe alır; API ve harita karoları her zaman ağdan gelir.
-const CACHE = 'overheard-shell-v14';
+const CACHE = 'overheard-shell-v15';
 const SHELL = [
   '/',
   '/css/app.css',
@@ -15,6 +15,8 @@ const SHELL = [
   '/js/ui.js',
   '/js/util.js',
   '/js/share.js',
+  '/js/store.js',
+  '/js/offline.js',
   '/js/views/admin.js',
   '/js/views/auth.js',
   '/js/views/best.js',
@@ -27,6 +29,7 @@ const SHELL = [
   '/js/views/profile.js',
   '/js/views/room.js',
   '/js/views/venue.js',
+  '/js/views/outbox.js',
   '/icons/icon.svg',
   '/manifest.webmanifest',
   '/privacy.html',
@@ -58,4 +61,51 @@ self.addEventListener('fetch', (event) => {
       })
       .catch(() => caches.match(event.request).then((hit) => hit || caches.match('/'))),
   );
+});
+
+// Arka planda eşitleme: sayfa kapalıyken de bağlantı gelince bekleyen çevrimdışı sözler gönderilir
+// (destekleyen tarayıcılarda). Sözler sayfanın kullandığı IndexedDB kuyruğundan (store.js) okunur.
+function openStore() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('overheard', 1);
+    req.onupgradeneeded = () => {
+      for (const name of ['outbox', 'received', 'keys']) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name, { keyPath: 'id' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function request(db, mode, action) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('outbox', mode);
+    const req = action(tx.objectStore('outbox'));
+    tx.oncomplete = () => resolve(req.result);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function flushOutbox() {
+  const db = await openStore();
+  const items = await request(db, 'readonly', (s) => s.getAll());
+  for (const item of items) {
+    const relay = item.kind === 'relay';
+    const body = relay ? item.payload : {
+      clientId: item.clientId, author: item.author, text: item.text, placeId: item.placeId, visibility: item.visibility,
+      anonymous: item.anonymous, ephemeral: item.ephemeral, heardAt: item.heardAt, fix: item.fix,
+    };
+    const res = await fetch(relay ? '/api/overheards/relay' : '/api/overheards/offline', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    // Yalnızca kabul edilenler silinir; reddedilenleri sayfa açılınca kullanıcıya nedeniyle gösterir.
+    if (res.ok) await request(db, 'readwrite', (s) => s.delete(item.id));
+    else if (res.status >= 500 || res.status === 429) throw new Error('retry');
+  }
+}
+
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'outbox') event.waitUntil(flushOutbox());
 });

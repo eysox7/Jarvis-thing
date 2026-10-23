@@ -43,6 +43,12 @@ export const api = {
   overheardsInBox: (bbox) => request('GET', `/api/overheards?bbox=${bbox.map((n) => n.toFixed(5)).join(',')}`),
   checkIn: (pos) => request('POST', '/api/checkins', pos),
   qrCheckIn: (code, pos) => request('POST', '/api/checkins/qr', { code, ...pos }),
+  // Çevrimdışı yazılmış söz (cihazdaki kuyruktan).
+  postOffline: (item) => request('POST', '/api/overheards/offline', {
+    clientId: item.clientId, author: item.author, text: item.text, placeId: item.placeId, visibility: item.visibility,
+    anonymous: item.anonymous, ephemeral: item.ephemeral, heardAt: item.heardAt, fix: item.fix,
+  }),
+  relay: (payload) => request('POST', '/api/overheards/relay', payload),
   myPlaces: () => request('GET', '/api/me/places'),
   overheard: (id) => request('GET', `/api/overheards/${enc(id)}`),
   post: (payload) => request('POST', '/api/overheards', payload),

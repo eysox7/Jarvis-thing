@@ -213,6 +213,21 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
     return { overheard: result, newBadges };
   });
 
+  // Çevrimdışı yazılmış söz (metroda, tünelde): bağlantı gelince cihazdan gönderilir. Aynı söz
+  // (clientId) yeniden gelirse denetime tekrar sorulmaz, kayıtlı söz döner.
+  router.post('/api/overheards/offline', async (ctx) => {
+    const user = requireActive(ctx);
+    const body = await readJson(ctx.req);
+    // Cihazda başka bir hesabın bekleyen sözü bu oturumla gönderilmesin (ör. arka planda eşitleme).
+    if (body.author !== undefined && body.author !== user.handle) throw new HttpError(409, 'author_mismatch');
+    limit(`post:${user.id}`, 10, 3600000);
+    if (!db.prepare('SELECT 1 FROM overheards WHERE user_id = ? AND client_id = ?').get(user.id, String(body.clientId ?? ''))) {
+      await aiGuard(body.text, 'overheard', domain.LIMITS.textMax);
+    }
+    const { result, newBadges } = domain.withBadges(db, user, () => domain.createOfflineOverheard(db, config, user, body));
+    return { overheard: result, newBadges };
+  });
+
   router.get('/api/overheards/:id', (ctx) => ({ overheard: domain.getOverheard(db, config, ctx.user, ctx.params.id) }));
 
   router.delete('/api/overheards/:id', (ctx) => {

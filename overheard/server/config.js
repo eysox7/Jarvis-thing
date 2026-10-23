@@ -56,6 +56,8 @@ export function loadConfig(overrides = {}) {
     // Overheard Kafe: kapatılması unutulan masalar bu süreden sonra kendiliğinden kapanır. (Kafe içi
     // sözlerin bekleme süresi kafe başına ayarlanır, varsayılan 20 dk.)
     venueTableMaxMs: 6 * 60 * 60 * 1000,
+    // Çevrimdışı yazılan söz (metroda, tünelde) en geç bu kadar sonra gönderilebilir.
+    offlineMaxAgeMs: 6 * 60 * 60 * 1000,
     // Toplu taşıma hattı: bir durağa bu kadar yakın (metre) iyi bir konum hatta "biniş" sayılır...
     lineBoardM: 150,
     // ...sonra konum güzergâha lineHoldM (+ belirsizlik) yakın kaldıkça, en fazla linePresenceMs

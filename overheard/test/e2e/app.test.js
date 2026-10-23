@@ -608,6 +608,40 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
     });
   });
 
+  describe('Çevrimdışı söz', () => {
+    let srv;
+    before(async () => { srv = await startTestServer({ demo: true }); });
+    after(async () => { await srv.close(); });
+
+    test('bağlantı yokken yazılan söz cihazda bekler, bağlantı gelince gönderilir', async () => {
+      const u = await newUser(browser, srv.base, KADIKOY);
+      await loginAsGuest(u.page);
+      await u.page.evaluate(() => window.overheard.app.teleport({ lat: 40.9925, lng: 29.0236 }));
+      await u.page.locator('.toast', { hasText: 'Kadıköy İskelesi: buradasın' }).waitFor();
+
+      // Tünele girildi.
+      await u.context.setOffline(true);
+      const chip = u.page.locator('#offline-chip');
+      await chip.getByText('Çevrimdışısın').waitFor();
+      await u.page.locator('[data-nav="post"]').click();
+      await sheet(u.page).locator('.offline-note').waitFor();
+      await sheet(u.page).locator('textarea[name="text"]').fill('Tünelde biri: "Sinyal yok ama dedikodu bol."');
+      await sheet(u.page).getByText('Kadıköy İskelesi').waitFor();
+      await sheet(u.page).getByRole('button', { name: /Bırak/ }).click();
+      await u.page.locator('.toast', { hasText: 'sözün cihazında bekliyor' }).waitFor();
+      await chip.getByText('1 söz gönderilmeyi bekliyor').waitFor();
+
+      // İstasyona gelindi: sinyal var.
+      await u.context.setOffline(false);
+      await u.page.locator('.toast', { hasText: 'Çevrimdışı yazdığın söz gönderildi' }).waitFor();
+      await chip.waitFor({ state: 'hidden' });
+      const row = srv.db.prepare("SELECT offline, place_id FROM overheards WHERE text LIKE '%Sinyal yok ama dedikodu%'").get();
+      assert.deepEqual({ ...row }, { offline: 1, place_id: 'ist-kadikoy-iskele' });
+      assert.deepEqual(u.errors, []);
+      await u.context.close();
+    });
+  });
+
   describe('Yoğun bölge', () => {
     let srv;
     before(async () => {

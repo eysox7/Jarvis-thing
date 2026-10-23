@@ -745,6 +745,17 @@ body.doc-page { overflow: auto; }
 .nudge-sub { font-size: 12.5px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nudge-go { flex: none; padding: 8px 12px; font-size: 13px; }
 .nudge-link { color: var(--accent); text-decoration: none; }
+
+/* Çevrimdışı ve bekleyen sözler. */
+.offline-chip {
+  position: fixed; z-index: 900; left: 50%; transform: translateX(-50%);
+  top: calc(var(--topbar-h) + var(--safe-top) + 8px);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+  background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 650; box-shadow: var(--shadow-sm); cursor: pointer;
+}
+.offline-chip.is-offline { background: var(--ink); color: var(--paper); border-color: transparent; }
+.offline-chip[hidden] { display: none; }
+.offline-note { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--paper-2); font-size: 13px; }
 body.has-nudge .toasts { bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 116px); }
 
 /* Bildirimler */

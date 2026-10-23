@@ -71,3 +71,9 @@ export const BADGE_EMOJI = {
 };
 
 export const REACTION_EMOJI = { lol: '😂', wow: '😮', same: '👂', heart: '❤️' };
+
+// Cihazın ürettiği benzersiz kimlik (çevrimdışı sözler için).
+export function newClientId() {
+  if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}

@@ -252,6 +252,22 @@ export const MIGRATIONS = [
   ALTER TABLE places ADD COLUMN origin TEXT;
   ALTER TABLE venues ADD COLUMN inside_delay_min INTEGER NOT NULL DEFAULT 20;
   `,
+  // v14: Çevrimdışı ve kulaktan kulağa (eşten eşe) sözler. client_id cihazın verdiği kimliktir: aynı
+  // söz iki kez gelirse bir kez kaydedilir. Kulaktan kulağa taşınan sözü sunucuya ulaştıran kişi
+  // relayed_by'dır. Cihaz anahtarları, çevrimdışı imzalanan sözlerin yazarını kanıtlar.
+  `
+  ALTER TABLE overheards ADD COLUMN client_id TEXT;
+  ALTER TABLE overheards ADD COLUMN offline INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE overheards ADD COLUMN relayed_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  CREATE UNIQUE INDEX overheards_client ON overheards(user_id, client_id) WHERE client_id IS NOT NULL;
+  CREATE TABLE device_keys (
+    id          TEXT PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    public_jwk  TEXT NOT NULL,
+    created_at  INTEGER NOT NULL
+  );
+  CREATE INDEX device_keys_user ON device_keys(user_id);
+  `,
 ];
 
 export function openDb(path) {

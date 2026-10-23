@@ -1,4 +1,4 @@
-import { h, clear, formatDistance } from '../util.js';
+import { h, clear, formatDistance, newClientId } from '../util.js';
 import { t, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { openSheet, closeSheet, formError, busy, toast } from '../ui.js';
@@ -28,21 +28,26 @@ export async function openCompose(app) {
 
   let position = null;
   let choice = null; // { placeId } | { newPlaceName: input }
+  // Çevrimdışı (metro, tünel): söz cihazda bekler, bağlantı gelince gönderilir.
+  let offline = false;
 
-  function renderPlaces(places) {
+  function renderPlaces(places, { allowNew = true } = {}) {
     clear(where);
     const newName = h('input', { name: 'newPlaceName', maxlength: limits.placeNameMax, placeholder: t('compose.newPlaceName') });
     const options = places.map((p, i) => {
       const radio = h('input', { type: 'radio', name: 'place', value: p.id, checked: i === 0 });
       radio.addEventListener('change', () => { choice = { placeId: p.id }; newName.hidden = true; });
       return h('label', { class: 'place-option' }, radio,
-        h('span', { class: 'place-option-name' }, p.name),
-        h('span', { class: 'muted' }, formatDistance(p.distance)));
+        h('span', { class: 'place-option-name' }, `${p.line ? '🚇 ' : ''}${p.name}`),
+        h('span', { class: 'muted' }, p.distance == null ? '' : formatDistance(p.distance)));
     });
-    if (places.length) {
+    if (places.length && allowNew) {
       const radio = h('input', { type: 'radio', name: 'place', value: '' });
       radio.addEventListener('change', () => { choice = { newPlaceName: newName }; newName.hidden = false; newName.focus(); });
       options.push(h('label', { class: 'place-option' }, radio, h('span', { class: 'place-option-name' }, `➕ ${t('compose.newPlace')}`)));
+      newName.hidden = true;
+      choice = { placeId: places[0].id };
+    } else if (places.length) {
       newName.hidden = true;
       choice = { placeId: places[0].id };
     } else {
@@ -55,10 +60,26 @@ export async function openCompose(app) {
     submit.disabled = false;
   }
 
+  // Bağlantı yokken son bilinen "buradasın" mekânları ve hatları (konum da gerekmez: tünelde GPS yok).
+  function offlineMode() {
+    offline = true;
+    const places = (app.state.data?.places || []).filter((p) => p.here).map((p) => ({ ...p, distance: null }));
+    if (!places.length) {
+      clear(where).append(h('p', { class: 'form-error' }, t('offline.noPlace')));
+      submit.disabled = true;
+      return;
+    }
+    renderPlaces(places, { allowNew: false });
+    where.prepend(h('p', { class: 'offline-note' }, `📴 ${t('offline.note')}`));
+  }
+
   async function locate() {
+    if (!navigator.onLine) return offlineMode();
     clear(where).append(h('p', { class: 'muted' }, t('compose.locating')));
     submit.disabled = true;
     position = await app.currentPosition();
+    // Tünelde GPS yok ama az önce bir mekânda/hattaydın: söz o girişe dayanarak gönderilir.
+    if (!position && (app.state.data?.places || []).some((p) => p.here)) return offlineMode();
     if (!position) {
       clear(where).append(
         h('p', { class: 'muted' }, t('compose.needLocation')),
@@ -73,8 +94,38 @@ export async function openCompose(app) {
       }
       renderPlaces(result.places);
     } catch (err) {
-      clear(where).append(h('p', { class: 'form-error' }, errorText(err)));
+      if (err.code === 'network') offlineMode();
+      else clear(where).append(h('p', { class: 'form-error' }, errorText(err)));
     }
+  }
+
+  async function saveOffline() {
+    if (!choice?.placeId) {
+      error.show(t('offline.newPlace'));
+      return;
+    }
+    if ([...text.value.trim()].length < limits.textMin) {
+      error.show(t('errors.text_too_short'));
+      return;
+    }
+    const place = app.state.data?.places.find((p) => p.id === choice.placeId);
+    const fix = app.state.lastFix;
+    const id = newClientId();
+    await app.saveOffline({
+      id,
+      clientId: id,
+      author: app.state.user.handle,
+      text: text.value.trim(),
+      placeId: choice.placeId,
+      placeName: place?.name || '',
+      visibility: form.querySelector('input[name="visibility"]:checked')?.value || 'local',
+      anonymous: anonymous.checked,
+      ephemeral: ephemeral.checked,
+      heardAt: Date.now(),
+      fix: fix ? [fix.lat, fix.lng, fix.accuracy, fix.at] : null,
+    });
+    closeSheet();
+    toast(t('offline.saved'), { tone: 'success', timeout: 7000 });
   }
 
   const form = h('form', {
@@ -83,6 +134,7 @@ export async function openCompose(app) {
       e.preventDefault();
       error.hide();
       busy(submit, async () => {
+        if (offline) return saveOffline();
         const payload = {
           text: text.value,
           lat: position.lat,
@@ -103,6 +155,8 @@ export async function openCompose(app) {
           await app.refresh();
           app.openOverheard(overheard);
         } catch (err) {
+          // Gönderirken bağlantı koptu (tünele girildi): söz cihazda bekler.
+          if (err.code === 'network' && choice?.placeId) return saveOffline();
           if (err.code === 'place_exists') {
             error.show(t('errors.place_exists', { name: err.data.place.name }));
             renderPlaces([{ ...err.data.place, distance: 0 }]);

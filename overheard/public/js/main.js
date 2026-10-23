@@ -14,6 +14,8 @@ import { maybeShowIntro } from './views/intro.js';
 import { openRoom, handleRoomMessage, closeRoomIfLeft } from './views/room.js';
 import { shareOverheard } from './share.js';
 import { openBest } from './views/best.js';
+import { openOutbox } from './views/outbox.js';
+import { createOffline } from './offline.js';
 
 const CITY_KEY = 'oh_city';
 const HINT_KEY = 'oh_demo_hint_seen';
@@ -29,11 +31,16 @@ const state = {
   city: null,
   data: null,
   position: null,
+  // Son iyi konum (çevrimdışı sözün "o sırada oradaydım" kanıtı).
+  lastFix: null,
   exploring: false,
+  // Sunucuya ulaşılamıyor: son görülen harita gösteriliyor, sözler cihazda bekliyor.
+  offline: false,
 };
 
 let map;
 let nudge;
+let offline;
 let events = null;
 let watchId = null;
 let lastCheckIn = null;
@@ -45,10 +52,40 @@ const storage = {
   set(key, value) {
     try { localStorage.setItem(key, value); } catch { /* yok say */ }
   },
+  remove(key) {
+    try { localStorage.removeItem(key); } catch { /* yok say */ }
+  },
 };
+
+// Çevrimdışı açılış için son yanıtlar (yapılandırma, hesap, şehir haritası) cihazda saklanır.
+const CACHE_PREFIX = 'oh_cache_';
+const cacheSave = (name, data) => storage.set(`${CACHE_PREFIX}${name}`, JSON.stringify({ at: Date.now(), data }));
+function cacheLoad(name) {
+  try {
+    return JSON.parse(storage.get(`${CACHE_PREFIX}${name}`)) || null;
+  } catch {
+    return null;
+  }
+}
+const mapCacheName = () => `map_${state.user?.handle || 'anon'}_${state.city.id}`;
+
+// Yerel sözler yalnızca oradayken okunur: önbellekteki harita hatta kalma süresinden (2 saat)
+// eskiyse yerel sözlerin metni gösterilmez, "buradasın" bilgisi düşer.
+const STALE_LOCAL_MS = 2 * 3600000;
+function fromCache({ at, data }) {
+  if (Date.now() - at <= STALE_LOCAL_MS) return data;
+  return {
+    ...data,
+    places: data.places.map((p) => ({ ...p, here: false })),
+    overheards: data.overheards.map((o) => (o.locked || o.visibility === 'public' || o.mine
+      ? o
+      : { id: o.id, placeId: o.placeId, placeName: o.placeName, cityId: o.cityId, lat: o.lat, lng: o.lng, createdAt: o.createdAt, reactionTotal: o.reactionTotal, visibility: o.visibility, onLine: o.onLine, locked: true, length: [...o.text].length })),
+  };
+}
 
 function setPosition(pos) {
   state.position = { ...pos, at: Date.now() };
+  if (pos.simulated || pos.accuracy <= 200) state.lastFix = { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, at: state.position.at };
   map.showMe(state.position);
   nudge.update();
 }
@@ -128,6 +165,8 @@ const app = {
   openAuth: (then) => openAuth(app, then),
 
   async setUser(user) {
+    // Misafir hesap kalıcıya çevrildiyse bekleyen çevrimdışı sözler yeni kullanıcı adına geçer.
+    if (state.user?.isGuest && user && state.user.handle !== user.handle) await offline?.retag(state.user.handle, user.handle);
     state.user = user;
     await refreshMe();
     connectEvents();
@@ -137,6 +176,7 @@ const app = {
 
   async logout() {
     await api.logout().catch(() => {});
+    for (const key of Object.keys(localStorage)) if (key.startsWith(`${CACHE_PREFIX}map_`) || key === `${CACHE_PREFIX}me`) storage.remove(key);
     state.user = null;
     state.stats = null;
     state.unread = 0;
@@ -148,22 +188,33 @@ const app = {
   },
 
   async refresh() {
+    let data;
     try {
-      const data = await api.cityMap(state.city.id);
-      dataGeneration += 1;
-      state.data = data;
-      lastBox = null;
-      map.render(state.data);
-      // Yakın bakıştaysak görünür alanın sözlerini de tazele.
-      if (lastView) onViewChange(lastView);
-      nudge.update();
-      renderRoomButton();
-      const openId = map.openId();
-      const open = openId && state.data.overheards.find((o) => o.id === openId);
-      if (open) map.updateOpen(bubbleContent(open, app));
+      data = await api.cityMap(state.city.id);
+      state.offline = false;
+      cacheSave(mapCacheName(), data);
     } catch (err) {
-      toast(errorText(err), { tone: 'error' });
+      const cached = err.code === 'network' ? cacheLoad(mapCacheName()) : null;
+      if (!cached) {
+        toast(errorText(err), { tone: 'error' });
+        return;
+      }
+      if (!state.offline) toast(t('offline.staleMap'));
+      state.offline = true;
+      data = fromCache(cached);
     }
+    offline?.render();
+    dataGeneration += 1;
+    state.data = data;
+    lastBox = null;
+    map.render(state.data);
+    // Yakın bakıştaysak görünür alanın sözlerini de tazele.
+    if (lastView) onViewChange(lastView);
+    nudge.update();
+    renderRoomButton();
+    const openId = map.openId();
+    const open = openId && state.data.overheards.find((o) => o.id === openId);
+    if (open) map.updateOpen(bubbleContent(open, app));
   },
 
   async selectCity(id, { keepView = false } = {}) {
@@ -260,6 +311,8 @@ const app = {
     const coords = { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy };
     const result = qrCode ? await api.qrCheckIn(qrCode, coords) : await api.checkIn(coords);
     lastCheckIn = { lat: pos.lat, lng: pos.lng, at: Date.now() };
+    // Bağlantı var: bekleyen çevrimdışı sözler gönderilsin.
+    offline.flush();
     if (result.blocked) {
       warnLocation(result.blocked);
       return result;
@@ -281,6 +334,12 @@ const app = {
     }
     if (result.places.some((p) => p.firstVisit)) refreshMe();
     return result;
+  },
+
+  // Çevrimdışı yazılan sözü cihaza kaydeder; bağlantı gelince gönderilir.
+  async saveOffline(item) {
+    await offline.save(item);
+    offline.flush();
   },
 
   // Demo: seçilen noktaya "ışınlanıp" orada check-in yapar.
@@ -530,6 +589,7 @@ function bindNav() {
   }
   document.getElementById('btn-locate').addEventListener('click', locateAndCheckIn);
   document.getElementById('btn-explore').addEventListener('click', toggleExplore);
+  document.getElementById('offline-chip').addEventListener('click', () => openOutbox(app));
   document.getElementById('btn-room').addEventListener('click', () => {
     const here = hereNow()[0];
     if (here) openRoom(app, here);
@@ -575,8 +635,25 @@ async function heartbeat() {
   );
 }
 
+// Çevrimdışıyken (metroda açılan uygulama) son kaydedilen yanıtlarla açılır.
+async function fetchCached(name, request, fallback) {
+  try {
+    const data = await request();
+    cacheSave(name, data);
+    return data;
+  } catch (err) {
+    const cached = cacheLoad(name);
+    if (cached) {
+      state.offline = true;
+      return cached.data;
+    }
+    if (fallback !== undefined) return fallback;
+    throw err;
+  }
+}
+
 async function boot() {
-  const [config, me] = await Promise.all([api.config(), api.me().catch(() => ({ user: null }))]);
+  const [config, me] = await Promise.all([fetchCached('config', api.config), fetchCached('me', api.me, { user: null })]);
   state.config = config;
   state.user = me.user;
   state.stats = me.stats || null;
@@ -596,6 +673,8 @@ async function boot() {
   map.setCity(state.city);
   nudge = createNudge(app);
 
+  offline = createOffline(app);
+  app.offline = offline;
   bindNav();
   renderChrome();
   const qrCode = takeQrCode();
@@ -604,6 +683,8 @@ async function boot() {
   connectEvents();
   await app.refresh();
   document.body.classList.add('is-ready');
+  offline.render();
+  offline.flush();
   if (qrCode) qrCheckIn(qrCode);
   else autoLocate();
   // "Orada olma" süresi dolunca yerel sözler sunucuda kilitlenir; açık ekran da bunu yakalasın.
