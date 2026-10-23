@@ -44,6 +44,11 @@ balonların altında sokak haritası görünür.</sub>
   açıkken yürüdükçe otomatik check-in yapılır. Bir mekâna varınca "buradasın, yerel sözler açık",
   ayrılınca "yerel sözler kilitlendi" bildirimi gelir. Konum izni verdiysen uygulamayı açmak bile
   bulunduğun mekânın yerel sözlerini açar.
+- **Mekân QR kodu.** Kafe, kütüphane, kampüs binası gibi kapalı alanlarda GPS zayıftır. Ortak
+  mekânın girişine asılan QR posterini okutan kişi, kaba konumu (Wi-Fi/baz istasyonu, 1 km
+  yakınlık) yeterli sayılarak mekâna girer; içeride konum oynasa da 2 saate kadar orada kalır,
+  uzaklaşınca çıkar. Kod, mekân kimliğinin sunucu sırrıyla imzasıdır (tahmin edilemez); posteri
+  moderatör panelinden indirilir.
 - **Şu an burada ve mekân odası.** Her mekânda o an kaç kişinin bulunduğu (isimsiz) görünür. Bir
   mekândaysan oradakilerle grup sohbetine katılabilirsin; oda yalnızca oradayken görünür,
   mesajlar 12 saat sonra silinir.
@@ -168,6 +173,8 @@ Bunu günlük bir zamanlayıcıya bağlayıp yedekleri sunucu dışına kopyalay
 | `OVERHEARD_TRUST_PROXY` | `0` | Ters vekil arkasında `1`: istemci adresi `X-Forwarded-For`'un son öğesi |
 | `OVERHEARD_RATE_SCALE` | `1` | Hız sınırı çarpanı |
 | `OVERHEARD_ANTI_SPOOF` | demo kapalıysa `1` | Konum sahteciliği denetimleri |
+| `OVERHEARD_PUBLIC_URL` | istek adresi | QR bağlantılarının kökü, ör. `https://overheard.example.com` |
+| `OVERHEARD_QR_SECRET` | veritabanında üretilir | Mekân QR imzası sırrı; değiştirmek basılı tüm QR posterlerini geçersiz kılar |
 
 ## Mimari
 
@@ -217,6 +224,7 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | `GET /api/cities/:id/best` | Haftanın en iyileri (herkese açık sözler) |
 | `GET /api/overheards?bbox=minLng,minLat,maxLng,maxLat` | Görünür alandaki sözler (en fazla 300; alan ≤ 0,6°) |
 | `POST /api/checkins` | `{lat, lng, accuracy}` → şu an bulunduğun mekânlar (`arrived`, `firstVisit`) ve ayrıldıkların (`left`) |
+| `POST /api/checkins/qr` | `{code, lat, lng, accuracy}` → mekân QR kodu ile giriş (kaba konum yeter; uzaksa `blocked: "qr_too_far"`) |
 | `GET /api/me/places` | Uğradığın ve şu an bulunduğun mekânlar |
 | `GET /api/me/export` · `POST /api/me/delete` | Verilerimi indir (JSON) · hesabı sil (`{password}`) |
 | `POST /api/overheards` | `{text, lat, lng, visibility: local\|public, anonymous?, ephemeral?, placeId?, newPlaceName?}` |
@@ -228,6 +236,7 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | `GET/POST /api/places/:id/room` | Mekân odası (yalnızca o an mekândayken) |
 | `POST /api/overheards/:id/block-author` · `POST /api/users/:handle/block` | Engelleme |
 | `GET /api/admin/reports` · `POST …/overheards/:id/restore` · `DELETE …/overheards/:id` · `POST …/users/:handle/ban` | Moderasyon (yalnızca `OVERHEARD_ADMINS`) |
+| `GET /api/admin/places?q=` · `GET /api/admin/places/:id/qr` | Mekân arama ve QR kodu (`url`, `svg`, `matrix`) |
 | `GET /api/events` | SSE akışı (`dm`, `reveal`, `room` olayları) |
 
 ## Testler
@@ -251,12 +260,16 @@ denetimler açıktır (`OVERHEARD_ANTI_SPOOF` ile değiştirilebilir):
 - 24 saatte 3 şüpheli olaydan sonra check-in'ler 24 saat mekân açmaz.
 - Saatte en fazla 30 yeni mekân açılabilir.
 - Şüpheli hesaplar moderatör panelinde listelenir.
+- Mekân QR koduyla girişte konum doğruluğu 3 km'ye kadar kabul edilir ama konum mekâna 1 km
+  yakın olmalı: kodun fotoğrafı evden okutulamaz. QR ile içeride kalmak 2 saatle sınırlıdır.
 
 ## Bilinen sınırlar
 
 - Yukarıdaki denetimler kaba sahteciliği frenler ama kararlı bir kullanıcıyı (yavaş yavaş sahte
   konumla "yürüyen") durduramaz. Kesin çözüm için yerli uygulama + cihaz doğrulaması (App Attest /
-  Play Integrity) ya da ortak mekânlarda QR/BLE işaretçileri gerekir.
+  Play Integrity) ya da BLE işaretçileri gerekir. Mekân QR kodu kapalı alanlarda yardımcı olur ama
+  sabit bir koddur: mekâna bir kez giden biri fotoğrafını alıp 1 km yakınından yeniden okutabilir
+  (dönen kod ya da ekranda gösterilen QR bu açığı kapatır).
 - Hız sınırları ve canlı bağlantılar tek süreç içindedir; yatay ölçeklemede paylaşılan bir depo
   (ör. Redis) gerekir.
 - Harita karoları CARTO/OpenStreetMap'ten gelir; yoğun kullanımda kendi karo sunucunuz ya da

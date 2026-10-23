@@ -249,12 +249,14 @@ const app = {
     return locateOnce();
   },
 
-  async checkIn(pos, { silent = false } = {}) {
+  // qrCode verilirse giriş mekânın QR kodu iledir: kapalı alanda kaba konum yeter.
+  async checkIn(pos, { silent = false, qrCode = null } = {}) {
     if (!state.user) {
-      app.openAuth(() => app.checkIn(pos, { silent }));
+      app.openAuth(() => app.checkIn(pos, { silent, qrCode }));
       return { places: [], city: null };
     }
-    const result = await api.checkIn({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy });
+    const coords = { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy };
+    const result = qrCode ? await api.qrCheckIn(qrCode, coords) : await api.checkIn(coords);
     lastCheckIn = { lat: pos.lat, lng: pos.lng, at: Date.now() };
     if (result.blocked) {
       warnLocation(result.blocked);
@@ -266,7 +268,7 @@ const app = {
     if (result.city && result.city !== state.city.id) await app.selectCity(result.city, { keepView: true });
     else if (arrived.length || left.length) await app.refresh();
     for (const p of arrived) {
-      toast(t('toast.arrived', { place: p.name }), { tone: 'success', timeout: 6000, action: t('room.enter'), onAction: () => openRoom(app, p) });
+      toast(t(p.qr ? 'qr.arrived' : 'toast.arrived', { place: p.name }), { tone: 'success', timeout: 6000, action: t('room.enter'), onAction: () => openRoom(app, p) });
     }
     closeRoomIfLeft(left);
     for (const p of left) if (p.localCount) toast(t('toast.left', { place: p.name }));
@@ -396,6 +398,49 @@ function toggleExplore() {
   state.exploring = true;
   toast(t('map.exploreOn'), { tone: 'success' });
   renderChrome();
+}
+
+// --- Mekân QR kodu: /?qr=mekân.imza ---
+// Kod adres çubuğundan hemen silinir: yenilemede ya da paylaşılan ekran görüntüsünde kalmasın.
+function takeQrCode() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('qr');
+  if (!code) return null;
+  params.delete('qr');
+  const query = params.toString();
+  history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
+  return code;
+}
+
+// Kapalı alanda GPS beklenmez: Wi-Fi/baz istasyonu konumu yeter.
+function coarsePosition() {
+  return new Promise((resolve) => {
+    if (!('geolocation' in navigator)) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+    );
+  });
+}
+
+async function qrCheckIn(code) {
+  if (!state.user) return app.openAuth(() => qrCheckIn(code));
+  toast(t('qr.locating'));
+  const pos = await coarsePosition();
+  if (!pos) return toast(t('qr.needLocation'), { tone: 'error', timeout: 8000 });
+  setPosition(pos);
+  try {
+    const result = await app.checkIn(pos, { qrCode: code });
+    const venue = result.places?.find((p) => p.qr);
+    if (venue) map.flyTo(venue.lat, venue.lng, 17);
+  } catch (err) {
+    toast(errorText(err), { tone: 'error', timeout: 8000 });
+  }
+  return null;
 }
 
 async function locateAndCheckIn() {
@@ -531,12 +576,14 @@ async function boot() {
 
   bindNav();
   renderChrome();
-  maybeShowIntro(app);
+  const qrCode = takeQrCode();
+  if (!qrCode) maybeShowIntro(app);
   showDemoHint();
   connectEvents();
   await app.refresh();
   document.body.classList.add('is-ready');
-  autoLocate();
+  if (qrCode) qrCheckIn(qrCode);
+  else autoLocate();
   // "Orada olma" süresi dolunca yerel sözler sunucuda kilitlenir; açık ekran da bunu yakalasın.
   setInterval(() => {
     if (document.visibilityState === 'visible') app.refresh();

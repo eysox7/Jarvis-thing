@@ -42,6 +42,7 @@ export const api = {
   best: (cityId) => request('GET', `/api/cities/${enc(cityId)}/best`),
   overheardsInBox: (bbox) => request('GET', `/api/overheards?bbox=${bbox.map((n) => n.toFixed(5)).join(',')}`),
   checkIn: (pos) => request('POST', '/api/checkins', pos),
+  qrCheckIn: (code, pos) => request('POST', '/api/checkins/qr', { code, ...pos }),
   myPlaces: () => request('GET', '/api/me/places'),
   overheard: (id) => request('GET', `/api/overheards/${enc(id)}`),
   post: (payload) => request('POST', '/api/overheards', payload),
@@ -61,5 +62,7 @@ export const api = {
   adminLocationFlags: () => request('GET', '/api/admin/location-flags'),
   adminRestore: (id) => request('POST', `/api/admin/overheards/${enc(id)}/restore`, {}),
   adminDelete: (id) => request('DELETE', `/api/admin/overheards/${enc(id)}`),
+  adminPlaces: (q) => request('GET', `/api/admin/places?q=${enc(q)}`),
+  adminPlaceQr: (id) => request('GET', `/api/admin/places/${enc(id)}/qr`),
   adminBan: (handle, banned) => request('POST', `/api/admin/users/${enc(handle)}/ban`, { banned }),
 };

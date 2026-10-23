@@ -100,6 +100,15 @@ export function renderShareCard(o, cityName) {
 
 const toBlob = (canvas) => new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 
+export function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const link = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 // Telefonda sistem paylaşım menüsünü açar; desteklenmiyorsa görseli indirir.
 export async function shareOverheard(o, cityName) {
   const blob = await toBlob(renderShareCard(o, cityName));
@@ -112,11 +121,74 @@ export async function shareOverheard(o, cityName) {
       if (err?.name === 'AbortError') return 'cancelled';
     }
   }
-  const url = URL.createObjectURL(blob);
-  const link = Object.assign(document.createElement('a'), { href: url, download: 'overheard.png' });
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  downloadBlob(blob, 'overheard.png');
   return 'downloaded';
+}
+
+// Mekânın girişine asılacak A5 QR posteri (1240×1748, ~150 dpi). matrix: sunucunun QR satırları.
+export function renderQrPoster(place, cityName, matrix, url) {
+  const PW = 1240;
+  const PH = 1748;
+  const canvas = document.createElement('canvas');
+  canvas.width = PW;
+  canvas.height = PH;
+  const ctx = canvas.getContext('2d');
+  const accent = cssVar('--accent') || '#ff5a3c';
+  const serif = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif';
+  const sans = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+  ctx.fillStyle = '#f4f1ea';
+  ctx.fillRect(0, 0, PW, PH);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+
+  ctx.fillStyle = accent;
+  ctx.font = `700 130px ${serif}`;
+  ctx.fillText('“', PW / 2 - 250, 70);
+  ctx.fillStyle = '#1d1a22';
+  ctx.font = `800 92px ${sans}`;
+  ctx.fillText('overheard', PW / 2 + 40, 90);
+
+  ctx.font = `italic 700 64px ${serif}`;
+  ctx.fillText(t('qr.posterTitle'), PW / 2, 250);
+
+  // QR, kenar boşluklu beyaz bir kartın içinde.
+  const quiet = 4;
+  const n = matrix.length + quiet * 2;
+  const cell = Math.floor(820 / n);
+  const side = cell * n;
+  const x0 = (PW - side) / 2;
+  const y0 = 380;
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 10;
+  roundRect(ctx, x0 - 30, y0 - 30, side + 60, side + 60, 48);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#000000';
+  matrix.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) if (row[x] === '1') ctx.fillRect(x0 + (x + quiet) * cell, y0 + (y + quiet) * cell, cell, cell);
+  });
+
+  const below = y0 + side + 80;
+  ctx.fillStyle = '#1d1a22';
+  ctx.font = `800 62px ${sans}`;
+  ctx.fillText(`📍 ${place.name}`, PW / 2, below);
+  if (cityName) {
+    ctx.fillStyle = '#6d6676';
+    ctx.font = `600 40px ${sans}`;
+    ctx.fillText(cityName, PW / 2, below + 80);
+  }
+  ctx.fillStyle = '#1d1a22';
+  ctx.font = `500 40px ${sans}`;
+  wrap(ctx, t('qr.posterHint'), PW - 240).forEach((line, i) => ctx.fillText(line, PW / 2, below + 160 + i * 54));
+  ctx.fillStyle = '#6d6676';
+  ctx.font = `500 30px ${sans}`;
+  ctx.fillText(t('qr.posterSmall'), PW / 2, PH - 120);
+  ctx.fillText(new URL(url).host, PW / 2, PH - 76);
+  return canvas;
+}
+
+export async function downloadQrPoster(place, cityName, matrix, url) {
+  downloadBlob(await toBlob(renderQrPoster(place, cityName, matrix, url)), `overheard-qr-${place.id}.png`);
 }

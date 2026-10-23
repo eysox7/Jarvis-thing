@@ -46,6 +46,16 @@ export function loadConfig(overrides = {}) {
     // Bu kadar şikâyet alan söz otomatik gizlenir.
     reportHideThreshold: 3,
     newPlaceRadiusM: 120,
+    // Mekân QR kodu: okutulduğunda kaba konum mekâna bu kadar yakın olmalı (metre)...
+    qrMaxDistanceM: 1000,
+    // ...ve konum doğruluğu bundan kötü olmamalı (kapalı alanda GPS zayıf; Wi-Fi/baz konumu yeter).
+    qrMaxAccuracyM: 3000,
+    // QR ile girilen mekânda, konum taze ve mekâna yakın kaldıkça en fazla bu kadar "orada" sayılır.
+    qrPresenceMs: 2 * 60 * 60 * 1000,
+    // QR imza sırrı; boşsa ilk kullanımda üretilip veritabanında saklanır. Değiştirmek basılı kodları geçersiz kılar.
+    qrSecret: env.OVERHEARD_QR_SECRET || '',
+    // QR bağlantılarının kökü (ör. https://overheard.example.com); boşsa isteğin adresinden türetilir.
+    publicUrl: (env.OVERHEARD_PUBLIC_URL || '').replace(/\/+$/, ''),
     // Hız sınırlarının çarpanı (testlerde büyütülür).
     rateLimitScale: Number(env.OVERHEARD_RATE_SCALE) || 1,
     googleMapsKey: env.GOOGLE_MAPS_API_KEY || '',

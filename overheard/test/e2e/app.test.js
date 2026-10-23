@@ -462,6 +462,52 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
     });
   });
 
+  describe('Mekân QR kodu', () => {
+    let srv;
+    before(async () => { srv = await startTestServer({ demo: true, admins: ['qrmod'] }); });
+    after(async () => { await srv.close(); });
+
+    test('moderatör posteri indirir; QR bağlantısıyla gelen kaba konumla mekâna girer', async () => {
+      const mod = await newUser(browser, srv.base, KADIKOY);
+      await mod.page.evaluate(() => fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ handle: 'qrmod', password: 'cok-gizli-parola', acceptTerms: true }),
+      }));
+      await mod.page.reload();
+      await mod.page.waitForSelector('body.is-ready');
+      await mod.page.locator('[data-nav="profile"]').click();
+      await sheet(mod.page).getByRole('button', { name: /Moderasyon paneli/ }).click();
+      await sheet(mod.page).getByRole('searchbox', { name: 'Mekân adı' }).fill('galata');
+      await sheet(mod.page).getByRole('button', { name: 'Ara', exact: true }).click();
+      const item = sheet(mod.page).locator('.admin-item', { hasText: 'Galata Kulesi' });
+      await item.getByRole('button', { name: /QR/ }).click();
+      await item.locator('img.qr-image').waitFor();
+      const url = await item.locator('input.qr-url').inputValue();
+      assert.match(url, /\/\?qr=ist-galata\./);
+      const [download] = await Promise.all([
+        mod.page.waitForEvent('download'),
+        item.getByRole('button', { name: /Posteri indir/ }).click(),
+      ]);
+      assert.equal(download.suggestedFilename(), 'overheard-qr-ist-galata.png');
+      assert.deepEqual(mod.errors, []);
+      await mod.context.close();
+
+      // Ziyaretçi: kafenin içinde, GPS zayıf (~500 m sapma, 600 m belirsizlik).
+      const visitor = await newUser(browser, srv.base, { latitude: 41.0301, longitude: 28.9741, accuracy: 600 });
+      await visitor.page.goto(url);
+      await visitor.page.waitForSelector('body.is-ready');
+      // Kod adres çubuğundan hemen silinir; giriş yapılmamışsa önce giriş istenir.
+      assert.equal(new URL(visitor.page.url()).search, '');
+      await sheet(visitor.page).getByRole('button', { name: /misafir/ }).click();
+      await visitor.page.locator('.toast', { hasText: 'Galata Kulesi: QR ile girdin' }).waitFor();
+      await visitor.page.waitForFunction(() => window.overheard.app.state.data.places.find((p) => p.id === 'ist-galata')?.here);
+      assert.equal(await visitor.page.locator('#btn-room').isVisible(), true);
+      assert.deepEqual(visitor.errors, []);
+      await visitor.context.close();
+    });
+  });
+
   describe('Yoğun bölge', () => {
     let srv;
     before(async () => {

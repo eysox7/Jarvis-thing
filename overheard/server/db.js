@@ -176,6 +176,19 @@ export const MIGRATIONS = [
   `
   ALTER TABLE overheards ADD COLUMN expires_at INTEGER;
   `,
+  // v10: Mekân QR kodu. Sunucu sırrı (QR imzası) veritabanında kalıcıdır; kullanıcının son QR
+  // okuttuğu mekân, kapalı alanda zayıf GPS'e rağmen "orada" sayılmasını sağlar.
+  `
+  CREATE TABLE app_secrets (
+    name   TEXT PRIMARY KEY,
+    value  TEXT NOT NULL
+  );
+  CREATE TABLE qr_presence (
+    user_id   INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    place_id  TEXT NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+    at        INTEGER NOT NULL
+  );
+  `,
 ];
 
 export function openDb(path) {

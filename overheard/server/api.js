@@ -3,6 +3,7 @@ import { HttpError, clientIp, readJson, sendJson, serializeCookie } from './http
 import { HANDLE_RE, createSession, destroySession, hashPassword, verifyPassword } from './auth.js';
 import { CITIES } from './data/cities.js';
 import * as domain from './domain.js';
+import { qrMatrix, qrSvg } from './qr.js';
 
 export const SESSION_COOKIE = 'oh_session';
 
@@ -143,6 +144,17 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     return { ...result, newBadges };
   });
 
+  // Mekânın QR kodu ile giriş: kapalı alanda zayıf GPS'e rağmen "orada" sayılırsın.
+  router.post('/api/checkins/qr', async (ctx) => {
+    const user = requireUser(ctx);
+    limit(`checkin:${user.id}`, 120, 3600000);
+    limit(`qr:${user.id}`, 30, 3600000);
+    const body = await readJson(ctx.req);
+    const coords = domain.readCoords(body);
+    const { result, newBadges } = domain.withBadges(db, user, () => domain.qrCheckIn(db, config, user, body.code, coords));
+    return { ...result, newBadges };
+  });
+
   router.get('/api/me/places', (ctx) => ({ places: domain.myPlaces(db, config, requireUser(ctx)) }));
 
   // KVKK/GDPR: kişisel verilerin indirilebilir kopyası.
@@ -268,6 +280,21 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   router.get('/api/admin/location-flags', (ctx) => {
     requireAdmin(ctx);
     return { users: domain.locationFlags(db) };
+  });
+
+  // Mekân QR posterleri: moderatör mekânı arar, kodu ve bağlantıyı alır.
+  router.get('/api/admin/places', (ctx) => {
+    requireAdmin(ctx);
+    return { places: domain.searchPlaces(db, ctx.url.searchParams.get('q') || '') };
+  });
+
+  router.get('/api/admin/places/:id/qr', (ctx) => {
+    requireAdmin(ctx);
+    const place = db.prepare('SELECT * FROM places WHERE id = ?').get(ctx.params.id);
+    if (!place) throw new HttpError(404, 'place_not_found');
+    const base = config.publicUrl || `${config.secureCookies ? 'https' : 'http'}://${ctx.req.headers.host}`;
+    const url = `${base}/?qr=${encodeURIComponent(domain.placeQrCode(db, config, place.id))}`;
+    return { place: domain.serializePlace(place), url, svg: qrSvg(url), matrix: qrMatrix(url) };
   });
 
   router.post('/api/admin/overheards/:id/restore', (ctx) => {

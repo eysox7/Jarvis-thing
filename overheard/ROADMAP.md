@@ -103,6 +103,16 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       haritadan, aramadan ve haftanın en iyilerinden kalkar, tepki/yeni konuşma alamaz. Üzerinden
       konuşma başlamışsa sohbet bağlamı için saklanır, başlamamışsa saatlik bakımda silinir. Şema v9.
 
+## Üçüncü tur
+
+- [x] **19. Mekân QR kodu** — Kapalı alanlar (kafe, kütüphane, kampüs) için mekân başına imzalı QR
+      (HMAC; sır veritabanında kalıcı ya da `OVERHEARD_QR_SECRET`). Okutunca kaba konum yeter (3 km
+      doğruluk, mekâna 1 km yakınlık); içeride konum oynasa da 2 saate kadar orada sayılırsın,
+      uzaklaşınca ya da konum 30 dk eskiyince çıkarsın. Kişi sayısına, mekân odasına ve söz bırakmaya
+      dahil. Moderatör panelinde mekân arama, QR önizleme, A5 poster (PNG) ve SVG indirme.
+      Bağımlılıksız QR üreticisi (`server/qr.js`, sürüm 1–10), testlerde gerçek bir QR okuyucuyla
+      doğrulanır. Şema v10.
+
 ## Kalite turları (tüm adımlar bitince)
 
 Erişilebilirlik denetimi, mobil Safari uyumluluğu, performans profili, hata mesajları, kopya

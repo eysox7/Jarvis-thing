@@ -682,6 +682,12 @@ body.doc-page { overflow: auto; }
 
 /* Moderasyon */
 .admin-item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 15px; }
+/* Mekân QR posterleri (moderasyon paneli). */
+.qr-search { display: flex; gap: 8px; }
+.qr-search .input { flex: 1; min-width: 0; }
+.qr-preview { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.qr-image { width: 220px; height: 220px; padding: 8px; background: #fff; border-radius: 14px; border: 1px solid var(--line); }
+.qr-url { width: 100%; font-size: 12px; }
 
 /* Profil */
 .profile-head { display: flex; align-items: center; gap: 14px; }

@@ -2,6 +2,7 @@ import { h, clear, timeAgo, displayName } from '../util.js';
 import { t, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { openSheet, toast, busy } from '../ui.js';
+import { downloadBlob, downloadQrPoster } from '../share.js';
 
 // Moderasyon paneli: şikâyet edilen ve otomatik gizlenen sözler.
 export async function openAdmin(app) {
@@ -17,6 +18,7 @@ export async function openAdmin(app) {
     return;
   }
   clear(body);
+  body.append(qrSection(app));
   if (flagged.length) {
     body.append(
       h('h3', { class: 'section-title' }, `📍 ${t('admin.locationFlags')}`),
@@ -71,4 +73,54 @@ export async function openAdmin(app) {
         type: 'button',
         onclick: act(() => api.adminBan(o.author, !o.authorBanned), o.authorBanned ? t('admin.unbanned') : t('admin.bannedToast')),
       }, o.authorBanned ? t('admin.unban') : t('admin.ban')))))));
+}
+
+// Mekân QR posterleri: kapalı alanlı ortak mekânların (kafe, kütüphane, kampüs) girişine asılır.
+function qrSection(app) {
+  const results = h('div', { class: 'stack' });
+  const input = h('input', { class: 'input', type: 'search', name: 'qr-place', placeholder: t('admin.qrSearch'), 'aria-label': t('admin.qrSearch'), autocomplete: 'off' });
+
+  const show = async (place, item) => {
+    try {
+      const { url, svg, matrix } = await api.adminPlaceQr(place.id);
+      const city = app.state.config.cities.find((c) => c.id === place.cityId)?.name;
+      item.querySelector('.qr-preview')?.remove();
+      item.append(h('div', { class: 'qr-preview' },
+        h('img', { class: 'qr-image', src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`, alt: t('admin.qrAlt', { place: place.name }), width: 220, height: 220 }),
+        h('input', { class: 'input qr-url', type: 'text', readonly: true, value: url, 'aria-label': t('admin.qrUrl'), onfocus: (e) => e.currentTarget.select() }),
+        h('div', { class: 'bubble-actions' },
+          h('button', { class: 'btn btn-primary', type: 'button', onclick: (e) => busy(e.currentTarget, () => downloadQrPoster(place, city, matrix, url)) }, `🖨️ ${t('admin.qrPoster')}`),
+          h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), `overheard-qr-${place.id}.svg`) }, t('admin.qrSvg')))));
+    } catch (err) {
+      toast(errorText(err), { tone: 'error' });
+    }
+  };
+
+  const search = async () => {
+    const q = input.value.trim();
+    if (q.length < 2) return;
+    try {
+      const { places } = await api.adminPlaces(q);
+      clear(results).append(places.length
+        ? h('ul', { class: 'list' }, places.map((p) => {
+          const item = h('li', { class: 'admin-item' });
+          const city = app.state.config.cities.find((c) => c.id === p.cityId)?.name || p.cityId;
+          item.append(h('p', { class: 'row-between' },
+            h('span', {}, h('strong', {}, p.name), h('span', { class: 'muted small' }, ` · ${city}`)),
+            h('button', { class: 'btn btn-ghost', type: 'button', onclick: (e) => busy(e.currentTarget, () => show(p, item)) }, `📮 ${t('admin.qrShow')}`)));
+          return item;
+        }))
+        : h('p', { class: 'muted' }, t('admin.qrNone')));
+    } catch (err) {
+      toast(errorText(err), { tone: 'error' });
+    }
+  };
+
+  const form = h('form', { class: 'qr-search', onsubmit: (e) => { e.preventDefault(); search(); } },
+    input, h('button', { class: 'btn', type: 'submit' }, t('admin.qrFind')));
+  return h('section', { class: 'stack' },
+    h('h3', { class: 'section-title' }, `📮 ${t('admin.qrTitle')}`),
+    h('p', { class: 'muted small' }, t('admin.qrHint')),
+    form,
+    results);
 }
