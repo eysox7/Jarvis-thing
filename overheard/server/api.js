@@ -4,10 +4,11 @@ import { HANDLE_RE, createSession, destroySession, hashPassword, verifyPassword 
 import { CITIES } from './data/cities.js';
 import * as domain from './domain.js';
 import { qrMatrix, qrSvg } from './qr.js';
+import { containsSlur } from './moderation.js';
 
 export const SESSION_COOKIE = 'oh_session';
 
-export function registerApi(router, { db, config, events, rateLimit }) {
+export function registerApi(router, { db, config, events, rateLimit, ai = null }) {
   const limit = (key, max, windowMs) => {
     if (!rateLimit(key, Math.ceil(max * config.rateLimitScale), windowMs)) throw new HttpError(429, 'rate_limited');
   };
@@ -22,6 +23,17 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireUser(ctx);
     if (user.banned) throw new HttpError(403, 'banned');
     return user;
+  };
+
+  // Yapay zekâ denetimi (ANTHROPIC_API_KEY varsa): herkese açık metin yayımlanmadan önce sorulur.
+  // Alan katmanının zaten reddedeceği metinler (çok kısa/uzun, listedeki nefret sözü) için çağrı yapılmaz.
+  const aiGuard = async (raw, kind, max, { multiline = false } = {}) => {
+    if (!ai || raw === undefined) return;
+    const text = domain.cleanText(raw, { multiline });
+    const length = [...text].length;
+    if (length < 2 || length > max || containsSlur(text)) return;
+    const verdict = await ai.review(text, kind);
+    if (verdict.decision === 'block') throw new HttpError(422, `flagged_${verdict.category}`);
   };
 
   const isAdmin = (user) => Boolean(user) && config.admins.includes(user.handle.toLowerCase());
@@ -53,6 +65,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     limits: domain.LIMITS,
     visibilities: domain.VISIBILITIES,
     presenceMinutes: Math.round(config.presenceTtlMs / 60000),
+    aiModeration: Boolean(ai),
   }));
 
   // --- Hesap ---
@@ -183,6 +196,10 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireActive(ctx);
     const body = await readJson(ctx.req);
     limit(`post:${user.id}`, 10, 3600000);
+    await Promise.all([
+      aiGuard(body.text, 'overheard', domain.LIMITS.textMax),
+      aiGuard(body.newPlaceName, 'place', domain.LIMITS.placeNameMax),
+    ]);
     const { result, newBadges } = domain.withBadges(db, user, () => domain.createOverheard(db, config, user, body));
     return { overheard: result, newBadges };
   });
@@ -261,6 +278,9 @@ export function registerApi(router, { db, config, events, rateLimit }) {
     const user = requireActive(ctx);
     limit(`room:${user.id}`, 30, 10 * 60000);
     const body = await readJson(ctx.req);
+    // Oda yalnızca oradakilere açık: denetim isteğinden önce erişim doğrulanır.
+    domain.requireHere(db, config, user, ctx.params.id);
+    await aiGuard(body.body, 'room', domain.LIMITS.roomMessageMax, { multiline: true });
     const { placeId, message, recipients } = domain.postRoomMessage(db, config, user, ctx.params.id, body.body);
     for (const id of recipients) events.publish(id, 'room', { placeId, message });
     return { message: { ...message, mine: true } };
@@ -274,7 +294,7 @@ export function registerApi(router, { db, config, events, rateLimit }) {
   // --- Moderasyon paneli (OVERHEARD_ADMINS) ---
   router.get('/api/admin/reports', (ctx) => {
     requireAdmin(ctx);
-    return { overheards: domain.reportedOverheards(db) };
+    return { overheards: domain.reportedOverheards(db), ai: ai ? ai.status() : { enabled: false } };
   });
 
   router.get('/api/admin/location-flags', (ctx) => {

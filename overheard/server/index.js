@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 import { seedDemoContent, seedPlaces } from './seed.js';
 import { purgeExpiredSessions } from './auth.js';
 import { purgeStaleData } from './domain.js';
+import { createAiModerator } from './ai-moderation.js';
 
 const config = loadConfig();
 const db = openDb(config.dbPath);
@@ -19,7 +20,9 @@ const maintain = () => {
 maintain();
 setInterval(maintain, 3600000).unref();
 
-const app = createApp({ db, config });
+const ai = await createAiModerator(config);
+if (ai) console.log(`Yapay zekâ denetimi açık (${config.aiModel})`);
+const app = createApp({ db, config, ai });
 const server = createServer(app.handler);
 
 server.listen(config.port, config.host, () => {

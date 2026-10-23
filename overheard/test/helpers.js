@@ -5,12 +5,12 @@ import { createApp } from '../server/app.js';
 import { seedDemoContent, seedPlaces } from '../server/seed.js';
 
 // Bellek içi veritabanıyla gerçek bir HTTP sunucusu ayağa kaldırır.
-export async function startTestServer({ demo = false, ...overrides } = {}) {
+export async function startTestServer({ demo = false, ai = null, ...overrides } = {}) {
   const config = loadConfig({ dbPath: ':memory:', demoMode: demo, rateLimitScale: 100, antiSpoofing: false, ...overrides });
   const db = openDb(':memory:');
   seedPlaces(db);
   if (demo) await seedDemoContent(db);
-  const app = createApp({ db, config });
+  const app = createApp({ db, config, ai });
   const server = createServer(app.handler);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;

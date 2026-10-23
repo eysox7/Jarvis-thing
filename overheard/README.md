@@ -75,6 +75,12 @@ balonların altında sokak haritası görünür.</sub>
 - **Moderasyon.** Sözlerde telefon, e-posta, bağlantı, plaka ve @kişi otomatik gizlenir; küfür
   maskelenir, nefret söylemi reddedilir. Moderatör paneli: gizlenen sözleri gözden geçirme, geri
   yükleme, silme, yasaklama.
+- **Bağlamı anlayan denetim (isteğe bağlı).** `ANTHROPIC_API_KEY` tanımlıysa herkese açık metinler
+  (söz, yeni mekân adı, mekân odası mesajı) yayımlanmadan önce Claude'a sorulur: kelime
+  listelerinin kaçırdığı birini tanınır kılan ayrıntılar ("3. kattaki muhasebeci Ayşe…"),
+  listede olmayan nefret söylemi, taciz, tehdit, müstehcenlik ve reklam engellenir; yazar nedenini
+  görür. Yalnızca metin gider (kullanıcı adı, konum, özel mesajlar gitmez). Servis hatası, hız
+  sınırı ya da zaman aşımında metin kelime listesiyle denetlenip yayımlanır.
 - **Kişisel veriler (KVKK/GDPR).** Kayıtta açık onay; Profil'den "Verilerimi indir" ve "Hesabımı
   sil"; kesin konum 24 saatte silinir. Taslak [gizlilik politikası](public/privacy.html) ve
   [kullanım koşulları](public/terms.html) (yayından önce doldurulup hukukçuya inceletilmeli).
@@ -175,6 +181,11 @@ Bunu günlük bir zamanlayıcıya bağlayıp yedekleri sunucu dışına kopyalay
 | `OVERHEARD_ANTI_SPOOF` | demo kapalıysa `1` | Konum sahteciliği denetimleri |
 | `OVERHEARD_PUBLIC_URL` | istek adresi | QR bağlantılarının kökü, ör. `https://overheard.example.com` |
 | `OVERHEARD_QR_SECRET` | veritabanında üretilir | Mekân QR imzası sırrı; değiştirmek basılı tüm QR posterlerini geçersiz kılar |
+| `ANTHROPIC_API_KEY` | — | Tanımlıysa yapay zekâ denetimi açılır (Claude API) |
+| `OVERHEARD_AI_MODERATION` | anahtar varsa `1` | Yapay zekâ denetimini aç/kapat |
+| `OVERHEARD_AI_MODEL` | `claude-opus-5-5` | Denetim modeli. Yüksek hacimde daha ucuz: `claude-haiku-5-5` (yedek model desteği yok: `OVERHEARD_AI_FALLBACKS=0`) |
+| `OVERHEARD_AI_TIMEOUT_MS` | `8000` | Bu süreyi aşan denetim beklenmez; metin kelime listesiyle yayımlanır |
+| `OVERHEARD_AI_FALLBACKS` | `1` | Sunucu taraflı yedek model (`fallbacks: "default"`): bir istek reddedilirse Anthropic'in önerdiği modelde aynı çağrıda yeniden denenir |
 
 ## Mimari
 

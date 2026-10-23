@@ -115,6 +115,7 @@ export async function openCompose(app) {
   },
   h('div', { class: 'quote-input' }, h('span', { class: 'quote-mark', 'aria-hidden': 'true' }, '“'), text),
   h('div', { class: 'row-between' }, h('span', { class: 'muted small' }, t('compose.rules')), counter),
+  app.state.config.aiModeration ? h('p', { class: 'muted small' }, `🤖 ${t('compose.aiNote')}`) : null,
   where,
   h('p', { class: 'field-label' }, t('compose.who')),
   visibility,

@@ -994,7 +994,7 @@ export function purgeStaleData(db, config, now = Date.now()) {
 // O an aynı mekânda bulunanların grup sohbeti. Yalnızca oradayken okunur ve yazılır;
 // mesajlar 12 saat sonra silinir. Engellenen kişilerin mesajları görünmez.
 
-function requireHere(db, config, user, placeId) {
+export function requireHere(db, config, user, placeId) {
   const place = db.prepare('SELECT id, name, city_id, lat, lng, radius_m FROM places WHERE id = ?').get(String(placeId));
   if (!place) throw new HttpError(404, 'place_not_found');
   if (!currentPlaceIds(db, config, user.id).has(place.id)) throw new HttpError(403, 'not_here', { placeName: place.name });

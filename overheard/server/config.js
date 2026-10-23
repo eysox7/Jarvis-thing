@@ -59,6 +59,15 @@ export function loadConfig(overrides = {}) {
     // Hız sınırlarının çarpanı (testlerde büyütülür).
     rateLimitScale: Number(env.OVERHEARD_RATE_SCALE) || 1,
     googleMapsKey: env.GOOGLE_MAPS_API_KEY || '',
+    // Bağlamı anlayan içerik denetimi (Claude). ANTHROPIC_API_KEY tanımlıysa varsayılan olarak açık;
+    // anahtar SDK tarafından doğrudan ortamdan okunur.
+    aiModeration: flag(env.OVERHEARD_AI_MODERATION, Boolean(env.ANTHROPIC_API_KEY)),
+    aiModel: env.OVERHEARD_AI_MODEL || 'claude-opus-5-5',
+    // Denetim yanıtı bu süreyi aşarsa metin yalnızca kelime listesiyle denetlenip yayımlanır (ms).
+    aiTimeoutMs: Number(env.OVERHEARD_AI_TIMEOUT_MS) || 8000,
+    // Sunucu taraflı yedek model: bir istek reddedilirse aynı çağrıda önerilen modelde yeniden denenir.
+    // Yedeği desteklemeyen bir model seçilirse 0 yapılmalı.
+    aiFallbacks: flag(env.OVERHEARD_AI_FALLBACKS, true),
     // Moderasyon paneline erişebilecek kullanıcı adları (virgülle ayrılmış).
     admins: (env.OVERHEARD_ADMINS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
     ...overrides,

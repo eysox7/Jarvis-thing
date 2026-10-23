@@ -60,11 +60,11 @@ function securityHeaders(config) {
 
 const VERSION = '0.2.0';
 
-export function createApp({ db, config }) {
+export function createApp({ db, config, ai = null }) {
   const router = new Router();
   const events = createEventHub();
   const rateLimit = createRateLimiter();
-  registerApi(router, { db, config, events, rateLimit });
+  registerApi(router, { db, config, events, rateLimit, ai });
   const headers = securityHeaders(config);
 
   async function serveStatic(req, res, pathname) {

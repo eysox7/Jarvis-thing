@@ -1,5 +1,5 @@
 # Örnek: Overheard + otomatik HTTPS için Caddy.
-#   OVERHEARD_DOMAIN=overheard.example.com GOOGLE_MAPS_API_KEY=... docker compose up -d
+#   OVERHEARD_DOMAIN=overheard.example.com GOOGLE_MAPS_API_KEY=... ANTHROPIC_API_KEY=... docker compose up -d
 services:
   app:
     build: .
@@ -8,6 +8,10 @@ services:
       OVERHEARD_TRUST_PROXY: "1"
       OVERHEARD_ADMINS: ${OVERHEARD_ADMINS:-}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      # İsteğe bağlı: tanımlıysa herkese açık metinler yayımlanmadan önce Claude ile denetlenir.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Mekân QR posterlerindeki bağlantıların kökü.
+      OVERHEARD_PUBLIC_URL: https://${OVERHEARD_DOMAIN:-localhost}
     volumes:
       - overheard-data:/data
 

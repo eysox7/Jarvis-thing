@@ -1,4 +1,5 @@
-# Overheard: çalışma zamanı bağımlılığı yok; yalnızca Node.js 22.13+ (yerleşik node:sqlite).
+# Overheard: Node.js 22.13+ (yerleşik node:sqlite). Tek (isteğe bağlı) çalışma zamanı bağımlılığı
+# yapay zekâ denetimi için Anthropic SDK'sıdır; ANTHROPIC_API_KEY yoksa hiç yüklenmez.
 FROM node:22-alpine
 
 ENV NODE_ENV=production \
@@ -8,7 +9,8 @@ ENV NODE_ENV=production \
     OVERHEARD_SECURE_COOKIES=1
 
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 COPY server ./server
 COPY public ./public
 

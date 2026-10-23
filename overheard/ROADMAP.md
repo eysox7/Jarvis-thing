@@ -112,6 +112,14 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       dahil. Moderatör panelinde mekân arama, QR önizleme, A5 poster (PNG) ve SVG indirme.
       Bağımlılıksız QR üreticisi (`server/qr.js`, sürüm 1–10), testlerde gerçek bir QR okuyucuyla
       doğrulanır. Şema v10.
+- [x] **20. Bağlamı anlayan denetim** — `ANTHROPIC_API_KEY` varsa herkese açık metinler (söz, yeni
+      mekân adı, mekân odası mesajı) yayımlanmadan önce Claude API'ye (resmî `@anthropic-ai/sdk`,
+      isteğe bağlı bağımlılık) sorulur: kişiyi tanınır kılan ayrıntı, listede olmayan nefret söylemi,
+      taciz, tehdit, müstehcenlik, reklam. Düşük düşünme çabası, JSON şemasına bağlı yanıt, sunucu
+      taraflı yedek model, toplam süre sınırı; ret (`refusal`) yayımlanmaz, hata/zaman aşımı/hız
+      sınırında kelime listesiyle yayımlanır. Yalnızca metin gider. Yazar kategoriye göre neden
+      görür; moderatör panelinde sayaçlar. Testler sahte istemciyle; istek biçimi gerçek SDK ile
+      yerel bir sahte sunucuya karşı doğrulandı.
 
 ## Kalite turları (tüm adımlar bitince)
 

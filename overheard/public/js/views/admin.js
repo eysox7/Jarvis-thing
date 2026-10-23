@@ -10,15 +10,16 @@ export async function openAdmin(app) {
   openSheet({ key: 'admin', title: `🛡️ ${t('admin.title')}`, body });
 
   let items;
+  let ai;
   let flagged;
   try {
-    [{ overheards: items }, { users: flagged }] = await Promise.all([api.adminReports(), api.adminLocationFlags()]);
+    [{ overheards: items, ai }, { users: flagged }] = await Promise.all([api.adminReports(), api.adminLocationFlags()]);
   } catch (err) {
     clear(body).append(h('p', { class: 'form-error' }, errorText(err)));
     return;
   }
   clear(body);
-  body.append(qrSection(app));
+  body.append(h('p', { class: 'muted small' }, ai?.enabled ? t('admin.ai', ai) : t('admin.aiOff')), qrSection(app));
   if (flagged.length) {
     body.append(
       h('h3', { class: 'section-title' }, `📍 ${t('admin.locationFlags')}`),
