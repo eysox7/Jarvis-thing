@@ -65,7 +65,8 @@ balonların altında sokak haritası görünür.</sub>
   yazıcısına gönderir, masa açık kaldıkça (varsayılan 15 dk'da bir, en fazla 4 fiş) yenisini basar.
   İki mod: **kafede yazılanlar** (yazanı ele vermemek için en az 20 dk eski sözler, rastgele
   masalara) ya da **yakın çevreden** (kafe içi yazılmaz; 1,5 km içindeki mekânların herkese açık
-  sözleri). Fişte yazar adı yok, saat yalnızca kabaca ("dün akşam") yazılır; altındaki QR okutan
+  sözleri). Yakında söz yoksa (Sultanbeyli, Sancaktepe gibi sakin semtlerde) arama 5 km, 15 km ve
+  en son şehrin geneline genişler; fişte sözün yeri ve uzaklığı yazar. Fişte yazar adı yok, saat yalnızca kabaca ("dün akşam") yazılır; altındaki QR okutan
   kafeye girer ve buradaki yerel sözleri açar. Yazıcı ekranı (`/yazici.html`) kafedeki bir
   cihazda personel hesabıyla açık durur; Chrome `--kiosk-printing` ile pencere açmadan basar.
   Kafeyi ve personelini moderatör panelinden yönetirsin.

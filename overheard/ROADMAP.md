@@ -135,7 +135,8 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       şikâyet alan, süresi dolan ve yasaklı yazarın sözleri basılmaz; aynı masaya aynı söz iki kez
       gitmez. Fişte yazar yok, saat kaba; altında kafenin QR'ı. Yazıcı ekranı canlı (SSE) dinler,
       `--kiosk-printing` ile sessiz basar. Haritada ☕ işareti. Moderatör kafeyi ve personeli yönetir.
-      Şema v12.
+      Şema v12. Sakin semtler için genişleyen arama: yakında söz yoksa 5 km, 15 km, sonra şehrin
+      geneli (kafe içi modda da kafenin kendi sözleri bitince yakın çevreye geçilir).
 
 ## Kalite turları (tüm adımlar bitince)
 

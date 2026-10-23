@@ -102,33 +102,49 @@ const PRINTABLE = `
   AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.overheard_id = o.id)
   AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = o.user_id AND u.banned_at IS NOT NULL)`;
 
-function nearbyPlaceIds(db, venue) {
-  const box = boundingBox(venue.lat, venue.lng, venue.nearby_m);
+function nearbyPlaceIds(db, venue, radiusM) {
+  const box = boundingBox(venue.lat, venue.lng, radiusM);
   return db.prepare('SELECT id, lat, lng FROM places WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ? AND id != ?')
     .all(box.minLat, box.maxLat, box.minLng, box.maxLng, venue.place_id)
-    .filter((p) => distanceM(venue.lat, venue.lng, p.lat, p.lng) <= venue.nearby_m)
+    .filter((p) => distanceM(venue.lat, venue.lng, p.lat, p.lng) <= radiusM)
     .map((p) => p.id);
 }
 
-// Masaya daha önce basılmamış bir söz seçer: kafede bugün en az basılanlar arasından rastgele.
+// Yakında söz yoksa arama genişler: turistik olmayan, sakin semtlerdeki (Sultanbeyli, Sancaktepe…)
+// bir kafede de müşteri boş dönmesin. Fişte sözün nerede ve ne kadar uzakta duyulduğu yazar.
+const FALLBACK_RADII_M = [5000, 15000];
+
+// Sırayla denenecek kaynaklar. Kafe içi modda önce kafenin kendi sözleri; henüz yoksa yakın çevre.
+// Başka mekânlardan yalnızca herkese açık sözler gelir.
+function tiers(db, config, venue, now) {
+  const radii = [venue.nearby_m, ...FALLBACK_RADII_M.filter((r) => r > venue.nearby_m)];
+  return [
+    ...(venue.mode === 'inside' ? [{ sql: 'o.place_id = :place AND o.created_at <= :cutoff', params: { cutoff: now - config.venueInsideDelayMs } }] : []),
+    ...radii.map((r) => nearbyPlaceIds(db, venue, r)).filter((ids) => ids.length).map((ids) => ({
+      sql: `o.place_id IN (${ids.map((_, i) => `:p${i}`).join(',')}) AND o.visibility = 'public'`,
+      params: Object.fromEntries(ids.map((id, i) => [`p${i}`, id])),
+    })),
+    // Son çare: şehrin geneli.
+    { sql: "o.place_id IN (SELECT id FROM places WHERE city_id = :city AND id != :place) AND o.visibility = 'public'", params: { city: venue.city_id } },
+  ];
+}
+
+const PICK_SQL = (tierSql) => `
+  SELECT o.id FROM overheards o
+  WHERE ${tierSql} AND ${PRINTABLE}
+    AND NOT EXISTS (SELECT 1 FROM print_jobs j WHERE j.table_id = :table AND j.overheard_id = o.id)
+  ORDER BY (SELECT COUNT(*) FROM print_jobs j WHERE j.place_id = :place AND j.overheard_id = o.id AND j.created_at > :dayAgo), random()
+  LIMIT 1`;
+
+// Masaya daha önce basılmamış bir söz seçer: en yakın kaynaktan, kafede bugün en az basılanlar
+// arasından rastgele.
 function pickOverheard(db, config, venue, tableId, now) {
-  const params = { place: venue.place_id, table: tableId, now, dayAgo: now - 86400000 };
-  let where;
-  if (venue.mode === 'nearby') {
-    const ids = nearbyPlaceIds(db, venue);
-    if (!ids.length) return null;
-    ids.forEach((id, i) => { params[`p${i}`] = id; });
-    where = `o.place_id IN (${ids.map((_, i) => `:p${i}`).join(',')}) AND o.visibility = 'public'`;
-  } else {
-    params.cutoff = now - config.venueInsideDelayMs;
-    where = 'o.place_id = :place AND o.created_at <= :cutoff';
+  const common = { place: venue.place_id, table: tableId, now, dayAgo: now - 86400000 };
+  for (const tier of tiers(db, config, venue, now)) {
+    const row = db.prepare(PICK_SQL(tier.sql)).get({ ...common, ...tier.params });
+    if (row) return row.id;
   }
-  return db.prepare(`
-    SELECT o.id FROM overheards o
-    WHERE ${where} AND ${PRINTABLE}
-      AND NOT EXISTS (SELECT 1 FROM print_jobs j WHERE j.table_id = :table AND j.overheard_id = o.id)
-    ORDER BY (SELECT COUNT(*) FROM print_jobs j WHERE j.place_id = :place AND j.overheard_id = o.id AND j.created_at > :dayAgo), random()
-    LIMIT 1`).get(params)?.id ?? null;
+  return null;
 }
 
 function queueJob(db, config, venue, tableId, now) {
@@ -151,15 +167,16 @@ export function venueState(db, config, venue, now = Date.now()) {
   return { venue: serializeVenue(venue), tables, available: countAvailable(db, config, venue, now) };
 }
 
+// Basılabilecek söz sayısı (genişleyen arama dahil: kafenin kendi sözleri + şehrin herkese açık sözleri).
 function countAvailable(db, config, venue, now) {
-  if (venue.mode === 'nearby') {
-    const ids = nearbyPlaceIds(db, venue);
-    if (!ids.length) return 0;
-    return db.prepare(`SELECT COUNT(*) AS n FROM overheards o WHERE o.place_id IN (${ids.map(() => '?').join(',')}) AND o.visibility = 'public' AND ${PRINTABLE.replaceAll(':now', '?')}`)
-      .get(...ids, now).n;
-  }
-  return db.prepare(`SELECT COUNT(*) AS n FROM overheards o WHERE o.place_id = ? AND o.created_at <= ? AND ${PRINTABLE.replaceAll(':now', '?')}`)
-    .get(venue.place_id, now - config.venueInsideDelayMs, now).n;
+  const own = venue.mode === 'inside'
+    ? db.prepare(`SELECT COUNT(*) AS n FROM overheards o WHERE o.place_id = ? AND o.created_at <= ? AND ${PRINTABLE.replaceAll(':now', '?')}`)
+      .get(venue.place_id, now - config.venueInsideDelayMs, now).n
+    : 0;
+  const city = db.prepare(`SELECT COUNT(*) AS n FROM overheards o JOIN places p ON p.id = o.place_id
+    WHERE p.city_id = ? AND o.place_id != ? AND o.visibility = 'public' AND ${PRINTABLE.replaceAll(':now', '?')}`)
+    .get(venue.city_id, venue.place_id, now).n;
+  return own + city;
 }
 
 // Masa açılır ve ilk fiş hemen yazıcıya gönderilir (söz varsa).

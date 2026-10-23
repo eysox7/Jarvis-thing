@@ -69,7 +69,8 @@ describe('Overheard Kafe', () => {
 
   test('kafe içi mod: masa açılınca uygun bir söz yazıcıya gider; yenisi, gizlisi, şikâyetlisi gitmez', async () => {
     const state = await staff.get(`/api/venues/${CAFE}`);
-    assert.equal(state.data.available, 2);
+    // Kafenin 2 uygun sözü + şehrin 3 herkese açık sözü (kafe içi bitince yakın çevreye geçilir).
+    assert.equal(state.data.available, 5);
     const opened = await staff.post(`/api/venues/${CAFE}/tables`, { tableNo: '7' });
     assert.equal(opened.data.queued, true);
     assert.equal(opened.data.state.tables[0].tableNo, '7');
@@ -77,16 +78,19 @@ describe('Overheard Kafe', () => {
 
     const tableId = opened.data.tableId;
     assert.equal((await staff.post(`/api/venues/${CAFE}/tables/${tableId}/print`)).status, 200);
-    // İkisi de basıldı; aynı masaya aynı söz iki kez gitmez.
-    assert.equal((await staff.post(`/api/venues/${CAFE}/tables/${tableId}/print`)).data.error, 'no_content');
-    const pending = await jobs();
-    assert.deepEqual(pending.map((j) => idOf(j.text)).sort(), ['ic1', 'ic2']);
-    for (const j of pending) {
+    const inside = await jobs();
+    assert.deepEqual(inside.map((j) => idOf(j.text)).sort(), ['ic1', 'ic2']);
+    for (const j of inside) {
       assert.equal(j.tableNo, '7');
       assert.equal(j.inside, true);
       assert.equal(j.author, undefined);
       assert.doesNotMatch(JSON.stringify(j), /kafe_yazar/);
     }
+    // Kafenin sözleri bitti (aynı masaya aynı söz iki kez gitmez): yakın çevreden devam edilir.
+    await staff.post(`/api/venues/${CAFE}/tables/${tableId}/print`);
+    const third = (await jobs()).at(-1);
+    assert.equal(third.inside, false);
+    assert.ok(['yakin1', 'yakin2'].includes(idOf(third.text)));
     const r = await staff.get(`/api/venues/${CAFE}/jobs`);
     assert.match(r.data.qr.url, new RegExp(`\\?qr=${CAFE}\\.`));
     assert.match(r.data.qr.svg, /^<svg/);
@@ -96,28 +100,44 @@ describe('Overheard Kafe', () => {
     const [first] = await jobs();
     await staff.post(`/api/venues/${CAFE}/jobs/${first.id}/printed`);
     const rest = await jobs();
-    assert.equal(rest.length, 1);
+    assert.equal(rest.length, 2);
     const state = (await staff.get(`/api/venues/${CAFE}`)).data;
-    assert.deepEqual([state.tables[0].printed, state.tables[0].pending], [1, 1]);
+    assert.deepEqual([state.tables[0].printed, state.tables[0].pending], [1, 2]);
     await staff.post(`/api/venues/${CAFE}/tables/${state.tables[0].id}/close`);
     assert.deepEqual(await jobs(), []);
     assert.deepEqual((await staff.get(`/api/venues/${CAFE}`)).data.tables, []);
   });
 
-  test('yakın çevre modu: yalnızca yakın mekânların herkese açık sözleri', async () => {
+  test('yakın çevre modu: önce yakının herkese açık sözleri, bitince giderek uzaktan; kafe içi ve yereller asla', async () => {
     const s = await staff.post(`/api/venues/${CAFE}/settings`, { mode: 'nearby' });
     assert.equal(s.data.venue.mode, 'nearby');
-    assert.equal(s.data.available, 2);
+    assert.equal(s.data.available, 3);
     const { data } = await staff.post(`/api/venues/${CAFE}/tables`, { tableNo: 'Bahçe 3' });
+    await staff.post(`/api/venues/${CAFE}/tables/${data.tableId}/print`);
     await staff.post(`/api/venues/${CAFE}/tables/${data.tableId}/print`);
     assert.equal((await staff.post(`/api/venues/${CAFE}/tables/${data.tableId}/print`)).data.error, 'no_content');
     const pending = await jobs();
-    assert.deepEqual(pending.map((j) => idOf(j.text)).sort(), ['yakin1', 'yakin2']);
-    for (const j of pending) {
-      assert.equal(j.inside, false);
-      assert.ok(j.distanceM > 0 && j.distanceM <= 1500);
-    }
+    // Sıra: önce 1,5 km içindekiler, sonra Galata (~6 km).
+    assert.deepEqual(pending.slice(0, 2).map((j) => idOf(j.text)).sort(), ['yakin1', 'yakin2']);
+    assert.equal(idOf(pending[2].text), 'uzak');
+    for (const j of pending) assert.equal(j.inside, false);
+    assert.ok(pending[0].distanceM <= 1500 && pending[1].distanceM <= 1500);
+    assert.ok(pending[2].distanceM > 5000);
     await staff.post(`/api/venues/${CAFE}/tables/${data.tableId}/close`);
+  });
+
+  test('sakin bir semtteki kafe (yakında hiç söz yok) şehrin genelinden basar', async () => {
+    srv.db.prepare("INSERT INTO places (id, city_id, name, kind, lat, lng, radius_m, created_at) VALUES ('ist-sultanbeyli-test', 'istanbul', 'Sultanbeyli Çarşı', 'market', 40.9667, 29.2667, 200, ?)").run(Date.now());
+    await mod.post('/api/admin/venues/ist-sultanbeyli-test', { mode: 'nearby' });
+    await mod.post('/api/admin/venues/ist-sultanbeyli-test/staff', { handle: 'kafe_garson' });
+    const { data } = await staff.post('/api/venues/ist-sultanbeyli-test/tables', { tableNo: '1' });
+    assert.equal(data.queued, true);
+    const [job] = (await staff.get('/api/venues/ist-sultanbeyli-test/jobs')).data.jobs;
+    assert.ok(job.distanceM > 15000, `${job.distanceM}`);
+    // Şehrin herkese açık sözlerinden biri (Bahariye kafesininki dahil; yereller hariç).
+    assert.ok(['ic2', 'yakin1', 'yakin2', 'uzak'].includes(idOf(job.text)));
+    await staff.post(`/api/venues/ist-sultanbeyli-test/tables/${data.tableId}/close`);
+    await mod.del('/api/admin/venues/ist-sultanbeyli-test');
   });
 
   test('açık masaya aralıklarla yeni fiş basılır, sınıra kadar; yazıcıya canlı haber gider', async () => {
