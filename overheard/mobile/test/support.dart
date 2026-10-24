@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:overheard/core/google_auth.dart';
 import 'package:overheard/core/location.dart';
 import 'package:overheard/mesh/device_key.dart';
 import 'package:overheard/mesh/gossip.dart';
@@ -131,3 +132,17 @@ MeshPacket signedPacket({
 }
 
 String jsonBody(Map<String, Object?> data) => jsonEncode(data);
+
+// Google hesap seçicisinin yerine: sıradaki kimlik belgesini verir; yoksa kullanıcı vazgeçmiş sayılır.
+class FakeGoogleAuth implements GoogleAuth {
+  String? next;
+  final requests = <String>[];
+
+  @override
+  Future<String> idToken(String serverClientId) async {
+    requests.add(serverClientId);
+    final token = next;
+    if (token == null) throw GoogleCanceled();
+    return token;
+  }
+}

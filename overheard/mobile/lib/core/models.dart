@@ -318,12 +318,31 @@ class Conversation {
 
 // Profil özeti (/api/me): sayılar, rozetler ve okunmamış konuşmalar.
 class Profile {
-  const Profile({this.stats = const {}, this.badges = const [], this.unread = 0, this.banned = false});
+  const Profile({
+    this.stats = const {},
+    this.badges = const [],
+    this.unread = 0,
+    this.banned = false,
+    this.passwordLogin = true,
+    this.googleLinked = false,
+  });
 
   final Map<String, int> stats;
   final List<({String id, bool earned})> badges;
   final int unread;
   final bool banned;
+  // Giriş yolları: hesabın parolası var mı, Google bağlı mı (hesap silmede hangisi sorulacak).
+  final bool passwordLogin;
+  final bool googleLinked;
+
+  Profile copyWith({int? unread}) => Profile(
+    stats: stats,
+    badges: badges,
+    unread: unread ?? this.unread,
+    banned: banned,
+    passwordLogin: passwordLogin,
+    googleLinked: googleLinked,
+  );
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
     stats: {for (final e in ((j['stats'] as Map?) ?? const {}).entries) e.key as String: _i(e.value)},
@@ -333,5 +352,7 @@ class Profile {
     ],
     unread: _i(j['unread']),
     banned: _b((j['user'] as Map?)?['banned']),
+    passwordLogin: (j['auth'] as Map?)?['password'] != false,
+    googleLinked: _b((j['auth'] as Map?)?['google']),
   );
 }

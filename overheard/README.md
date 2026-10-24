@@ -86,6 +86,10 @@ balonların altında sokak haritası görünür.</sub>
   @x sayesinde ulaştı" bildirimi alır). Söz yazarın cihaz anahtarıyla (ECDSA P-256, özel anahtar
   cihazdan çıkmaz) imzalanır: taşıyan değiştiremez, kimse başkası adına söz uyduramaz; "o sırada
   oradaydım" kanıtı yazarındır. Bağlantı adresin `#` sonrasında taşınır, sunucu kayıtlarına düşmez.
+- **Google ile giriş** (web ve uygulama): Google kimlik belgesi sunucuda doğrulanır, yalnızca hesap
+  kimliği saklanır; açık hesaba bağlanabilir, Google hesabıyla silme onaylanır.
+- **GitHub Pages sitesi ve bağlantı dosyası** (`site/`): tanıtım, APK, gizlilik, koşullar, hesap
+  silme; uygulama sunucuyu `connect.json`'dan bulur. Sunucu Codespaces'te de çalışır.
 - **Android uygulaması ve yeraltı modu** ([`mobile/`](mobile/README.md), Flutter). Metroda internet
   yokken yazılan söz, aynı paket biçimiyle Bluetooth/Wi-Fi üzerinden (Google Nearby Connections)
   yanındaki telefonlara kendiliğinden geçer ve telefondan telefona yayılır; bağlantı bulan telefon
@@ -251,6 +255,51 @@ Bunu günlük bir zamanlayıcıya bağlayıp yedekleri sunucu dışına kopyalay
 | `OVERHEARD_AI_MODEL` | `claude-opus-5-5` | Denetim modeli. Yüksek hacimde daha ucuz: `claude-haiku-5-5` (yedek model desteği yok: `OVERHEARD_AI_FALLBACKS=0`) |
 | `OVERHEARD_AI_TIMEOUT_MS` | `8000` | Bu süreyi aşan denetim beklenmez; metin kelime listesiyle yayımlanır |
 | `OVERHEARD_AI_FALLBACKS` | `1` | Sunucu taraflı yedek model (`fallbacks: "default"`): bir istek reddedilirse Anthropic'in önerdiği modelde aynı çağrıda yeniden denenir |
+| `OVERHEARD_GOOGLE_CLIENT_IDS` | — | Google ile giriş: Google Cloud OAuth istemci kimlikleri, virgülle. İlki "Web uygulaması" türündeki istemci (web düğmesi ve Android uygulaması onu kullanır). Boşsa Google ile giriş kapalı. |
+
+### Google ile giriş
+
+Sunucu Google'ın verdiği kimlik belgesini (ID token) Google'ın açık anahtarlarıyla doğrular; ek
+paket yok. Yalnızca Google hesap kimliği (`sub`) saklanır, e-posta ve ad saklanmaz. Google ile
+açılan hesabın parolası yoktur: silme işlemi taze bir Google girişiyle onaylanır. Açık bir hesaba
+(misafir dahil) Google bağlanabilir. Kurulum (bir kez, ücretsiz):
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → yeni proje (ör. "Overheard").
+2. **Google Auth Platform → Branding**: uygulama adı, destek e-postası, gizlilik politikası adresi
+   (Pages sitesindeki `privacy.html`). **Audience**: "External". Yayın durumu "Testing" iken yalnızca
+   eklediğin test kullanıcıları girebilir; herkese açmak için "Publish app" (yalnızca temel kapsamlar
+   kullanıldığı için Google incelemesi gerekmez).
+3. **Clients → Create client → Web application**: "Authorized JavaScript origins" alanına web
+   uygulamasının HTTPS adresi (ör. `https://overheard.ornek.com`; Codespaces adresi her codespace'te
+   farklıdır). Çıkan **istemci kimliği** `OVERHEARD_GOOGLE_CLIENT_IDS` değeridir.
+4. **Create client → Android**: paket adı `app.overheard`, SHA-1 parmak izi pilot anahtarınınki:
+   `9F:62:D0:01:FC:11:3D:9C:62:AD:F4:4B:50:70:78:96:70:41:77:89`. Play Store'a geçince yükleme
+   anahtarının ve Play App Signing anahtarının SHA-1'leri için de birer Android istemcisi eklenir.
+5. Sunucuyu `OVERHEARD_GOOGLE_CLIENT_IDS=<web istemci kimliği>` ile yeniden başlat. Uygulama istemci
+   kimliğini sunucudan (`/api/config`) öğrenir; APK'yı yeniden derlemek gerekmez.
+
+### Sunucu nerede çalışır: GitHub Pages, Codespaces, yerel
+
+GitHub Pages yalnızca sabit dosya sunar; sunucuyu (API, veritabanı) çalıştıramaz. Bu yüzden
+görevler ayrıldı:
+
+- **Pages sitesi** (`site/`, `npm run build:site`): tanıtım sayfası ve APK indirme, gizlilik
+  politikası, kullanım koşulları, hesap silme sayfası (Play Store bu adresleri ister) ve
+  **`connect.json`**. Uygulama sunucunun adresini bu dosyadan öğrenir; sunucu taşınınca yalnızca bu
+  dosya güncellenir (`npm run connect -- https://yeni-adres`, commit, push), APK yeniden kurulmaz.
+  Site her push'ta GitHub Actions ile yeniden kurulur (`.github/workflows/overheard.yml`): testler,
+  pilot anahtarıyla APK, site. Gizli depoda Pages, GitHub Pro ister; ücretsiz hesapta site ayrı ve
+  herkese açık bir depoda (ör. `eysox7/overheard`) yayımlanır, kaynak kod gizli kalır (iş akışının
+  başındaki açıklama).
+- **Sunucu, GitHub Codespaces'te**: depo → Code → Codespaces → "New with options" → yapılandırma
+  "Overheard sunucusu". Codespace açılınca sunucu başlar, genel adresi
+  (`https://<codespace>-8787.app.github.dev`) terminale yazar. Ports sekmesinden 8787'yi "Public"
+  yap, adresi `npm run connect` ile `connect.json`'a yaz ve push'la. Codespace kullanılmayınca
+  durur (GitHub'ın aylık ücretsiz kotası vardır); kalıcı bir sunucu için Docker ile bir VPS (yukarıda).
+  Google girişi için `OVERHEARD_GOOGLE_CLIENT_IDS`'i Settings → Secrets and variables → Codespaces'e ekle.
+- **Yerel**: `npm start` ve telefonlarda (giriş ekranı → Sunucu) `http://<bilgisayarın-IP'si>:8787`.
+  Elle yazılan adres `connect.json`'dan önce gelir; "Otomatik adrese dön" ile bırakılır. Metrodan
+  erişilebilmesi için tünel: `npx cloudflared tunnel --url http://localhost:8787`.
 
 ## Mimari
 
@@ -295,7 +344,8 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | --- | --- |
 | `GET /api/config` | Pilot şehirler, sınırlar, demo modu |
 | `POST /api/auth/register` · `login` · `guest` · `upgrade` · `logout` | Hesap (`upgrade`: misafiri kalıcı hesaba çevirir) |
-| `GET /api/me` | Kullanıcı, istatistikler, okunmamış mesaj sayısı |
+| `POST /api/auth/google` | Google ile giriş `{idToken, acceptTerms?, handle?}`: bağlı hesaba girer, oturum açıksa Google'ı bu hesaba bağlar, yoksa hesap açar |
+| `GET /api/me` | Kullanıcı, istatistikler, okunmamış mesaj sayısı, giriş yolları (`auth: {password, google}`) |
 | `GET /api/cities/:id/map` | Şehrin mekânları (söz sayılarıyla) ve en yeni 300 sözü (görüntüleyene göre kilitli/açık) |
 | `GET /api/cities/:id/best` | Haftanın en iyileri (herkese açık sözler) |
 | `GET /api/overheards?bbox=minLng,minLat,maxLng,maxLat` | Görünür alandaki sözler (en fazla 300; alan ≤ 0,6°) |
@@ -324,9 +374,9 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 
 | Komut | Kapsam |
 | --- | --- |
-| `npm test` | 110 API/birim testi: yerel/herkese açık görünürlük ve anlık mekân kuralı, check-in, söz, tepki, tanıklar, anonimlik, mesajlaşma, rozetler, moderasyon, konum denetimleri, QR, kafe, hatlar, çevrimdışı ve kulaktan kulağa söz, ölçek, göçler, yedekleme |
+| `npm test` | 118 API/birim testi: Google kimlik belgesi doğrulama ve Google ile giriş, ters vekil arkasında köken denetimi, yerel/herkese açık görünürlük ve anlık mekân kuralı, check-in, söz, tepki, tanıklar, anonimlik, mesajlaşma, rozetler, moderasyon, konum denetimleri, QR, kafe, hatlar, çevrimdışı ve kulaktan kulağa söz, ölçek, göçler, yedekleme |
 | `npm run test:e2e` | 23 tarayıcı senaryosu (Playwright + Chromium): iki kullanıcıyla uçtan uca akış, ayrılınca yeniden kilitlenme ve herkese açık söz, tanık ve anonim sohbet, keşif kartı, rozetler, tanıtım, dil değişimi, moderasyon paneli, yoğun bölge, Google Maps uyarlayıcısı (taklit API ile), QR, kafe, çevrimdışı ve kulaktan kulağa |
-| `cd mobile && flutter test` | 28 Android uygulaması testi: imza (web/sunucu biçimi), paket, telefondan telefona yayılma (bellek içi ağda zincir, üçgen, atlama ve süre sınırı, denetim), içerik denetiminin Node sürümüyle eşliği, ekranlar ve gerçek sunucuyla uçtan uca (Dart'ta imzalanan sözün Node'da doğrulanması, tepki, mesajlaşma, şikâyet/engelleme, hesap silme) |
+| `cd mobile && flutter test` | 30 Android uygulaması testi (Google ile giriş ve bağlantı dosyası dahil): imza (web/sunucu biçimi), paket, telefondan telefona yayılma (bellek içi ağda zincir, üçgen, atlama ve süre sınırı, denetim), içerik denetiminin Node sürümüyle eşliği, ekranlar ve gerçek sunucuyla uçtan uca (Dart'ta imzalanan sözün Node'da doğrulanması, tepki, mesajlaşma, şikâyet/engelleme, hesap silme) |
 
 Testler bellek içi veritabanıyla gerçek bir HTTP sunucusu açar; dış ağa çıkmaz (harita karoları
 ve Google Maps API'si testte taklit edilir).

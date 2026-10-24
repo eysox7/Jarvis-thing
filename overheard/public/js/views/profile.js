@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { openSheet, closeSheet, field, formError, busy, toast } from '../ui.js';
 import { openAdmin } from './admin.js';
 import { openVenue } from './venue.js';
+import { googleButton } from '../google.js';
 
 const LANG_NAMES = { tr: 'Türkçe', en: 'English' };
 
@@ -73,13 +74,57 @@ function upgradeForm(app) {
   submit);
 }
 
+// Google hesabını bağlama (misafir hesabı da böylece kalıcı olur); bağlıysa durum satırı.
+function googleSection(app, auth) {
+  const clientId = app.state.config.googleClientId;
+  if (!clientId || !auth) return null;
+  if (auth.google) return h('p', { class: 'muted small' }, `✅ ${t('profile.googleLinked')}`);
+  return h('div', { class: 'stack' },
+    h('h3', { class: 'section-title' }, t('profile.googleLink')),
+    googleButton(clientId, async (credential) => {
+      try {
+        const { user } = await api.google(credential);
+        toast(t('profile.googleLinkedDone'), { tone: 'success' });
+        await app.setUser(user);
+        openProfile(app);
+      } catch (err) {
+        toast(errorText(err), { tone: 'error' });
+      }
+    }));
+}
+
+// Parolası olmayan (Google ile açılmış) hesabın silinmesi: Google hesabını seçerek onaylanır.
+function confirmDeleteWithGoogle(app) {
+  openSheet({
+    key: 'delete-google',
+    title: t('profile.delete'),
+    body: h('div', { class: 'stack' },
+      h('p', {}, t('profile.deleteConfirm')),
+      h('p', { class: 'muted small' }, t('profile.deleteGoogle')),
+      googleButton(app.state.config.googleClientId, async (credential) => {
+        try {
+          await api.deleteAccount('', credential);
+          toast(t('profile.deleted'));
+          await app.logout();
+        } catch (err) {
+          toast(errorText(err), { tone: 'error' });
+        }
+      })),
+  });
+}
+
 // KVKK/GDPR hakları: verilerin bir kopyası ve hesabın kalıcı silinmesi.
-function privacySection(app) {
+function privacySection(app, auth) {
   const { user } = app.state;
+  const viaGoogle = !user.isGuest && auth && !auth.password && auth.google;
   const remove = h('button', {
     class: 'btn btn-ghost btn-danger btn-block',
     type: 'button',
     onclick: (e) => busy(e.currentTarget, async () => {
+      if (viaGoogle) {
+        confirmDeleteWithGoogle(app);
+        return;
+      }
       if (!window.confirm(t('profile.deleteConfirm'))) return;
       const password = user.isGuest ? '' : window.prompt(t('profile.deletePassword'));
       if (password === null) return;
@@ -118,12 +163,13 @@ export async function openProfile(app) {
   }, h('span', { class: 'city-name' }, c.name), h('span', { class: 'muted small' }, c.region ? `${c.region}, ${c.country}` : c.country))));
 
   let account;
+  let auth = null;
   if (state.user) {
     let stats = state.stats;
     let progress = null;
     let venues = [];
     try {
-      ({ stats, progress, venues = [] } = await api.me());
+      ({ stats, progress, venues = [], auth } = await api.me());
     } catch {
       // Eldeki istatistiklerle devam et.
     }
@@ -138,6 +184,7 @@ export async function openProfile(app) {
       state.user.isAdmin ? h('button', { class: 'btn btn-block', type: 'button', onclick: () => openAdmin(app) }, `🛡️ ${t('admin.open')}`) : null,
       ...venues.map((v) => h('button', { class: 'btn btn-block', type: 'button', onclick: () => openVenue(app, v) }, `☕ ${t('venue.panel', { name: v.name })}`)),
       state.user.isGuest ? upgradeForm(app) : null,
+      googleSection(app, auth),
       h('div', { class: 'stats' },
         stat(stats?.places, t('profile.places')),
         stat(stats?.cities, t('profile.cities')),
@@ -161,7 +208,7 @@ export async function openProfile(app) {
       cities,
       h('label', { class: 'field field-inline' }, h('span', { class: 'field-label' }, t('profile.language')), langSelect),
       state.user ? h('button', { class: 'btn btn-ghost btn-block', type: 'button', onclick: () => app.logout() }, t('profile.logout')) : null,
-      state.user ? privacySection(app) : null,
+      state.user ? privacySection(app, auth) : null,
       h('p', { class: 'legal' },
         h('a', { href: '/privacy.html', target: '_blank', rel: 'noopener' }, t('legal.privacy')),
         ' · ',

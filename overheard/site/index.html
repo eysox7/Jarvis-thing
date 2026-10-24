@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overheard</title>
+  <meta name="description" content="Duyduğunu haritaya bırak. Yerel sözler yalnızca oradayken okunur; metroda internet yokken bile.">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <img src="icon.svg" alt="">
+      <div>
+        <h1>Overheard</h1>
+        <p class="tagline">Duyduğunu haritaya bırak.</p>
+      </div>
+    </header>
+
+    <p class="quote">Vapurda biri: "Martılar da zam yaptı."</p>
+
+    <p>Bir yerde duyduğun komik, tuhaf, güzel bir sözü o mekândayken bırak. <strong>Yerel sözler yalnızca oradayken okunur</strong>; herkese açık olanları herkes her yerden okur. Aynı mekânlarda bulunduğun insanlarla sözler üzerinden tanış.</p>
+    <p>Metroda internet yoksa da yazabilirsin: yeraltı modunda söz <strong>Bluetooth ile yanındaki telefonlara geçer</strong>, içlerinden biri sinyal bulunca yerine ulaşır.</p>
+
+    <section class="card">
+      <h2>Android uygulaması</h2>
+      <p><a class="btn" id="apk" href="overheard.apk" download>APK'yı indir</a></p>
+      <p class="muted" id="apk-note">Pilot sürüm. Kurmak için telefonda "bilinmeyen kaynaklardan yükleme"ye izin ver. Google Play'e yakında.</p>
+    </section>
+
+    <section class="card">
+      <h2>Pilot sunucusu</h2>
+      <p class="status" id="status" data-state="unknown"><span class="dot"></span><span id="status-text">Denetleniyor…</span></p>
+      <p class="muted" id="server-message"></p>
+      <p class="muted">Uygulama sunucunun adresini bu sitedeki <a href="connect.json">connect.json</a> dosyasından öğrenir.</p>
+    </section>
+
+    <ul class="links">
+      <li><a href="privacy.html">Gizlilik politikası</a></li>
+      <li><a href="terms.html">Kullanım koşulları</a></li>
+      <li><a href="hesap-silme.html">Hesabını silme</a></li>
+    </ul>
+
+    <section class="card" lang="en">
+      <h2>In English</h2>
+      <p>Drop what you overheard on the map. Local overheards can only be read on the spot; public ones from anywhere. In the subway with no signal, underground mode passes your overheard to nearby phones over Bluetooth until one of them reaches the server. Pilot cities: İstanbul, Ankara, İzmir, Austin, New York, Los Angeles. <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="hesap-silme.html">Delete your account</a></p>
+    </section>
+
+    <footer>© Overheard</footer>
+  </main>
+  <script>
+    // APK bu derlemede yoksa düğme kapanır; sunucu açık mı diye /healthz sorulur.
+    (async () => {
+      const apk = document.getElementById('apk');
+      try {
+        const res = await fetch('overheard.apk', { method: 'HEAD' });
+        if (!res.ok) throw new Error();
+      } catch {
+        apk.setAttribute('aria-disabled', 'true');
+        apk.removeAttribute('href');
+        apk.textContent = 'APK yakında';
+      }
+      const status = document.getElementById('status');
+      const text = document.getElementById('status-text');
+      try {
+        const connect = await (await fetch('connect.json', { cache: 'no-store' })).json();
+        if (connect.message) document.getElementById('server-message').textContent = connect.message;
+        if (!connect.server) throw new Error('no-server');
+        const health = await fetch(`${connect.server.replace(/\/+$/, '')}/healthz`, { cache: 'no-store' });
+        if (!health.ok) throw new Error('down');
+        status.dataset.state = 'up';
+        text.textContent = 'Açık';
+      } catch {
+        status.dataset.state = 'down';
+        text.textContent = 'Şu an kapalı';
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -7,7 +7,12 @@ kullanır.
 
 ## Neler var
 
-- **Giriş / hesap açma** (oturum, web'deki `oh_session` çerezi; şifreli depoda tutulur).
+- **Giriş / hesap açma**: kullanıcı adı ve parola ya da **Google ile devam et** (Android Credential
+  Manager; sunucuda Google açıksa görünür). Oturum web'deki `oh_session` çerezidir, şifreli depoda tutulur.
+- **Sunucuyu kendiliğinden bulma**: uygulama sunucunun adresini GitHub Pages'teki `connect.json`'dan
+  öğrenir (sırayla `eysox7.github.io/overheard/` ve `eysox7.github.io/Jarvis-thing/`). Sunucu taşınınca
+  yalnızca o dosya değişir. Giriş ekranındaki "Sunucu" bölümünden adres elle de yazılabilir (yerel
+  sunucuyla denemek için); elle yazılan adres önce gelir.
 - **Harita**: şehir seçimi, hatlar (güzergâh çizgisi), mekânlar ve söz balonları. Kilitli (yerel)
   sözlerin metni sunucudan gelmez. Bağlantı yokken son görülen harita gösterilir.
 - **Buradayım** (check-in): içinde olduğun mekânlar ve bindiğin hat; yerel sözler açılır.
@@ -61,12 +66,19 @@ Gerekenler: Flutter 3.47+ (Dart 3.13), Android SDK (platform 36 ve 37, build-too
 cd overheard/mobile
 flutter pub get
 flutter analyze
-flutter test                      # 28 test: birim, ekran, denetim eşliği ve gerçek sunucuyla uçtan uca (node gerekir)
-flutter build apk --release --split-per-abi --target-platform android-arm64 \
-  --dart-define=OVERHEARD_URL=https://overheard.ornek.com
+flutter test                      # 30 test: birim, ekran, denetim eşliği, gerçek sunucuyla uçtan uca (node gerekir)
+flutter build apk --release --split-per-abi --target-platform android-arm64
 ```
 
-- `OVERHEARD_URL` giriş ekranındaki sunucu adresinin varsayılanıdır (ekranda değiştirilebilir).
+- Bağlantı dosyasının adresi derlemede değiştirilebilir:
+  `--dart-define=OVERHEARD_CONNECT=https://.../connect.json` (virgülle birden çok). Sabit bir sunucu
+  için `--dart-define=OVERHEARD_URL=https://...` da verilebilir.
+- **İmza**: hata ayıklama ve pilot derlemeleri depodaki `android/app/pilot.keystore` ile imzalanır
+  (şifresi `overheard-pilot`; gizli değildir). Böylece her derleme, her bilgisayar ve GitHub Actions
+  aynı imzayı üretir: güncellemeler eski sürümün üzerine kurulur ve Google girişi için verilen SHA-1
+  (`9F:62:D0:01:FC:11:3D:9C:62:AD:F4:4B:50:70:78:96:70:41:77:89`) değişmez. 0.2.0 ve öncesi başka bir
+  anahtarla imzalıydı: bir kez kaldırıp yeniden kurmak gerekir. Play Store yükleme anahtarı bu
+  değildir (aşağıda).
 - Sürüm derlemesi yalnızca `https://` sunucuya bağlanır. Yerel ağdaki `http://` bir sunucuyla
   denemek için derlemeden önce `export ORG_GRADLE_PROJECT_overheardCleartext=true` (hata ayıklama
   derlemesinde zaten açık).
@@ -87,9 +99,9 @@ flutter build apk --release --split-per-abi --target-platform android-arm64 \
    keyAlias=upload
    keyPassword=...
    ```
-   Dosya varsa sürüm derlemesi bu anahtarla, yoksa hata ayıklama anahtarıyla (pilot) imzalanır.
+   Dosya varsa sürüm derlemesi bu anahtarla, yoksa pilot anahtarıyla imzalanır.
 3. Play Store `.aab` ister:
-   `flutter build appbundle --release --dart-define=OVERHEARD_URL=https://overheard.ornek.com`
+   `flutter build appbundle --release`
    → `build/app/outputs/bundle/release/app-release.aab`. Play App Signing'i aç (Google dağıtım
    anahtarını tutar, sen yükleme anahtarıyla imzalarsın).
 4. Play Console beyanları:
@@ -108,9 +120,11 @@ flutter build apk --release --split-per-abi --target-platform android-arm64 \
 
 ## İki telefonla deneme
 
-1. Sunucuyu çalıştır (`cd overheard && npm start`; aynı Wi-Fi'deki telefonlar için bilgisayarın
-   yerel IP'si, ör. `http://192.168.1.20:8787`) ya da yayındaki sunucuyu kullan.
-2. APK'yı iki Android telefona kur, ikisinde ayrı hesap aç.
+1. Sunucu: `connect.json`'da bir adres varsa uygulama onu kendiliğinden kullanır (Codespaces ya da
+   VPS; ana README → "Sunucu nerede çalışır"). Yerelde denemek için `cd overheard && npm start` ve
+   giriş ekranında Sunucu → `http://<bilgisayarın-IP'si>:8787`.
+2. APK'yı iki Android telefona kur (Pages sitesinden ya da GitHub Actions çıktısından), ikisinde ayrı
+   hesap aç (ya da Google ile devam et).
 3. Telefon A: bir mekânda **Buradayım** (demo verisinde ör. Kadıköy İskelesi; demo modunda konum
    denetimleri gevşektir).
 4. Telefon A'da uçak modunu aç, Bluetooth'u yeniden aç. **Söz bırak** → "yeraltı ağına bırakıldı".

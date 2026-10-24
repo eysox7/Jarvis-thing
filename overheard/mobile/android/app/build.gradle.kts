@@ -8,7 +8,7 @@ plugins {
 }
 
 // Play Store imzası: android/key.properties (storeFile, storePassword, keyAlias, keyPassword). Dosya
-// yoksa sürüm derlemesi hata ayıklama anahtarıyla imzalanır (pilot). Anahtar depoya eklenmez.
+// yoksa sürüm derlemesi depodaki pilot anahtarıyla imzalanır. Yükleme anahtarı depoya eklenmez.
 val keystoreFile = rootProject.file("key.properties")
 val keystore = Properties().apply { if (keystoreFile.exists()) FileInputStream(keystoreFile).use { load(it) } }
 
@@ -37,6 +37,13 @@ android {
     }
 
     signingConfigs {
+        // Pilot anahtarı (depoda; şifresi gizli değil): hata ayıklama ve pilot derlemeleri.
+        create("pilot") {
+            storeFile = file("pilot.keystore")
+            storePassword = "overheard-pilot"
+            keyAlias = "pilot"
+            keyPassword = "overheard-pilot"
+        }
         if (keystoreFile.exists()) {
             create("upload") {
                 storeFile = file(keystore.getProperty("storeFile"))
@@ -49,10 +56,11 @@ android {
 
     buildTypes {
         debug {
+            signingConfig = signingConfigs.getByName("pilot")
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         release {
-            signingConfig = signingConfigs.getByName(if (keystoreFile.exists()) "upload" else "debug")
+            signingConfig = signingConfigs.getByName(if (keystoreFile.exists()) "upload" else "pilot")
             // Cihazda denenmemiş eklentilerde (Nearby) R8'in bir şeyi silmesi riskine girilmez.
             isMinifyEnabled = false
             isShrinkResources = false

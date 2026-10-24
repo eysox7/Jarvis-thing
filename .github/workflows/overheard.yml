@@ -1,0 +1,135 @@
+# Overheard: sunucu ve uygulama testleri, Android APK (pilot anahtarıyla) ve tanıtım sitesi (GitHub Pages).
+#
+# Site iki yoldan yayımlanabilir (depo ayarlarından seçilir, ayrıntı: overheard/README.md):
+#   - Bu deponun Pages'i: Settings → Pages → Source: GitHub Actions ve depo değişkeni
+#     OVERHEARD_PAGES=this-repo. (Gizli depoda Pages, GitHub Pro gerektirir.)
+#   - Ayrı, herkese açık bir site deposu (ör. eysox7/overheard): depo değişkeni
+#     OVERHEARD_SITE_REPO=eysox7/overheard ve o depoya yazabilen dağıtım anahtarı
+#     OVERHEARD_SITE_DEPLOY_KEY (gizli). Kaynak kod gizli kalır, yalnızca site açıktır.
+name: Overheard
+
+on:
+  push:
+    branches: [main, 'claude/overheard-**']
+    paths: ['overheard/**', '.github/workflows/overheard.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: overheard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Sunucu testleri
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: overheard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: overheard/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  app:
+    name: Android uygulaması
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: overheard/mobile
+    steps:
+      - uses: actions/checkout@v4
+      # Uygulama testlerinin bir kısmı gerçek sunucuyla çalışır.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: overheard/package-lock.json
+      - run: npm ci
+        working-directory: overheard
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.8
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: APK
+        env:
+          # Pilot: yerel ağdaki http:// sunucuyla da denenebilsin.
+          ORG_GRADLE_PROJECT_overheardCleartext: 'true'
+        run: flutter build apk --release --split-per-abi --target-platform android-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: overheard-apk
+          path: overheard/mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          retention-days: 30
+
+  site:
+    name: Tanıtım sitesi
+    needs: [server, app]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: overheard-apk
+          path: apk
+      - run: node overheard/site/build.mjs --apk apk/app-arm64-v8a-release.apk
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: overheard/site/dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: overheard-site
+          path: overheard/site/dist
+          include-hidden-files: true
+
+  pages:
+    name: Bu deponun Pages'i
+    needs: site
+    if: vars.OVERHEARD_PAGES == 'this-repo'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  site-repo:
+    name: Ayrı site deposu
+    needs: site
+    if: vars.OVERHEARD_SITE_REPO != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: overheard-site
+          path: dist
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.OVERHEARD_SITE_DEPLOY_KEY }}
+          external_repository: ${{ vars.OVERHEARD_SITE_REPO }}
+          publish_branch: gh-pages
+          publish_dir: dist
+          force_orphan: true
+          commit_message: Overheard sitesi

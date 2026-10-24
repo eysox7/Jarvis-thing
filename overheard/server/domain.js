@@ -1128,6 +1128,8 @@ export function exportUserData(db, user) {
   return {
     exportedAt: iso(Date.now()),
     user: { handle: u.handle, isGuest: Boolean(u.is_guest), createdAt: iso(u.created_at), termsAcceptedAt: iso(u.terms_accepted_at) },
+    signIn: db.prepare('SELECT provider, created_at FROM user_identities WHERE user_id = ?').all(user.id)
+      .map((i) => ({ provider: i.provider, linkedAt: iso(i.created_at) })),
     lastLocation: last ? { lat: last.lat, lng: last.lng, accuracy: last.accuracy, at: iso(last.at) } : null,
     presenceAnchors: db.prepare('SELECT p.name, a.source, a.at FROM presence_anchors a JOIN places p ON p.id = a.place_id WHERE a.user_id = ? ORDER BY a.at')
       .all(user.id).map((a) => ({ place: a.name, via: a.source, at: iso(a.at) })),

@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:overheard/app/controller.dart';
 import 'package:overheard/core/api.dart';
 import 'package:overheard/core/b64.dart';
+import 'package:overheard/core/google_auth.dart';
 import 'package:overheard/core/location.dart';
 import 'package:overheard/core/models.dart';
 import 'package:overheard/core/storage.dart';
@@ -27,14 +28,40 @@ void main() {
   final root = Directory.current.parent.path;
   final hasServer = File('$root/server/index.js').existsSync() && Process.runSync('which', ['node']).exitCode == 0;
   Process? server;
+  HttpServer? certs;
   Directory? temp;
   late String base;
+  // Google'ın yerine: Node'da üretilen RSA anahtarıyla imzalı kimlik belgeleri (sub → belge).
+  var googleTokens = <String, String>{};
   late MemoryNetwork net;
   final apps = <AppController>[];
 
   setUpAll(() async {
     if (!hasServer) return;
     temp = await Directory.systemTemp.createTemp('overheard-interop');
+    const script = '''
+      import { generateKeyPairSync, sign } from 'node:crypto';
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'dart-test', alg: 'RS256' };
+      const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+      const now = Math.floor(Date.now() / 1000);
+      const token = (sub, name) => {
+        const head = b64({ alg: 'RS256', kid: 'dart-test' });
+        const body = b64({ iss: 'https://accounts.google.com', aud: 'dart-test-client', sub, iat: now, exp: now + 3600, given_name: name, email_verified: true });
+        return head + '.' + body + '.' + sign('RSA-SHA256', Buffer.from(head + '.' + body), privateKey).toString('base64url');
+      };
+      console.log(JSON.stringify({ keys: [jwk], tokens: { yeni: token('g-yeni', 'Metro Kulağı'), silinen: token('g-silinen', 'Silinecek') } }));
+    ''';
+    final generated = await Process.run('node', ['--input-type=module', '-e', script], stdoutEncoding: utf8);
+    final google = jsonDecode(generated.stdout as String) as Map<String, dynamic>;
+    googleTokens = (google['tokens'] as Map).cast<String, String>();
+    certs = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    certs!.listen((request) {
+      request.response
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({'keys': google['keys']}))
+        ..close();
+    });
     final port = 20000 + Random().nextInt(20000);
     base = 'http://127.0.0.1:$port';
     server = await Process.start(
@@ -48,6 +75,8 @@ void main() {
         'OVERHEARD_AI_MODERATION': 'false',
         // Sunucu testlerindeki gibi: aynı adresten çok sayıda hesap açılır.
         'OVERHEARD_RATE_SCALE': '100',
+        'OVERHEARD_GOOGLE_CLIENT_IDS': 'dart-test-client',
+        'OVERHEARD_GOOGLE_CERTS_URL': 'http://127.0.0.1:${certs!.port}/certs',
       },
     );
     server!.stdout.drain<void>();
@@ -67,6 +96,7 @@ void main() {
   tearDownAll(() async {
     server?.kill();
     await server?.exitCode;
+    await certs?.close(force: true);
     await temp?.delete(recursive: true);
   });
 
@@ -79,7 +109,7 @@ void main() {
     apps.clear();
   });
 
-  Future<AppController> phone(String name, String handle) async {
+  Future<AppController> phone(String name, String? handle, {GoogleAuth? google}) async {
     final api = Api(baseUrl: base);
     final store = MeshStore();
     final files = MemoryFiles();
@@ -89,6 +119,7 @@ void main() {
       vault: vault,
       files: files,
       locator: FakeLocator(Fix(_pier.lat, _pier.lng, 12, DateTime.now().millisecondsSinceEpoch)),
+      google: google,
       underground: Underground(
         store: store,
         files: files,
@@ -99,6 +130,7 @@ void main() {
     );
     apps.add(app);
     await app.boot();
+    if (handle == null) return app;
     await app.register(handle, 'metro-parola-1');
     await app.refresh();
     expect(app.hasKey, isTrue);
@@ -268,6 +300,91 @@ void main() {
         app.signIn(handle, 'metro-parola-1'),
         throwsA(isA<ApiException>().having((e) => e.code, 'code', 'bad_credentials')),
       );
+    });
+
+    test('Google ile hesap açılır, profile bağlanır; parolasız hesap Google ile silinir', () async {
+      final google = FakeGoogleAuth();
+      final app = await phone('A', null, google: google);
+      await app.loadConfig();
+      expect(app.googleClientId, 'dart-test-client');
+      // Hesap seçici kapatılırsa hiçbir şey olmaz.
+      await expectLater(app.signInWithGoogle(), throwsA(isA<GoogleCanceled>()));
+      expect(app.me, isNull);
+
+      google.next = googleTokens['yeni'];
+      await app.signInWithGoogle();
+      expect(app.me?.handle, 'metro_kulagi');
+      expect(google.requests.last, 'dart-test-client');
+      await app.refresh();
+      expect(app.profile.googleLinked, isTrue);
+      expect(app.profile.passwordLogin, isFalse);
+      expect(app.hasKey, isTrue);
+
+      // Çıkıp yeniden Google ile girince aynı hesap.
+      await app.signOut();
+      await app.signInWithGoogle();
+      expect(app.me?.handle, 'metro_kulagi');
+
+      // Başka biri: parolayla açılmış hesaba Google bağlanır.
+      final other = FakeGoogleAuth()..next = googleTokens['silinen'];
+      final member = await phone('B', unique('uye'), google: other);
+      await member.linkGoogle();
+      expect(member.profile.googleLinked, isTrue);
+      expect(member.profile.passwordLogin, isTrue);
+
+      // Parolasız hesabın silinmesi Google hesabı seçilerek onaylanır.
+      google.next = googleTokens['yeni'];
+      await app.refreshProfile();
+      await app.deleteAccount('');
+      expect(app.me, isNull);
+      expect(google.requests.length, greaterThanOrEqualTo(4));
+    });
+
+    test('bağlantı dosyası sunucuyu bulur; elle girilen adres önce gelir', () async {
+      final file = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var connect = {'server': base, 'message': 'Pilot sunucusu açık'};
+      file.listen((request) {
+        request.response
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode(connect))
+          ..close();
+      });
+      final api = Api(baseUrl: '');
+      final store = MeshStore();
+      final files = MemoryFiles();
+      final vault = MemoryVault();
+      final app = AppController(
+        api: api,
+        vault: vault,
+        files: files,
+        locator: FakeLocator(),
+        // İlk adres yanıt vermez (ör. site henüz yayında değil); sıradaki kullanılır.
+        connectUrl: '$_unreachable/connect.json,http://127.0.0.1:${file.port}/connect.json',
+        underground: Underground(
+          store: store,
+          files: files,
+          linkFactory: (_) => net.join('A'),
+          radio: FakeRadio(),
+          courier: Courier(api, store),
+        ),
+      );
+      apps.add(app);
+      await app.boot();
+      expect(app.server, base);
+      expect(app.serverDiscovered, isTrue);
+      expect(app.serverMessage, 'Pilot sunucusu açık');
+      expect(app.googleClientId, 'dart-test-client');
+
+      // Yerel sunucuyla denemek için elle yazılan adres, dosya değişse de korunur.
+      await app.setServer('http://192.168.1.20:8787');
+      connect = {'server': 'https://yeni.ornek.com'};
+      await app.discover();
+      expect(app.server, 'http://192.168.1.20:8787');
+      expect(app.serverDiscovered, isFalse);
+      // Otomatiğe dönünce dosyadaki adres.
+      await app.useDiscoveredServer();
+      expect(app.server, 'https://yeni.ornek.com');
+      await file.close(force: true);
     });
   });
 }

@@ -34,6 +34,20 @@ class Api {
 
   Future<Map<String, dynamic>> get(String path) => _send('GET', path);
 
+  // Sunucu dışındaki bir adres (bağlantı dosyası); oturum çerezi gönderilmez.
+  Future<Map<String, dynamic>> getUrl(String url) async {
+    try {
+      final response = await _client.get(Uri.parse(url), headers: {'accept': 'application/json'}).timeout(timeout);
+      if (response.statusCode >= 400) throw ApiException(response.statusCode, 'http_${response.statusCode}');
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      return data is Map<String, dynamic> ? data : <String, dynamic>{};
+    } on ApiException {
+      rethrow;
+    } on Exception {
+      throw ApiException(0, 'offline');
+    }
+  }
+
   Future<Map<String, dynamic>> post(String path, [Map<String, Object?> body = const {}]) => _send('POST', path, body);
 
   Future<Map<String, dynamic>> _send(String method, String path, [Object? body]) async {

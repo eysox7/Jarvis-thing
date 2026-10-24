@@ -3,3 +3,4 @@ data/
 test-results/
 *.log
 .DS_Store
+site/dist/

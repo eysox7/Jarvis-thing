@@ -273,6 +273,19 @@ export const MIGRATIONS = [
   `
   ALTER TABLE overheards ADD COLUMN hops INTEGER;
   `,
+  // v16: Google ile giriş. Yalnızca Google hesap kimliği (sub) tutulur. password_login: hesabın
+  // bilinen bir parolası var mı (Google ile açılan ya da Google'a bağlanan misafir hesabında yok).
+  `
+  CREATE TABLE user_identities (
+    provider    TEXT NOT NULL,
+    subject     TEXT NOT NULL,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  INTEGER NOT NULL,
+    PRIMARY KEY (provider, subject)
+  );
+  CREATE INDEX user_identities_user ON user_identities(user_id);
+  ALTER TABLE users ADD COLUMN password_login INTEGER NOT NULL DEFAULT 1;
+  `,
 ];
 
 export function openDb(path) {

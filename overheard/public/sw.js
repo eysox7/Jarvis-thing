@@ -1,5 +1,5 @@
 // Uygulama kabuğunu önbelleğe alır; API ve harita karoları her zaman ağdan gelir.
-const CACHE = 'overheard-shell-v17';
+const CACHE = 'overheard-shell-v18';
 const SHELL = [
   '/',
   '/css/app.css',
@@ -7,6 +7,7 @@ const SHELL = [
   '/vendor/leaflet/leaflet.js',
   '/js/main.js',
   '/js/api.js',
+  '/js/google.js',
   '/js/i18n.js',
   '/js/map.js',
   '/js/maps/common.js',

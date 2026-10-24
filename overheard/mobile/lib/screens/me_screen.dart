@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app/app.dart';
+import '../core/google_auth.dart';
 import '../l10n/strings.dart';
 
 class MeScreen extends StatelessWidget {
@@ -18,6 +19,8 @@ class MeScreen extends StatelessWidget {
     final app = AppScope.read(context);
     final password = TextEditingController();
     final guest = app.me?.isGuest ?? false;
+    // Parolası olmayan (Google ile açılmış) hesap silmeyi Google hesabını seçerek onaylar.
+    final viaGoogle = !guest && !app.profile.passwordLogin && app.profile.googleLinked;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -27,7 +30,10 @@ class MeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(t('profile.deleteConfirm')),
-            if (!guest) ...[
+            if (viaGoogle) ...[
+              const SizedBox(height: 12),
+              Text(t('me.deleteGoogle')),
+            ] else if (!guest) ...[
               const SizedBox(height: 12),
               Text(t('profile.deletePassword')),
               TextField(controller: password, obscureText: true, autofocus: true),
@@ -51,6 +57,20 @@ class MeScreen extends StatelessWidget {
     try {
       await app.deleteAccount(value);
       messenger.showSnackBar(SnackBar(content: Text(t('profile.deleted'))));
+    } on GoogleCanceled {
+      // Onay verilmedi.
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(errorText(e))));
+    }
+  }
+
+  Future<void> _linkGoogle(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await AppScope.read(context).linkGoogle();
+      messenger.showSnackBar(SnackBar(content: Text(t('me.googleLinkedDone'))));
+    } on GoogleCanceled {
+      // Hesap seçilmedi.
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(errorText(e))));
     }
@@ -135,6 +155,16 @@ class MeScreen extends StatelessWidget {
               title: Text(t('me.device')),
               subtitle: Text(app.hasKey ? t('me.deviceReady') : t('me.deviceMissing')),
             ),
+            if (app.googleClientId != null)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.account_circle_outlined, color: profile.googleLinked ? successColor : null),
+                title: Text(t('me.google')),
+                subtitle: profile.googleLinked ? Text(t('me.googleLinked')) : null,
+                trailing: profile.googleLinked
+                    ? null
+                    : TextButton(onPressed: () => _linkGoogle(context), child: Text(t('me.googleLink'))),
+              ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.description_outlined),

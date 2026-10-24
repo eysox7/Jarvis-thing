@@ -1,0 +1,15 @@
+{
+  // GitHub Codespaces'te Overheard sunucusu: Code → Codespaces → "..." → New with options →
+  // "Overheard sunucusu". Açılınca sunucu kendiliğinden başlar ve genel adresi terminale yazar.
+  "name": "Overheard sunucusu",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "forwardPorts": [8787],
+  "portsAttributes": {
+    "8787": { "label": "Overheard sunucusu", "onAutoForward": "notify" }
+  },
+  "postCreateCommand": "cd overheard && npm ci",
+  "postAttachCommand": "cd overheard && npm run codespace",
+  "customizations": {
+    "codespaces": { "openFiles": ["overheard/README.md"] }
+  }
+}

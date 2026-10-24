@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core/api.dart';
 import '../core/b64.dart';
+import '../core/google_auth.dart';
 import '../core/location.dart';
 import '../core/models.dart';
 import '../core/moderation.dart';
@@ -49,7 +50,9 @@ class AppController extends ChangeNotifier {
     required this.files,
     required this.locator,
     required this.underground,
+    this.google,
     this.defaultServer = '',
+    this.connectUrl = '',
     int Function()? clock,
   }) : _clock = clock ?? (() => DateTime.now().millisecondsSinceEpoch) {
     // Yeraltı modundaki değişiklikler (yeni söz, yakındaki telefon) ekranları da yeniler.
@@ -61,7 +64,11 @@ class AppController extends ChangeNotifier {
   final Files files;
   final Locator locator;
   final Underground underground;
+  final GoogleAuth? google;
   final String defaultServer;
+  // Bağlantı dosyası (GitHub Pages): asıl sunucunun adresi buradan öğrenilir; sunucu taşınınca
+  // uygulamayı yeniden kurmak gerekmez. Biçim: {"server": "https://...", "message": "..."}.
+  final String connectUrl;
   final int Function() _clock;
 
   // Yerinde kalma süreleri (sunucudaki stickyPresenceMs / linePresenceMs ile aynı).
@@ -73,6 +80,11 @@ class AppController extends ChangeNotifier {
   Profile profile = const Profile();
   List<City> cities = fallbackCities;
   bool demoMode = false;
+  // Sunucuda Google ile giriş açıksa web istemci kimliği.
+  String? googleClientId;
+  // Sunucu adresi bağlantı dosyasından mı geldi; dosyadaki duyuru (ör. "sunucu bakımda").
+  bool serverDiscovered = false;
+  String? serverMessage;
   String cityId = 'istanbul';
   CityMap? map;
   bool mapStale = false;
@@ -106,6 +118,13 @@ class AppController extends ChangeNotifier {
     final config = await files.load('config');
     if (config != null) _applyConfig(config);
     await underground.load();
+    serverDiscovered = await vault.read('server_manual') != '1' && server.isNotEmpty && server != defaultServer;
+    // İlk açılışta sunucu bilinmiyorsa bağlantı dosyası beklenir; biliniyorsa arka planda tazelenir.
+    if (server.isEmpty) {
+      await discover();
+    } else {
+      unawaited(discover());
+    }
     booted = true;
     notifyListeners();
     // Bekleyen sözler bağlantı bulununca gitsin (metrodan çıkınca).
@@ -137,10 +156,43 @@ class AppController extends ChangeNotifier {
     await loadCity(cityId);
   }
 
-  Future<void> setServer(String url) async {
+  // Elle girilen adres bağlantı dosyasından önce gelir (yerel sunucuyla deneme için).
+  Future<void> setServer(String url, {bool manual = true}) async {
     final clean = url.trim().replaceAll(RegExp(r'/+$'), '');
+    if (manual && clean == api.baseUrl) return;
     api.baseUrl = clean;
+    serverDiscovered = !manual;
     await vault.write('server', clean);
+    await vault.write('server_manual', manual ? '1' : null);
+    notifyListeners();
+  }
+
+  // Elle girilen adresi bırakıp bağlantı dosyasına döner.
+  Future<void> useDiscoveredServer() async {
+    await vault.write('server_manual', null);
+    await discover();
+  }
+
+  // Bağlantı dosyasını okur (virgülle birden çok adres verilebilir; ilk yanıt veren kullanılır).
+  // Adres elle girilmediyse sunucu oradaki adrese ayarlanır.
+  Future<void> discover() async {
+    if (connectUrl.isEmpty || await vault.read('server_manual') == '1') return;
+    for (final source in connectUrl.split(',').map((u) => u.trim()).where((u) => u.isNotEmpty)) {
+      try {
+        final json = await api.getUrl(source);
+        final url = json['server'];
+        final message = json['message'];
+        serverMessage = message is String && message.isNotEmpty ? message : null;
+        if (url is String && RegExp(r'^https?://').hasMatch(url)) {
+          await setServer(url, manual: false);
+          await loadConfig().catchError((_) {});
+        }
+        notifyListeners();
+        return;
+      } on ApiException {
+        // Bu adres yanıt vermedi; sıradakine bakılır. Hiçbiri yoksa son bilinen adres kalır.
+      }
+    }
   }
 
   Future<void> signIn(String handle, String password) =>
@@ -150,6 +202,23 @@ class AppController extends ChangeNotifier {
       _auth('/api/auth/register', {'handle': handle, 'password': password, 'acceptTerms': true});
 
   Future<void> guest() => _auth('/api/auth/guest', {});
+
+  // Google ile devam: hesap varsa girilir, yoksa açılır (düğmenin altındaki not: koşulları kabul).
+  Future<void> signInWithGoogle() async =>
+      _auth('/api/auth/google', {'idToken': await _googleToken(), 'acceptTerms': true});
+
+  // Açık hesaba Google bağlanır (misafir hesabı kalıcı olur); sonra Google ile de girilebilir.
+  Future<void> linkGoogle() async {
+    final result = await api.post('/api/auth/google', {'idToken': await _googleToken()});
+    await _setMe(Me.fromJson(result['user'] as Map<String, dynamic>));
+    await refreshProfile();
+  }
+
+  Future<String> _googleToken() async {
+    final clientId = googleClientId, auth = google;
+    if (clientId == null || auth == null) throw ApiException(404, 'google_disabled');
+    return auth.idToken(clientId);
+  }
 
   Future<void> loadConfig() async {
     final config = await api.get('/api/config');
@@ -194,6 +263,7 @@ class AppController extends ChangeNotifier {
     final list = config['cities'];
     if (list is List && list.isNotEmpty) cities = [for (final c in list) City.fromJson(c as Map<String, dynamic>)];
     demoMode = config['demoMode'] == true;
+    googleClientId = config['googleClientId'] as String?;
   }
 
   // Bağlıyken bir kez: cihaz anahtarı üretilir, açık yarısı sunucuya kaydedilir. Özel yarı yalnızca
@@ -363,7 +433,7 @@ class AppController extends ChangeNotifier {
     ];
     final unread = list.where((c) => c.unread).length;
     if (unread != profile.unread) {
-      profile = Profile(stats: profile.stats, badges: profile.badges, unread: unread, banned: profile.banned);
+      profile = profile.copyWith(unread: unread);
       notifyListeners();
     }
     return list;
@@ -390,8 +460,10 @@ class AppController extends ChangeNotifier {
 
   // Hesap ve sunucudaki tüm veriler kalıcı olarak silinir; telefondaki her şey (anahtar, yeraltı
   // deposu, önbellekler) de temizlenir.
+  // Parolası olmayan (Google ile açılmış) hesapta silme, taze bir Google girişiyle onaylanır.
   Future<void> deleteAccount(String password) async {
-    await api.post('/api/me/delete', {'password': password});
+    final viaGoogle = !(me?.isGuest ?? false) && !profile.passwordLogin && profile.googleLinked;
+    await api.post('/api/me/delete', viaGoogle ? {'googleIdToken': await _googleToken()} : {'password': password});
     if (underground.running) await underground.stop();
     underground.clear();
     await files.clear();

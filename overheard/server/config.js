@@ -77,6 +77,11 @@ export function loadConfig(overrides = {}) {
     // Hız sınırlarının çarpanı (testlerde büyütülür).
     rateLimitScale: Number(env.OVERHEARD_RATE_SCALE) || 1,
     googleMapsKey: env.GOOGLE_MAPS_API_KEY || '',
+    // Google ile giriş: Google Cloud'daki OAuth istemci kimlikleri (virgülle). İlki "Web uygulaması"
+    // türündeki istemci olmalı: web düğmesi ve Android uygulaması (serverClientId) onu kullanır.
+    googleClientIds: (env.OVERHEARD_GOOGLE_CLIENT_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
+    // Google açık anahtarlarının adresi (yalnızca testlerde değiştirilir).
+    googleCertsUrl: env.OVERHEARD_GOOGLE_CERTS_URL || 'https://www.googleapis.com/oauth2/v3/certs',
     // Bağlamı anlayan içerik denetimi (Claude). ANTHROPIC_API_KEY tanımlıysa varsayılan olarak açık;
     // anahtar SDK tarafından doğrudan ortamdan okunur.
     aiModeration: flag(env.OVERHEARD_AI_MODERATION, Boolean(env.ANTHROPIC_API_KEY)),

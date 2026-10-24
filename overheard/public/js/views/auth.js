@@ -2,6 +2,7 @@ import { h } from '../util.js';
 import { t, errorText } from '../i18n.js';
 import { api } from '../api.js';
 import { openSheet, closeSheet, field, formError, busy } from '../ui.js';
+import { googleButton } from '../google.js';
 
 // "{terms}" ve "{privacy}" yer tutucularını bağlantılara çevirir.
 export function legalText(key) {
@@ -88,10 +89,26 @@ export function openAuth(app, then) {
       h('p', { class: 'legal' }, legalText('auth.guestConsent')))
     : null;
 
+  // Google ile devam: hesap varsa girilir, yoksa açılır (düğmenin altındaki not: koşulları kabul).
+  const clientId = app.state.config.googleClientId;
+  const google = clientId
+    ? h('div', { class: 'stack' },
+      googleButton(clientId, async (credential) => {
+        error.hide();
+        try {
+          await done(await api.google(credential, { acceptTerms: true }));
+        } catch (err) {
+          error.show(errorText(err));
+        }
+      }),
+      h('p', { class: 'legal' }, legalText('auth.googleConsent')),
+      h('p', { class: 'divider' }, t('auth.or')))
+    : null;
+
   openSheet({
     key: 'auth',
     title: t('auth.login'),
-    body: h('div', { class: 'stack' }, h('p', { class: 'muted' }, t('auth.why')), form, guest),
+    body: h('div', { class: 'stack' }, h('p', { class: 'muted' }, t('auth.why')), google, form, guest),
   });
   setTimeout(() => handle.focus(), 50);
 }

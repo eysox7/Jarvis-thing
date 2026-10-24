@@ -183,6 +183,14 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       taşındı (listeler sunucudan üretilir, Node ile eşlik testi): nefret söylemi içeren söz yeraltında
       yazılmaz, alınmaz, yayılmaz; kişisel veri ve küfür imzadan önce maskelenir. Yeraltı saha
       günlüğü. key.properties ile yükleme anahtarı imzası ve .aab derlemesi.
+- [x] **29c. Google ile giriş, Pages sitesi, Codespaces sunucusu** — Sunucu Google kimlik belgesini
+      açık anahtarlarla doğrular (bağımlılıksız, anahtar önbelleği ve döndürme), yalnızca `sub`
+      saklanır (şema v16: user_identities, password_login); hesap açma, açık hesaba (misafir dahil)
+      bağlama, Google ile onaylı silme. Uygulamada Credential Manager ile Google girişi, profilde
+      bağlama; web'de Google Identity Services düğmesi. Uygulama sunucuyu GitHub Pages'teki
+      `connect.json`'dan bulur (birden çok konum, elle adres önce gelir). Pages sitesi (tanıtım, APK,
+      gizlilik, koşullar, hesap silme, canlı sunucu durumu), GitHub Actions (testler, pilot anahtarlı
+      APK, site), Codespaces yapılandırması. Depoda sabit pilot imza anahtarı (Google SHA-1 değişmez).
 - [ ] **30. iPhone'da yeraltı modu** — `MeshLink` için Multipeer Connectivity (iPhone ↔ iPhone) ve
       BLE GATT (Android ↔ iPhone) bağlantı katmanı; iOS'ta arka plan Bluetooth kısıtları.
 - [ ] **31. Gizli sözler (mini oyun)** — İnternetsiz yazılmış sözler (`offline`, `hops`) özel:

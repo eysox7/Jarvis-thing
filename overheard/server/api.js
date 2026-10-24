@@ -7,10 +7,12 @@ import * as venues from './venues.js';
 import * as p2p from './p2p.js';
 import { qrMatrix, qrSvg } from './qr.js';
 import { containsSlur } from './moderation.js';
+import { suggestHandle } from './google.js';
+import { transaction } from './db.js';
 
 export const SESSION_COOKIE = 'oh_session';
 
-export function registerApi(router, { db, config, events, rateLimit, ai = null }) {
+export function registerApi(router, { db, config, events, rateLimit, ai = null, google = { enabled: false, clientId: null } }) {
   const limit = (key, max, windowMs) => {
     if (!rateLimit(key, Math.ceil(max * config.rateLimitScale), windowMs)) throw new HttpError(429, 'rate_limited');
   };
@@ -74,6 +76,8 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
     visibilities: domain.VISIBILITIES,
     presenceMinutes: Math.round(config.presenceTtlMs / 60000),
     aiModeration: Boolean(ai),
+    // Google ile giriş açıksa web istemci kimliği (web düğmesi ve Android serverClientId).
+    googleClientId: google.enabled ? google.clientId : null,
   }));
 
   // --- Hesap ---
@@ -97,7 +101,7 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
   router.post('/api/auth/login', async (ctx) => {
     limit(`login:${clientIp(ctx.req, config.trustProxy)}`, 20, 15 * 60000);
     const body = await readJson(ctx.req);
-    const user = db.prepare('SELECT * FROM users WHERE handle = ? AND is_guest = 0').get(String(body.handle || '').trim());
+    const user = db.prepare('SELECT * FROM users WHERE handle = ? AND is_guest = 0 AND password_login = 1').get(String(body.handle || '').trim());
     if (!user || !(await verifyPassword(String(body.password || ''), user.pass_hash))) throw new HttpError(401, 'bad_credentials');
     startSession(ctx, user.id);
     return { user: publicUser(user) };
@@ -133,6 +137,55 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
     return { user: publicUser({ handle, isGuest: false, banned: user.banned }) };
   });
 
+  // Google ile giriş. Google hesabı bağlıysa o hesaba girilir. Oturum açıkken çağrılırsa Google bu
+  // hesaba bağlanır (misafir hesabı kalıcı olur). Değilse yeni hesap açılır (koşullar kabul edilmeli);
+  // kullanıcı adı istenen ad ya da Google adından türetilir.
+  const googleIdentity = async (token) => {
+    if (!google.enabled) throw new HttpError(404, 'google_disabled');
+    return google.verifyIdToken(token);
+  };
+  const googleUser = (sub) => db.prepare(`SELECT u.* FROM user_identities i JOIN users u ON u.id = i.user_id
+                                          WHERE i.provider = 'google' AND i.subject = ?`).get(sub);
+  const freeHandle = (wanted) => {
+    const base = HANDLE_RE.test(wanted) ? wanted : suggestHandle(wanted);
+    const taken = db.prepare('SELECT 1 FROM users WHERE handle = ?');
+    if (!taken.get(base)) return base;
+    for (let i = 0; i < 20; i++) {
+      const candidate = `${base.slice(0, 15)}_${randomBytes(2).toString('hex')}`;
+      if (!taken.get(candidate)) return candidate;
+    }
+    throw new HttpError(409, 'handle_taken');
+  };
+
+  router.post('/api/auth/google', async (ctx) => {
+    limit(`google:${clientIp(ctx.req, config.trustProxy)}`, 30, 3600000);
+    const body = await readJson(ctx.req);
+    const identity = await googleIdentity(body.idToken);
+    const linked = googleUser(identity.sub);
+    if (linked) {
+      startSession(ctx, linked.id);
+      return { user: publicUser(linked), created: false };
+    }
+    const now = Date.now();
+    if (ctx.user) {
+      db.prepare("INSERT INTO user_identities (provider, subject, user_id, created_at) VALUES ('google', ?, ?, ?)").run(identity.sub, ctx.user.id, now);
+      if (ctx.user.isGuest) db.prepare('UPDATE users SET is_guest = 0, password_login = 0 WHERE id = ?').run(ctx.user.id);
+      return { user: publicUser({ ...ctx.user, isGuest: false }), linked: true };
+    }
+    if (body.acceptTerms !== true) throw new HttpError(400, 'terms_required');
+    limit(`register:${clientIp(ctx.req, config.trustProxy)}`, 10, 3600000);
+    const handle = freeHandle(String(body.handle || identity.name || ''));
+    const passHash = await hashPassword(randomBytes(24).toString('hex'));
+    const userId = transaction(db, () => {
+      const { lastInsertRowid } = db.prepare(`INSERT INTO users (handle, pass_hash, created_at, terms_accepted_at, password_login)
+                                              VALUES (?, ?, ?, ?, 0)`).run(handle, passHash, now, now);
+      db.prepare("INSERT INTO user_identities (provider, subject, user_id, created_at) VALUES ('google', ?, ?, ?)").run(identity.sub, Number(lastInsertRowid), now);
+      return Number(lastInsertRowid);
+    });
+    startSession(ctx, userId);
+    return { user: publicUser({ handle, isGuest: false }), created: true };
+  });
+
   router.post('/api/auth/logout', (ctx) => {
     if (ctx.token) destroySession(db, ctx.token);
     ctx.setCookie(serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure: config.secureCookies }));
@@ -148,6 +201,11 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
       progress: domain.progress(db, ctx.user),
       // Personeli olduğun Overheard Kafeler (kafe paneli için).
       venues: venues.staffVenues(db, ctx.user.id),
+      // Giriş yolları: parola (hesap silmede sorulur) ve Google (parolasız hesapta silmeyi onaylar).
+      auth: {
+        password: !ctx.user.isGuest && Boolean(db.prepare('SELECT password_login FROM users WHERE id = ?').get(ctx.user.id)?.password_login),
+        google: Boolean(db.prepare("SELECT 1 FROM user_identities WHERE user_id = ? AND provider = 'google'").get(ctx.user.id)),
+      },
     };
   });
 
@@ -193,8 +251,14 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
     limit(`delete:${user.id}`, 5, 3600000);
     const body = await readJson(ctx.req);
     if (!user.isGuest) {
-      const row = db.prepare('SELECT pass_hash FROM users WHERE id = ?').get(user.id);
-      if (!(await verifyPassword(String(body.password || ''), row.pass_hash))) throw new HttpError(401, 'bad_credentials');
+      const row = db.prepare('SELECT pass_hash, password_login FROM users WHERE id = ?').get(user.id);
+      if (row.password_login) {
+        if (!(await verifyPassword(String(body.password || ''), row.pass_hash))) throw new HttpError(401, 'bad_credentials');
+      } else {
+        // Parolası olmayan (Google ile açılmış) hesap: silme, taze bir Google girişiyle onaylanır.
+        const identity = await googleIdentity(body.googleIdToken);
+        if (googleUser(identity.sub)?.id !== user.id) throw new HttpError(401, 'bad_credentials');
+      }
     }
     domain.deleteAccount(db, user);
     ctx.setCookie(serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure: config.secureCookies }));

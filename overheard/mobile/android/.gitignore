@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# Pilot anahtarı bilerek depoda: her derleme aynı imzayı (ve Google girişi için aynı SHA-1'i) taşısın.
+# Play Store yükleme anahtarı değildir; o key.properties ile verilir ve depoya girmez.
+!app/pilot.keystore

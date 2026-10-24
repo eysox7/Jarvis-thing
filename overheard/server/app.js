@@ -7,6 +7,7 @@ import { sessionUser } from './auth.js';
 import { createEventHub } from './events.js';
 import { createRateLimiter } from './ratelimit.js';
 import { SESSION_COOKIE, registerApi } from './api.js';
+import { createGoogleVerifier } from './google.js';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -35,6 +36,14 @@ function securityHeaders(config) {
       frame: ' https://*.google.com',
     }
     : { script: '', img: '', style: '', connect: '', font: '', frame: '' };
+  // Google ile giriş düğmesi (Google Identity Services); yalnızca istemci kimliği tanımlıysa.
+  if (config.googleClientIds?.length) {
+    const gsi = ' https://accounts.google.com/gsi/';
+    g.script += ' https://accounts.google.com/gsi/client';
+    g.style += gsi;
+    g.connect += gsi;
+    g.frame += gsi;
+  }
   return {
     'content-security-policy': [
       "default-src 'self'",
@@ -61,11 +70,15 @@ function securityHeaders(config) {
 
 const VERSION = '0.2.0';
 
-export function createApp({ db, config, ai = null }) {
+export function createApp({
+  db, config, ai = null, google = createGoogleVerifier({ clientIds: config.googleClientIds, certsUrl: config.googleCertsUrl }),
+}) {
   const router = new Router();
   const events = createEventHub();
   const rateLimit = createRateLimiter();
-  const api = registerApi(router, { db, config, events, rateLimit, ai });
+  const api = registerApi(router, { db, config, events, rateLimit, ai, google });
+  // Ters vekil (Codespaces, Cloudflare tüneli, nginx) arkasında tarayıcının gördüğü adres.
+  const publicHost = config.publicUrl ? new URL(config.publicUrl).host : null;
   const headers = securityHeaders(config);
 
   async function serveStatic(req, res, pathname) {
@@ -106,12 +119,15 @@ export function createApp({ db, config, ai = null }) {
     const pathname = url.pathname;
 
     // Yük dengeleyici / konteyner sağlık denetimi.
+    // Tanıtım sitesi (GitHub Pages) sunucunun açık olup olmadığını buradan gösterir: başka bir kökenden
+    // okunabilir (yalnızca bu uç; hiçbir kişisel veri içermez).
     if (pathname === '/healthz') {
+      const cors = { 'access-control-allow-origin': '*' };
       try {
         db.prepare('SELECT 1').get();
-        return sendJson(res, 200, { ok: true, version: VERSION, demo: config.demoMode });
+        return sendJson(res, 200, { ok: true, version: VERSION, demo: config.demoMode }, cors);
       } catch {
-        return sendJson(res, 503, { ok: false });
+        return sendJson(res, 503, { ok: false }, cors);
       }
     }
 
@@ -125,7 +141,8 @@ export function createApp({ db, config, ai = null }) {
       // Durum değiştiren isteklerde Origin başka bir siteyse reddet.
       if (req.method !== 'GET' && req.headers.origin) {
         const origin = new URL(req.headers.origin);
-        if (origin.host !== req.headers.host) throw new HttpError(403, 'bad_origin');
+        const forwarded = config.trustProxy ? String(req.headers['x-forwarded-host'] || '').split(',')[0].trim() : '';
+        if (![req.headers.host, forwarded, publicHost].includes(origin.host)) throw new HttpError(403, 'bad_origin');
       }
       const match = router.match(req.method, pathname);
       if (!match) throw new HttpError(404, 'not_found');
