@@ -268,6 +268,11 @@ export const MIGRATIONS = [
   );
   CREATE INDEX device_keys_user ON device_keys(user_id);
   `,
+  // v15: Kulaktan kulağa sözün sunucuya varana dek kaç telefondan geçtiği (yazarın kendisi gönderdiyse
+  // 0). Yalnızca çevrimdışı sözlerde dolu; internetsiz yazılmış sözler ileride oyunlaştırılacak.
+  `
+  ALTER TABLE overheards ADD COLUMN hops INTEGER;
+  `,
 ];
 
 export function openDb(path) {

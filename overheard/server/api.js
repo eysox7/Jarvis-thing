@@ -240,14 +240,17 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null }
   router.post('/api/overheards/relay', async (ctx) => {
     const carrier = requireActive(ctx);
     limit(`relay:${carrier.id}`, 60, 3600000);
-    const { author, body } = await p2p.openRelay(db, (await readJson(ctx.req)).p);
+    const request = await readJson(ctx.req);
+    const { author, body } = await p2p.openRelay(db, request.p);
+    // Bluetooth ağında kaç telefondan geçtiği (uygulama bildirir; QR ile gelen tek atlamadır).
+    const hops = Number.isInteger(request.hops) ? Math.min(Math.max(request.hops, 0), 32) : null;
     if (author.banned) throw new HttpError(403, 'banned');
     const known = db.prepare('SELECT 1 FROM overheards WHERE user_id = ? AND client_id = ?').get(author.id, String(body.clientId ?? ''));
     if (!known) {
       limit(`post:${author.id}`, 10, 3600000);
       await aiGuard(body.text, 'overheard', domain.LIMITS.textMax);
     }
-    const result = domain.createOfflineOverheard(db, config, author, body, { relayedBy: carrier.id === author.id ? null : carrier.id });
+    const result = domain.createOfflineOverheard(db, config, author, body, { relayedBy: carrier.id === author.id ? null : carrier.id, hops });
     if (!result.duplicate && carrier.id !== author.id) {
       events.publish(author.id, 'relayed', { overheardId: result.id, placeName: result.placeName, carrier: carrier.handle });
     }

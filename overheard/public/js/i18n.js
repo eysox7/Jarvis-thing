@@ -399,6 +399,8 @@ const STRINGS = {
     'best.empty': 'Bu hafta henüz herkese açık söz yok. İlkini sen bırak!',
     'compose.ephemeral': '24 saat sonra kaybolsun',
     'bubble.expires': '{n} sa sonra kaybolacak',
+    'bubble.offline': 'İnternetsiz yazıldı',
+    'bubble.offlineHops': 'İnternetsiz yazıldı · {n} telefondan geçti',
   },
   en: {
     'app.tagline': 'Drop what you heard. Local ones can only be read by people who are there right now.',
@@ -800,6 +802,8 @@ const STRINGS = {
     'best.empty': 'No public overheards this week yet. Drop the first one!',
     'compose.ephemeral': 'Disappear after 24 hours',
     'bubble.expires': 'disappears in {n}h',
+    'bubble.offline': 'Written offline',
+    'bubble.offlineHops': 'Written offline · passed through {n} phones',
   },
 };
 

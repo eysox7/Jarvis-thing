@@ -378,7 +378,7 @@ export function searchPlaces(db, query) {
 
 const OVERHEARD_SELECT = `
   SELECT o.id, o.user_id, o.place_id, o.text, o.created_at, o.hidden, o.anonymous, o.visibility, o.expires_at,
-         u.handle, p.name AS place_name, p.city_id, p.lat AS place_lat, p.lng AS place_lng, p.radius_m, p.kind AS place_kind
+         o.offline, o.hops, u.handle, p.name AS place_name, p.city_id, p.lat AS place_lat, p.lng AS place_lng, p.radius_m, p.kind AS place_kind
   FROM overheards o
   JOIN users u ON u.id = o.user_id
   JOIN places p ON p.id = o.place_id`;
@@ -471,6 +471,9 @@ function serializeOverheard(row, ctx) {
     visibility: row.visibility,
     expiresAt: row.expires_at ?? null,
     onLine: row.place_kind === 'line',
+    // İnternetsiz yazılmış söz ve (kulaktan kulağa geldiyse) kaç telefondan geçtiği.
+    offline: Boolean(row.offline),
+    hops: row.offline ? row.hops ?? 0 : null,
   };
   if (!canReadRow(ctx, row)) {
     // Kilitli yerel söz: metin sunucudan hiç çıkmaz, yalnızca uzunluğu ipucu olarak verilir.
@@ -697,7 +700,7 @@ function fixAtPlace(db, config, fix, place) {
   return distanceM(fix.lat, fix.lng, place.lat, place.lng) <= place.radius_m + Math.min(fix.accuracy, config.maxAccuracyBonusM);
 }
 
-export function createOfflineOverheard(db, config, user, body, { relayedBy = null } = {}) {
+export function createOfflineOverheard(db, config, user, body, { relayedBy = null, hops = null } = {}) {
   const clientId = String(body.clientId ?? '');
   if (!CLIENT_ID_RE.test(clientId)) throw new HttpError(400, 'bad_client_id');
   const existing = db.prepare('SELECT id FROM overheards WHERE user_id = ? AND client_id = ?').get(user.id, clientId);
@@ -730,9 +733,10 @@ export function createOfflineOverheard(db, config, user, body, { relayedBy = nul
     if (fix) db.prepare('INSERT INTO checkins (user_id, place_id, at) VALUES (?, ?, ?)').run(user.id, place.id, Math.round(fix.at));
     const pioneer = !db.prepare('SELECT 1 FROM overheards WHERE place_id = ? LIMIT 1').get(place.id);
     const id = newId();
-    db.prepare(`INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous, visibility, expires_at, client_id, offline, relayed_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`)
-      .run(id, user.id, place.id, text, heardAt, body.anonymous ? 1 : 0, visibility, body.ephemeral ? heardAt + config.ephemeralMs : null, clientId, relayedBy);
+    db.prepare(`INSERT INTO overheards (id, user_id, place_id, text, created_at, anonymous, visibility, expires_at, client_id, offline, relayed_by, hops)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
+      .run(id, user.id, place.id, text, heardAt, body.anonymous ? 1 : 0, visibility, body.ephemeral ? heardAt + config.ephemeralMs : null, clientId, relayedBy,
+        hops ?? (relayedBy ? 1 : 0));
     return { ...getOverheard(db, config, user, id), masked, pioneer, offline: true };
   });
 }

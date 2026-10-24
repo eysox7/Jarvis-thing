@@ -169,9 +169,18 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       (ECDSA P-256, WebCrypto; özel anahtar dışa aktarılamaz) imzalar, sunucu doğrular; taşıyan
       değiştiremez, başkası adına söz uyduramaz. Uygulama içi kamera okuyucu (BarcodeDetector ya da
       jsQR); yazara "ulaştı" bildirimi.
-- [ ] **29. Yerli uygulama ile kendiliğinden eşten eşe** — Capacitor sarmalayıcı + iOS Multipeer
-      Connectivity / Android Nearby Connections: aynı vagondaki telefonlar imzalı sözleri (28'deki
-      paket biçimi) kendiliğinden birbirine aktarır.
+- [x] **29. Android uygulaması ve yeraltı modu** — Flutter ile yerli Android uygulaması (`mobile/`):
+      giriş, harita (hatlar, mekânlar, söz balonları; çevrimdışı son harita), check-in, söz bırakma.
+      Yeraltı modu: Google Nearby Connections (P2P_CLUSTER) ile telefonlar internetsiz ve dokunmadan
+      bağlanır; imzalı sözler (28'deki paket biçimi, Dart'ta ECDSA P-256 / RFC 6979) dedikodu
+      protokolüyle telefondan telefona yayılır (en fazla 8 atlama, 6 saat; boşta kalan bağlantı
+      bırakılır). Bağlantı bulan telefon sunucuya ulaştırır; sunucu kaç telefondan geçtiğini tutar
+      (şema v15, `hops`), internetsiz sözler haritada 📡. Telefon cepteyken kalıcı bildirimli hizmet.
+      Dart testleri gerçek Node sunucusuyla uçtan uca çalışır.
+- [ ] **30. iPhone'da yeraltı modu** — `MeshLink` için Multipeer Connectivity (iPhone ↔ iPhone) ve
+      BLE GATT (Android ↔ iPhone) bağlantı katmanı; iOS'ta arka plan Bluetooth kısıtları.
+- [ ] **31. Gizli sözler (mini oyun)** — İnternetsiz yazılmış sözler (`offline`, `hops`) özel:
+      yeraltında toplanan sözler "gizli söz" olarak açılır, kaç telefondan geçtiği oyunun parçası.
 
 ## Kalite turları (tüm adımlar bitince)
 

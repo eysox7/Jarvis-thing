@@ -86,6 +86,11 @@ balonların altında sokak haritası görünür.</sub>
   @x sayesinde ulaştı" bildirimi alır). Söz yazarın cihaz anahtarıyla (ECDSA P-256, özel anahtar
   cihazdan çıkmaz) imzalanır: taşıyan değiştiremez, kimse başkası adına söz uyduramaz; "o sırada
   oradaydım" kanıtı yazarındır. Bağlantı adresin `#` sonrasında taşınır, sunucu kayıtlarına düşmez.
+- **Android uygulaması ve yeraltı modu** ([`mobile/`](mobile/README.md), Flutter). Metroda internet
+  yokken yazılan söz, aynı paket biçimiyle Bluetooth/Wi-Fi üzerinden (Google Nearby Connections)
+  yanındaki telefonlara kendiliğinden geçer ve telefondan telefona yayılır; bağlantı bulan telefon
+  sunucuya ulaştırır. Sunucu sözün kaç telefondan geçtiğini (`hops`) tutar; internetsiz yazılmış
+  sözler haritada 📡 ile görünür.
 - **Sakin semtler.** Hiç sözün olmadığı bir yerde harita "Bu civarda henüz söz yok, ilkini sen
   bırak" der; yakında bir Overheard Kafe varsa onu da gösterir. Bir mekânın ya da hattın ilk sözünü
   bırakan 🚩 **Öncü** rozetini alır.
@@ -153,6 +158,8 @@ npm start            # http://localhost:8787
 npm test             # API testleri
 npm run test:e2e     # tarayıcıda uçtan uca testler (Playwright + Chromium)
 ```
+
+Android uygulamasının derlenmesi ve iki telefonla denenmesi: [`mobile/README.md`](mobile/README.md).
 
 ### Semtlere mekân ve hat aktarma (OpenStreetMap)
 
@@ -310,15 +317,16 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | `GET /api/venues/:placeId` · `POST …/settings` · `POST …/tables` · `POST …/tables/:id/print` · `POST …/tables/:id/close` | Kafe paneli (personel): mod, masa açma, bir fiş daha, kapatma |
 | `GET /api/venues/:placeId/jobs` · `POST …/jobs/:id/printed` | Yazıcı kuyruğu (fişler + kafe QR'ı); yeni fişte personele SSE `print` |
 | `POST /api/overheards/offline` | `{clientId, text, placeId, heardAt, fix?, …}` → çevrimdışı yazılmış söz (kanıt: o sıradaki giriş ya da `fix`) |
-| `POST /api/me/device-keys` · `POST /api/overheards/relay` | Cihaz imza anahtarı (açık yarı) · kulaktan kulağa taşınan imzalı söz `{p: "<veri>.<anahtar>.<imza>"}`; yazara SSE `relayed` |
+| `POST /api/me/device-keys` · `POST /api/overheards/relay` | Cihaz imza anahtarı (açık yarı) · kulaktan kulağa taşınan imzalı söz `{p: "<veri>.<anahtar>.<imza>", hops?}` (`hops`: Bluetooth ağında kaç telefondan geçtiği); yazara SSE `relayed` |
 | `GET /api/events` | SSE akışı (`dm`, `reveal`, `room` olayları) |
 
 ## Testler
 
 | Komut | Kapsam |
 | --- | --- |
-| `npm test` | 46 API/birim testi: yerel/herkese açık görünürlük ve anlık mekân kuralı, check-in, söz, tepki, tanıklar, anonimlik, mesajlaşma, rozetler, moderasyon, konum denetimleri, ölçek, göçler, yedekleme |
-| `npm run test:e2e` | 14 tarayıcı senaryosu (Playwright + Chromium): iki kullanıcıyla uçtan uca akış, ayrılınca yeniden kilitlenme ve herkese açık söz, tanık ve anonim sohbet, keşif kartı, rozetler, tanıtım, dil değişimi, moderasyon paneli, yoğun bölge, Google Maps uyarlayıcısı (taklit API ile) ve Leaflet'e dönüş |
+| `npm test` | 110 API/birim testi: yerel/herkese açık görünürlük ve anlık mekân kuralı, check-in, söz, tepki, tanıklar, anonimlik, mesajlaşma, rozetler, moderasyon, konum denetimleri, QR, kafe, hatlar, çevrimdışı ve kulaktan kulağa söz, ölçek, göçler, yedekleme |
+| `npm run test:e2e` | 23 tarayıcı senaryosu (Playwright + Chromium): iki kullanıcıyla uçtan uca akış, ayrılınca yeniden kilitlenme ve herkese açık söz, tanık ve anonim sohbet, keşif kartı, rozetler, tanıtım, dil değişimi, moderasyon paneli, yoğun bölge, Google Maps uyarlayıcısı (taklit API ile), QR, kafe, çevrimdışı ve kulaktan kulağa |
+| `cd mobile && flutter test` | 19 Android uygulaması testi: imza (web/sunucu biçimi), paket, telefondan telefona yayılma (bellek içi ağda zincir, üçgen, atlama ve süre sınırı), ekranlar ve gerçek sunucuyla uçtan uca (Dart'ta imzalanan sözün Node'da doğrulanması) |
 
 Testler bellek içi veritabanıyla gerçek bir HTTP sunucusu açar; dış ağa çıkmaz (harita karoları
 ve Google Maps API'si testte taklit edilir).
@@ -347,9 +355,10 @@ denetimler açıktır (`OVERHEARD_ANTI_SPOOF` ile değiştirilebilir):
   sabit bir koddur: mekâna bir kez giden biri fotoğrafını alıp 1 km yakınından yeniden okutabilir
   (dönen kod ya da ekranda gösterilen QR bu açığı kapatır).
 - Kulaktan kulağa tarayıcıda kullanıcının bir hamlesiyle (QR okutma, AirDrop/Quick Share) çalışır.
-  Telefonların internetsiz, kendiliğinden birbirini bulması (Bluetooth/Wi-Fi Direct ağı) tarayıcıdan
-  yapılamaz (iOS Safari Bluetooth'a izin vermez, WebRTC bağlantı kurmak için sunucu ister); bunun
-  için yerli uygulama (iOS Multipeer Connectivity, Android Nearby Connections) gerekir. Sunucu
+  Telefonların internetsiz, kendiliğinden birbirini bulması tarayıcıdan yapılamaz (iOS Safari
+  Bluetooth'a izin vermez, WebRTC bağlantı kurmak için sunucu ister); bunu Android uygulaması
+  (`mobile/`, Nearby Connections) yapar. iPhone için bağlantı katmanı (Multipeer Connectivity ya da
+  BLE) henüz yok. Sunucu
   tarafı (imzalı paket, aktarma ucu) buna hazırdır. Kodu telefonun kamera uygulamasıyla okutan
   kişinin tarayıcısı Overheard'ü daha önce açmış olmalı (çevrimdışı kabuk önbellekte).
 - Hız sınırları ve canlı bağlantılar tek süreç içindedir; yatay ölçeklemede paylaşılan bir depo

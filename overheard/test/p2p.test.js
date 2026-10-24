@@ -63,6 +63,26 @@ describe('Kulaktan kulağa (eşten eşe)', () => {
     assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM overheards WHERE client_id = ?').get(it.c).n, 1);
   });
 
+  test('Bluetooth ağında kaç telefondan geçtiği kaydedilir; söz "internetsiz yazıldı" diye görünür', async () => {
+    const viaMesh = item({ v: 'p' });
+    const r = await carrier.post('/api/overheards/relay', { p: await authorDevice.sign(viaMesh), hops: 3 });
+    assert.equal(r.status, 200);
+    assert.equal(r.data.overheard.offline, true);
+    assert.equal(r.data.overheard.hops, 3);
+    // Uygulama bildirmezse (QR/AirDrop) tek atlamadır; yazar kendisi gönderdiyse sıfır.
+    const viaQr = item();
+    await carrier.post('/api/overheards/relay', { p: await authorDevice.sign(viaQr) });
+    const byAuthor = item();
+    await author.post('/api/overheards/relay', { p: await authorDevice.sign(byAuthor), hops: 0 });
+    const hops = (c) => srv.db.prepare('SELECT hops FROM overheards WHERE client_id = ?').get(c).hops;
+    assert.equal(hops(viaQr.c), 1);
+    assert.equal(hops(byAuthor.c), 0);
+    // Çevrimiçi yazılmış sözde bu alanlar boştur.
+    const online = await author.post('/api/overheards', { ...KADIKOY, text: 'İskelede biri: "Bu vapur da bizim gibi gecikiyor."' });
+    assert.equal(online.data.overheard.offline, false);
+    assert.equal(online.data.overheard.hops, null);
+  });
+
   test('taşıyan sözü değiştiremez, başkası adına söz uyduramaz', async () => {
     const signed = await authorDevice.sign(item());
     const [data, keyId, sig] = signed.split('.');
