@@ -28,7 +28,7 @@ void main() {
     underground: Underground(
       store: store,
       files: files,
-      linkFactory: NearbyLink.new,
+      linkFactory: (log) => NearbyLink(onLog: log),
       radio: AndroidRadio(),
       courier: Courier(api, store),
     ),

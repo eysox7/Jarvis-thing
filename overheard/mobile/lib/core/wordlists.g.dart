@@ -1,0 +1,43 @@
+// OTOMATİK ÜRETİLDİ: tool/gen_shared.mjs (kaynak: server/data/wordlists.js). Elle düzenleme.
+
+const slurs = <String>[
+  'nigger',
+  'nigga',
+  'faggot',
+  'fagot',
+  'retard',
+  'kike',
+  'spic',
+  'chink',
+  'tranny',
+  'ibne',
+  'pust',
+  'zenci',
+];
+
+const profanity = <String>[
+  'fuck',
+  'fucking',
+  'motherfucker',
+  'shit',
+  'bitch',
+  'asshole',
+  'dick',
+  'cunt',
+  'bastard',
+  'amk',
+  'aq',
+  'amina',
+  'aminakoyim',
+  'siktir',
+  'sikerim',
+  'sikeyim',
+  'orospu',
+  'orospucocugu',
+  'yarrak',
+  'yarak',
+  'pezevenk',
+  'gavat',
+  'kahpe',
+  'serefsiz',
+];

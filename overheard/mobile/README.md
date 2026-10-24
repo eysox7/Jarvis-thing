@@ -16,7 +16,14 @@ kullanır.
 - **Yeraltı modu**: telefonlar birbirini internetsiz ve dokunmadan bulur (Google Nearby Connections,
   `P2P_CLUSTER`), sözleri telefondan telefona yayar ve bağlantı bulan telefon sunucuya ulaştırır.
   Telefon cepteyken de sürsün diye kalıcı bildirimli ön plan hizmeti çalışır. Gelen sözler hemen
-  okunur ("yeraltında duyulanlar").
+  okunur ("yeraltında duyulanlar"); rahatsız edici bulunan söz telefondan silinebilir.
+- **Saha günlüğü** (Yeraltı sekmesinin altında): telefon bulundu, bağlandı, söz istendi/alındı,
+  gönderilemedi, sunucuya ulaştı... İki telefonla denerken ne olduğunu gösterir.
+- **Söz ayrıntısı**: tepkiler (😂 😮 ❤️, o sırada oradaysan 👂), yazana mesaj, şikâyet, yazarı engelleme.
+- **Mesajlar**: sözler üzerinden başlayan konuşmalar, okunmamış rozeti, anonim sözün sahibi için
+  "kimliğimi göster".
+- **Profil**: sayılar, rozetler, kullanım koşulları ve gizlilik politikası, çıkış, **uygulama içinden
+  hesap silme** (sunucudaki hesap ve telefondaki anahtar, yeraltı deposu, önbellekler).
 
 ## Yeraltı modu nasıl çalışır
 
@@ -40,6 +47,12 @@ kullanır.
 Gizlilik: telefonlar kullanıcı adı yerine her açılışta değişen rastgele bir ad duyurur. Taşınan
 sözler yalnızca yanındakilerin zaten okuyacağı metinlerdir; anonim sözde yazar adı pakete girmez.
 
+İçerik denetimi: internetsiz sözler sunucuya varmadan okunduğu için sunucunun kuralları telefonda da
+uygulanır (`lib/core/moderation.dart`, listeler sunucudan üretilir). Nefret söylemi içeren söz
+yazılamaz; gelirse alınmaz, saklanmaz ve yayılmaz. Kişisel veri (telefon, e-posta, plaka, @kişi,
+bağlantı) ve küfür imzalanmadan önce maskelenir, gelen sözlerde de maskeli gösterilir. Bir test,
+Dart ve Node sürümlerinin aynı sonucu verdiğini denetler.
+
 ## Derleme
 
 Gerekenler: Flutter 3.47+ (Dart 3.13), Android SDK (platform 36 ve 37, build-tools 36), JDK 17+.
@@ -48,7 +61,7 @@ Gerekenler: Flutter 3.47+ (Dart 3.13), Android SDK (platform 36 ve 37, build-too
 cd overheard/mobile
 flutter pub get
 flutter analyze
-flutter test                      # birim + ekran + gerçek sunucuyla uçtan uca (node gerekir)
+flutter test                      # 28 test: birim, ekran, denetim eşliği ve gerçek sunucuyla uçtan uca (node gerekir)
 flutter build apk --release --split-per-abi --target-platform android-arm64 \
   --dart-define=OVERHEARD_URL=https://overheard.ornek.com
 ```
@@ -57,10 +70,41 @@ flutter build apk --release --split-per-abi --target-platform android-arm64 \
 - Sürüm derlemesi yalnızca `https://` sunucuya bağlanır. Yerel ağdaki `http://` bir sunucuyla
   denemek için derlemeden önce `export ORG_GRADLE_PROJECT_overheardCleartext=true` (hata ayıklama
   derlemesinde zaten açık).
-- Pilot derleme hata ayıklama anahtarıyla imzalanır; Play Store için kendi anahtarınla
-  (`key.properties`) değiştir.
-- `lib/l10n/server_strings.g.dart` web uygulamasının hata metinlerinden üretilir:
-  `node tool/gen_server_strings.mjs`.
+- `lib/l10n/web_strings.g.dart` (web uygulamasının metinleri) ve `lib/core/wordlists.g.dart`
+  (sunucunun denetim listeleri) üretilir: `node tool/gen_shared.mjs`.
+
+## Play Store'a hazırlık
+
+1. Yükleme anahtarı oluştur (bir kez; dosyayı ve parolaları güvenli bir yerde sakla, depoya ekleme):
+   ```bash
+   keytool -genkeypair -v -keystore ~/overheard-upload.jks -storetype JKS -keyalg RSA -keysize 2048 \
+     -validity 10000 -alias upload
+   ```
+2. `android/key.properties` (depoda yok sayılır):
+   ```
+   storeFile=/home/sen/overheard-upload.jks
+   storePassword=...
+   keyAlias=upload
+   keyPassword=...
+   ```
+   Dosya varsa sürüm derlemesi bu anahtarla, yoksa hata ayıklama anahtarıyla (pilot) imzalanır.
+3. Play Store `.aab` ister:
+   `flutter build appbundle --release --dart-define=OVERHEARD_URL=https://overheard.ornek.com`
+   → `build/app/outputs/bundle/release/app-release.aab`. Play App Signing'i aç (Google dağıtım
+   anahtarını tutar, sen yükleme anahtarıyla imzalarsın).
+4. Play Console beyanları:
+   - **Ön plan hizmeti** (`connectedDevice`): "Telefon cepteyken yakındaki telefonlarla Bluetooth
+     üzerinden internetsiz söz aktarımı (yeraltı modu); kullanıcı açar, kalıcı bildirim görünür."
+     Kısa bir ekran kaydı istenir (yeraltı modunu açma → bildirim → başka telefona söz geçmesi).
+   - **Konum**: yalnızca uygulama açıkken (check-in ve "o sırada oradaydım" kanıtı); arka plan
+     konumu kullanılmaz.
+   - **Kullanıcı içeriği (UGC)**: uygulama içi şikâyet, engelleme, moderasyon paneli, kullanım
+     koşulları kabulü, nefret söylemi filtresi ve kişisel veri maskesi var.
+   - **Hesap silme**: uygulama içinde (Profil → Hesabımı sil). Play uygulamasız silme için bir web
+     adresi de ister: web uygulamasında da aynı seçenek var (sunucu adresi → Profil → Hesabımı sil).
+   - **Veri güvenliği** formu: konum (yaklaşık/kesin, uygulama işlevi için), kullanıcı içeriği
+     (sözler, mesajlar), hesap bilgisi (kullanıcı adı); üçüncü tarafla paylaşım yok; aktarım
+     şifreli (https); silme isteği desteklenir.
 
 ## İki telefonla deneme
 

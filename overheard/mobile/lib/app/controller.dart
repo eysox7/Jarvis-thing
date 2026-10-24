@@ -8,6 +8,7 @@ import '../core/api.dart';
 import '../core/b64.dart';
 import '../core/location.dart';
 import '../core/models.dart';
+import '../core/moderation.dart';
 import '../core/storage.dart';
 import '../mesh/device_key.dart';
 import '../mesh/packet.dart';
@@ -69,6 +70,7 @@ class AppController extends ChangeNotifier {
 
   bool booted = false;
   Me? me;
+  Profile profile = const Profile();
   List<City> cities = fallbackCities;
   bool demoMode = false;
   String cityId = 'istanbul';
@@ -123,6 +125,7 @@ class AppController extends ChangeNotifier {
         return;
       }
       await _setMe(Me.fromJson(user as Map<String, dynamic>));
+      profile = Profile.fromJson(result);
       final config = await api.get('/api/config');
       _applyConfig(config);
       await files.save('config', config);
@@ -284,6 +287,9 @@ class AppController extends ChangeNotifier {
     }
     final key = _key, id = keyId;
     if (key == null || id == null || !hasKey) throw NoDeviceKey();
+    // Söz telefondan telefona sunucudan önce okunur: nefret söylemi yazılmaz, kişisel veri ve küfür
+    // imzalanmadan önce maskelenir (sunucunun kuralları).
+    final clean = moderatePublicText(text);
     final now = _clock();
     // Kanıt: şimdiki iyi konum ya da (tünelde) binerken alınmış son konum.
     final proof = [
@@ -294,7 +300,7 @@ class AppController extends ChangeNotifier {
       clientId: _newClientId(),
       placeId: place.id,
       placeName: place.name,
-      text: text,
+      text: clean,
       heardAt: now,
       public: public,
       anonymous: anonymous,
@@ -318,6 +324,86 @@ class AppController extends ChangeNotifier {
       throw ApiException(400, packet.error ?? 'default', {'placeName': place.name});
     }
     return ComposeOutcome.mesh(packet);
+  }
+
+  // Okunmamış mesaj sayısı ve profil sayıları (sekme rozeti için ara ara).
+  Future<void> refreshProfile() async {
+    try {
+      final result = await api.get('/api/me');
+      if (result['user'] == null) return;
+      profile = Profile.fromJson(result);
+      notifyListeners();
+    } on ApiException {
+      // Bağlantı yoksa eski sayılar kalır.
+    }
+  }
+
+  // --- Söz üzerinde eylemler ---
+
+  Future<Overheard> react(String id, String kind) async {
+    final result = await api.post('/api/overheards/$id/reactions', {'kind': kind});
+    return Overheard.fromJson(result['overheard'] as Map<String, dynamic>);
+  }
+
+  Future<void> report(String id) => api.post('/api/overheards/$id/report', {'reason': 'inappropriate'});
+
+  // Yazar engellenir (anonimse kimliği açılmadan); sözleri haritadan kalkar, birbirinize yazamazsınız.
+  Future<void> blockAuthor(String id) async {
+    await api.post('/api/overheards/$id/block-author');
+    unawaited(loadCity(cityId).catchError((_) {}));
+  }
+
+  // --- Mesajlar ---
+
+  Future<List<ConversationSummary>> conversations() async {
+    final result = await api.get('/api/conversations');
+    final list = [
+      for (final c in (result['conversations'] as List? ?? const []))
+        ConversationSummary.fromJson(c as Map<String, dynamic>),
+    ];
+    final unread = list.where((c) => c.unread).length;
+    if (unread != profile.unread) {
+      profile = Profile(stats: profile.stats, badges: profile.badges, unread: unread, banned: profile.banned);
+      notifyListeners();
+    }
+    return list;
+  }
+
+  Future<Conversation> conversation(String id) async =>
+      Conversation.fromJson((await api.get('/api/conversations/$id'))['conversation'] as Map<String, dynamic>);
+
+  Future<void> sendMessage(String conversationId, String body) =>
+      api.post('/api/conversations/$conversationId/messages', {'body': body});
+
+  // Sözün sahibine ilk mesaj; konuşmanın kimliği döner.
+  Future<String> messageAbout(String overheardId, String body) async =>
+      (await api.post('/api/overheards/$overheardId/messages', {'body': body}))['conversationId'] as String;
+
+  Future<Conversation> reveal(String conversationId) async => Conversation.fromJson(
+    (await api.post('/api/conversations/$conversationId/reveal'))['conversation'] as Map<String, dynamic>,
+  );
+
+  // --- Hesap ---
+
+  String get termsUrl => '$server/terms.html';
+  String get privacyUrl => '$server/privacy.html';
+
+  // Hesap ve sunucudaki tüm veriler kalıcı olarak silinir; telefondaki her şey (anahtar, yeraltı
+  // deposu, önbellekler) de temizlenir.
+  Future<void> deleteAccount(String password) async {
+    await api.post('/api/me/delete', {'password': password});
+    if (underground.running) await underground.stop();
+    underground.clear();
+    await files.clear();
+    for (final key in ['device_key', 'device_key_id', 'device_key_owner', 'fix', 'city']) {
+      await vault.write(key, null);
+    }
+    _key = null;
+    keyId = null;
+    _keyOwner = null;
+    lastFix = null;
+    map = null;
+    await _signedOut();
   }
 
   Future<Overheard> overheard(String id) async =>

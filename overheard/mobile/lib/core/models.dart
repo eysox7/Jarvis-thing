@@ -138,6 +138,8 @@ class Overheard {
     this.reactions = const {},
     this.myReactions = const [],
     this.here = false,
+    this.canMessage = false,
+    this.sameTime = false,
   });
 
   final String id;
@@ -161,6 +163,9 @@ class Overheard {
   final Map<String, int> reactions;
   final List<String> myReactions;
   final bool here;
+  final bool canMessage;
+  // Söz söylendiğinde sen de oradaydın ("Ben de duydum" yalnızca o zaman).
+  final bool sameTime;
 
   bool get public => visibility == 'public';
 
@@ -184,6 +189,8 @@ class Overheard {
     reactions: {for (final e in ((j['reactions'] as Map?) ?? const {}).entries) e.key as String: _i(e.value)},
     myReactions: [...((j['myReactions'] as List?) ?? const []).whereType<String>()],
     here: _b(j['here']),
+    canMessage: _b(j['canMessage']),
+    sameTime: _b(j['sameTime']),
   );
 }
 
@@ -216,4 +223,115 @@ class Presence {
   );
 
   Map<String, dynamic> toJson() => {'places': places.map((p) => p.toJson()).toList(), 'at': at};
+}
+
+class ConversationSummary {
+  const ConversationSummary({
+    required this.id,
+    required this.overheardText,
+    required this.placeName,
+    required this.lastAt,
+    this.withHandle,
+    this.lastMessage,
+    this.lastFromMe = false,
+    this.unread = false,
+  });
+
+  final String id;
+  final String overheardText;
+  final String placeName;
+  final int lastAt;
+  // Karşıdaki kişi (anonim sözün sahibi kimliğini açmadıysa null).
+  final String? withHandle;
+  final String? lastMessage;
+  final bool lastFromMe;
+  final bool unread;
+
+  factory ConversationSummary.fromJson(Map<String, dynamic> j) => ConversationSummary(
+    id: j['id'] as String,
+    overheardText: j['overheardText'] as String? ?? '',
+    placeName: j['placeName'] as String? ?? '',
+    lastAt: _i(j['lastAt']),
+    withHandle: j['with'] as String?,
+    lastMessage: j['lastMessage'] as String?,
+    lastFromMe: _b(j['lastFromMe']),
+    unread: _b(j['unread']),
+  );
+}
+
+class Message {
+  const Message({required this.id, required this.body, required this.createdAt, required this.fromMe});
+
+  final int id;
+  final String body;
+  final int createdAt;
+  final bool fromMe;
+
+  factory Message.fromJson(Map<String, dynamic> j) => Message(
+    id: _i(j['id']),
+    body: j['body'] as String? ?? '',
+    createdAt: _i(j['createdAt']),
+    fromMe: _b(j['fromMe']),
+  );
+}
+
+class Conversation {
+  const Conversation({
+    required this.id,
+    required this.role,
+    required this.kind,
+    required this.overheardText,
+    required this.placeName,
+    required this.messages,
+    this.withHandle,
+    this.mutualPlaces = const [],
+    this.canReveal = false,
+  });
+
+  final String id;
+  // owner: sözün sahibi sensin; starter: konuşmayı sen başlattın.
+  final String role;
+  // author: söz sahibiyle; witness: aynı sözün tanıklarıyla.
+  final String kind;
+  final String overheardText;
+  final String placeName;
+  final List<Message> messages;
+  final String? withHandle;
+  final List<String> mutualPlaces;
+  final bool canReveal;
+
+  factory Conversation.fromJson(Map<String, dynamic> j) {
+    final overheard = (j['overheard'] as Map?) ?? const {};
+    return Conversation(
+      id: j['id'] as String,
+      role: j['role'] as String? ?? 'starter',
+      kind: j['kind'] as String? ?? 'author',
+      overheardText: overheard['text'] as String? ?? '',
+      placeName: overheard['placeName'] as String? ?? '',
+      messages: [for (final m in (j['messages'] as List? ?? const [])) Message.fromJson(m as Map<String, dynamic>)],
+      withHandle: j['with'] as String?,
+      mutualPlaces: [for (final p in (j['mutualPlaces'] as List? ?? const [])) (p as Map)['name'] as String? ?? ''],
+      canReveal: _b(j['canReveal']),
+    );
+  }
+}
+
+// Profil özeti (/api/me): sayılar, rozetler ve okunmamış konuşmalar.
+class Profile {
+  const Profile({this.stats = const {}, this.badges = const [], this.unread = 0, this.banned = false});
+
+  final Map<String, int> stats;
+  final List<({String id, bool earned})> badges;
+  final int unread;
+  final bool banned;
+
+  factory Profile.fromJson(Map<String, dynamic> j) => Profile(
+    stats: {for (final e in ((j['stats'] as Map?) ?? const {}).entries) e.key as String: _i(e.value)},
+    badges: [
+      for (final b in (((j['progress'] as Map?)?['badges'] as List?) ?? const []))
+        (id: (b as Map)['id'] as String, earned: _b(b['earned'])),
+    ],
+    unread: _i(j['unread']),
+    banned: _b((j['user'] as Map?)?['banned']),
+  );
 }

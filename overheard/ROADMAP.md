@@ -177,6 +177,12 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       bırakılır). Bağlantı bulan telefon sunucuya ulaştırır; sunucu kaç telefondan geçtiğini tutar
       (şema v15, `hops`), internetsiz sözler haritada 📡. Telefon cepteyken kalıcı bildirimli hizmet.
       Dart testleri gerçek Node sunucusuyla uçtan uca çalışır.
+- [x] **29b. Uygulamada topluluk ve Play Store uyumu** — Söz ayrıntısında tepkiler, yazana mesaj,
+      şikâyet ve engelleme; Mesajlar sekmesi (okunmamış rozeti, kimliğini açma); profil (sayılar,
+      rozetler, koşullar/gizlilik, uygulama içinden hesap silme). Sunucunun içerik denetimi Dart'a
+      taşındı (listeler sunucudan üretilir, Node ile eşlik testi): nefret söylemi içeren söz yeraltında
+      yazılmaz, alınmaz, yayılmaz; kişisel veri ve küfür imzadan önce maskelenir. Yeraltı saha
+      günlüğü. key.properties ile yükleme anahtarı imzası ve .aab derlemesi.
 - [ ] **30. iPhone'da yeraltı modu** — `MeshLink` için Multipeer Connectivity (iPhone ↔ iPhone) ve
       BLE GATT (Android ↔ iPhone) bağlantı katmanı; iOS'ta arka plan Bluetooth kısıtları.
 - [ ] **31. Gizli sözler (mini oyun)** — İnternetsiz yazılmış sözler (`offline`, `hops`) özel:

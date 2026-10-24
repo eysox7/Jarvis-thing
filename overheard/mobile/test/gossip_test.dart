@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:overheard/core/moderation.dart';
 import 'package:overheard/mesh/gossip.dart';
 import 'package:overheard/mesh/mesh_store.dart';
 import 'package:overheard/mesh/packet.dart';
@@ -9,20 +10,31 @@ import 'package:overheard/mesh/packet.dart';
 import 'support.dart';
 
 class Phone {
-  Phone(MemoryNetwork network, String name, int Function() clock, {int maxHops = 8}) : link = network.join(name) {
-    gossip = Gossip(store: store, link: link, maxHops: maxHops, clock: clock, onReceived: received.add)..start();
+  Phone(MemoryNetwork network, String name, int Function() clock, {int maxHops = 8, bool Function(MeshPacket)? accept})
+    : link = network.join(name) {
+    gossip = Gossip(
+      store: store,
+      link: link,
+      maxHops: maxHops,
+      clock: clock,
+      onReceived: received.add,
+      accept: accept,
+      onLog: log.add,
+    )..start();
   }
 
   final MemoryLink link;
   final store = MeshStore();
   final received = <MeshPacket>[];
+  final log = <String>[];
   late final Gossip gossip;
 }
 
 void main() {
   late MemoryNetwork net;
   late int now;
-  Phone phone(String name, {int maxHops = 8}) => Phone(net, name, () => now, maxHops: maxHops);
+  Phone phone(String name, {int maxHops = 8, bool Function(MeshPacket)? accept}) =>
+      Phone(net, name, () => now, maxHops: maxHops, accept: accept);
 
   setUp(() {
     net = MemoryNetwork();
@@ -148,5 +160,24 @@ void main() {
     // Düşen söz yeniden istenmez.
     expect(store.knows(old.id), isTrue);
     expect(store.add(old, now: now), isFalse);
+  });
+
+  test('denetimden geçmeyen söz alınmaz, saklanmaz ve yayılmaz', () async {
+    final a = phone('A');
+    final b = phone('B', accept: (p) => !containsSlur(p.note.text));
+    final c = phone('C');
+    await net.connect('A', 'B');
+    await net.connect('B', 'C');
+    final bad = signedPacket(clientId: 'clientid-bad1', text: 'Vagondaki adam ibne dedi', heardAt: now);
+    final good = signedPacket(clientId: 'clientid-good', heardAt: now);
+    await a.gossip.publish(bad);
+    await a.gossip.publish(good);
+    await settle();
+    expect(b.store[bad.id], isNull);
+    expect(b.store.knows(bad.id), isTrue);
+    expect(c.store[bad.id], isNull);
+    expect(c.store[good.id]?.hops, 2);
+    expect(b.received.map((p) => p.id), [good.id]);
+    expect(b.log.any((line) => line.startsWith('Söz geri çevrildi')), isTrue);
   });
 }

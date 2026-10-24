@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../core/moderation.dart';
 import '../core/storage.dart';
 import '../l10n/strings.dart';
 import 'courier.dart';
@@ -11,6 +12,14 @@ import 'packet.dart';
 import 'radio.dart';
 
 enum UndergroundStart { ok, permissions, unavailable }
+
+// Saha denemesi günlüğünün bir satırı (telefon bulundu, bağlandı, söz alındı, gönderilemedi...).
+class LogLine {
+  const LogLine(this.at, this.message);
+
+  final int at;
+  final String message;
+}
 
 // Yeraltı modu: telefonlar arası yayılmayı (Gossip) bağlantı katmanına (Nearby) bağlar, depoyu diske
 // yazar ve bağlantı bulunca sözleri sunucuya ulaştırır (Courier). Mod kapalıyken de yazılan söz
@@ -31,7 +40,8 @@ class Underground extends ChangeNotifier {
 
   final MeshStore store;
   final Files files;
-  final MeshLink Function() linkFactory;
+  // Bağlantı katmanını kurar; verilen işlev saha günlüğüne yazar.
+  final MeshLink Function(void Function(String message) log) linkFactory;
   final MeshRadio radio;
   final Courier courier;
   final int maxHops;
@@ -44,6 +54,10 @@ class Underground extends ChangeNotifier {
   Timer? _save;
   bool _busy = false;
   final _received = StreamController<MeshPacket>.broadcast();
+  final List<LogLine> _log = [];
+
+  // En yeni önce, en fazla 200 satır.
+  List<LogLine> get log => _log.reversed.toList();
 
   bool get running => _gossip != null;
   int get peers => _gossip?.peers.length ?? 0;
@@ -64,16 +78,29 @@ class Underground extends ChangeNotifier {
     if (running || _busy) return UndergroundStart.ok;
     _busy = true;
     try {
-      if (!await radio.permit()) return UndergroundStart.permissions;
-      final link = linkFactory();
-      final gossip = Gossip(store: store, link: link, maxHops: maxHops, clock: _clock, onReceived: _onReceived)
-        ..start();
+      if (!await radio.permit()) {
+        _write('İzin verilmedi (Bluetooth, yakındaki cihazlar, konum)');
+        return UndergroundStart.permissions;
+      }
+      final link = linkFactory(_write);
+      final gossip = Gossip(
+        store: store,
+        link: link,
+        maxHops: maxHops,
+        clock: _clock,
+        onReceived: _onReceived,
+        // Nefret söylemi içeren söz alınmaz, saklanmaz ve yayılmaz.
+        accept: (packet) => !containsSlur(packet.note.text),
+        onLog: _write,
+      )..start();
       _linkEvents = link.events.listen((_) => _changed(save: false));
       if (!await link.start()) {
         await gossip.stop();
         await _linkEvents?.cancel();
+        _write('Yakındaki cihaz bağlantısı başlatılamadı');
         return UndergroundStart.unavailable;
       }
+      _write('Yeraltı modu açıldı');
       _link = link;
       _gossip = gossip;
       _tick = Timer.periodic(const Duration(seconds: 15), (_) => _maintain());
@@ -94,7 +121,20 @@ class Underground extends ChangeNotifier {
     _gossip = null;
     _link = null;
     await radio.release();
-    notifyListeners();
+    _write('Yeraltı modu kapandı');
+  }
+
+  // Hesap silinince: depo ve günlük boşaltılır.
+  void clear() {
+    store.clear();
+    _log.clear();
+    _changed();
+  }
+
+  // Sözü bu telefondan siler (rahatsız edici bulduysan); bir daha alınmaz ve kimseye sunulmaz.
+  void hide(String id) {
+    store.forget(id, now: _clock());
+    _changed();
   }
 
   // Kendi yeni sözün. Mod açıksa bağlı herkese gider; bağlantı varsa hemen sunucuya da.
@@ -107,6 +147,7 @@ class Underground extends ChangeNotifier {
   Future<int> flush() async {
     final before = packets.map((p) => p.state).toList();
     final sent = await courier.flush(now: _clock());
+    if (sent > 0) _write('Sunucuya ulaştı: $sent söz');
     final after = packets.map((p) => p.state).toList();
     if (!listEquals(before, after)) _changed();
     return sent;
@@ -127,6 +168,12 @@ class Underground extends ChangeNotifier {
   void _onReceived(MeshPacket packet) {
     _received.add(packet);
     _changed();
+  }
+
+  void _write(String message) {
+    _log.add(LogLine(_clock(), message));
+    if (_log.length > 200) _log.removeAt(0);
+    notifyListeners();
   }
 
   void _changed({bool save = true}) {

@@ -13,7 +13,7 @@ import 'gossip.dart';
 // duyurulur. Kalabalıkta bağlantı yuvası sınırlı olduğundan, alışverişi biten telefondan kopulur ve
 // bir süre ona yeniden bağlanılmaz; böylece sırayla herkese ulaşılır.
 class NearbyLink implements MeshLink {
-  NearbyLink({Nearby? nearby, Random? random}) : _nearby = nearby ?? Nearby() {
+  NearbyLink({Nearby? nearby, Random? random, this.onLog}) : _nearby = nearby ?? Nearby() {
     final source = random ?? Random.secure();
     _name = 'oh-${List.generate(6, (_) => source.nextInt(36).toRadixString(36)).join()}';
   }
@@ -23,6 +23,7 @@ class NearbyLink implements MeshLink {
   static const cooldown = Duration(seconds: 60);
 
   final Nearby _nearby;
+  final void Function(String message)? onLog;
   late final String _name;
   final _events = StreamController<LinkEvent>.broadcast();
   final Set<String> _connected = {};
@@ -47,7 +48,9 @@ class NearbyLink implements MeshLink {
         onDisconnected: _lost,
         serviceId: serviceId,
       );
-    } catch (_) {}
+    } catch (e) {
+      onLog?.call('Görünür olunamadı: $e');
+    }
     try {
       discovering = await _nearby.startDiscovery(
         _name,
@@ -56,8 +59,13 @@ class NearbyLink implements MeshLink {
         onEndpointLost: (_) {},
         serviceId: serviceId,
       );
-    } catch (_) {}
+    } catch (e) {
+      onLog?.call('Arama başlatılamadı: $e');
+    }
     _running = advertising || discovering;
+    onLog?.call(
+      'Bu telefon $_name olarak görünür: ${advertising ? 'evet' : 'hayır'}, arıyor: ${discovering ? 'evet' : 'hayır'}',
+    );
     return _running;
   }
 
@@ -83,6 +91,7 @@ class NearbyLink implements MeshLink {
     // İki telefon birbirini aynı anda bulursa ikisi birden istemesin: adı küçük olan ister, öbürü
     // biraz bekler (karşı taraf onu göremiyorsa yine de bağlansın diye).
     _names[id] = name;
+    onLog?.call('Telefon bulundu: $name');
     final delay = _name.compareTo(name) < 0 ? Duration.zero : const Duration(seconds: 4);
     Timer(delay, () => _request(id));
   }
@@ -98,20 +107,28 @@ class NearbyLink implements MeshLink {
         onConnectionResult: _result,
         onDisconnected: _lost,
       );
-    } catch (_) {
+    } catch (e) {
       _pending.remove(id);
+      onLog?.call('Bağlantı isteği olmadı (${_names[id] ?? id}): $e');
     }
   }
 
   void _initiated(String id, ConnectionInfo info) {
     _pending.add(id);
     _names[id] = info.endpointName;
-    _nearby.acceptConnection(id, onPayLoadRecieved: _payload).catchError((_) => false);
+    _nearby.acceptConnection(id, onPayLoadRecieved: _payload).catchError((Object e) {
+      onLog?.call('Bağlantı kabul edilemedi (${info.endpointName}): $e');
+      return false;
+    });
   }
 
   void _result(String id, Status status) {
     _pending.remove(id);
-    if (status == Status.CONNECTED && _connected.add(id)) _events.add(PeerConnected(id));
+    if (status != Status.CONNECTED) onLog?.call('Bağlanılamadı (${_names[id] ?? id}): ${status.name}');
+    if (status == Status.CONNECTED && _connected.add(id)) {
+      onLog?.call('Bağlandı: ${_names[id] ?? id}');
+      _events.add(PeerConnected(id));
+    }
   }
 
   void _lost(String id) {

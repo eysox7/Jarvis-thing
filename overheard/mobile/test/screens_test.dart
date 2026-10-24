@@ -3,11 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:overheard/app/app.dart';
 import 'package:overheard/app/controller.dart';
 import 'package:overheard/core/api.dart';
+import 'package:overheard/core/models.dart';
 import 'package:overheard/core/storage.dart';
 import 'package:overheard/mesh/courier.dart';
 import 'package:overheard/mesh/mesh_store.dart';
 import 'package:overheard/mesh/packet.dart';
 import 'package:overheard/mesh/underground.dart';
+import 'package:overheard/screens/me_screen.dart';
+import 'package:overheard/screens/overheard_sheet.dart';
 import 'package:overheard/screens/underground_screen.dart';
 
 import 'support.dart';
@@ -29,7 +32,7 @@ void main() {
       underground: Underground(
         store: store,
         files: files,
-        linkFactory: () => MemoryNetwork().join('A'),
+        linkFactory: (_) => MemoryNetwork().join('A'),
         radio: radio,
         courier: Courier(api, store),
       ),
@@ -93,5 +96,94 @@ void main() {
     expect(radio.alive, isTrue);
     expect(find.text('On · looking for nearby phones'), findsOneWidget);
     await tester.runAsync(app.underground.stop);
+  });
+
+  testWidgets('söz ayrıntısı: okunabilen sözde tepki, mesaj, şikâyet ve engelleme; kilitlide yok', (tester) async {
+    Widget card(Overheard o) => AppScope(
+      controller: app,
+      child: MaterialApp(
+        home: Scaffold(body: OverheardCard(overheard: o)),
+      ),
+    );
+    const open = Overheard(
+      id: 'o1',
+      placeId: 'p',
+      placeName: 'Kadıköy İskelesi',
+      lat: 0,
+      lng: 0,
+      createdAt: 0,
+      locked: false,
+      text: 'Martılar da zam yaptı',
+      author: 'yolcu',
+      canMessage: true,
+      offline: true,
+      hops: 3,
+      reactions: {'heart': 2},
+    );
+    await tester.pumpWidget(card(open));
+    expect(find.text('“Martılar da zam yaptı”'), findsOneWidget);
+    expect(find.text('Message'), findsOneWidget);
+    expect(find.text('Report'), findsOneWidget);
+    expect(find.text('Block'), findsOneWidget);
+    expect(find.text('❤️ 2'), findsOneWidget);
+    // "Ben de duydum" yalnızca o sırada orada olana.
+    expect(find.textContaining('👂'), findsNothing);
+    expect(find.text('Written offline · passed through 3 phones'), findsOneWidget);
+
+    const locked = Overheard(
+      id: 'o2',
+      placeId: 'p',
+      placeName: 'Moda Sahili',
+      lat: 0,
+      lng: 0,
+      createdAt: 0,
+      locked: true,
+      length: 42,
+    );
+    await tester.pumpWidget(card(locked));
+    expect(find.textContaining('Be at Moda Sahili to read it'), findsOneWidget);
+    expect(find.text('Report'), findsNothing);
+    expect(find.text('Message'), findsNothing);
+  });
+
+  testWidgets('profil: koşullar, gizlilik ve hesap silme', (tester) async {
+    await tester.pumpWidget(
+      AppScope(
+        controller: app,
+        child: const MaterialApp(home: MeScreen()),
+      ),
+    );
+    expect(find.text('Terms of use'), findsOneWidget);
+    expect(find.text('Privacy policy'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Delete my account'), 200);
+    await tester.tap(find.text('Delete my account'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('permanently'), findsOneWidget);
+  });
+
+  testWidgets('yeraltı: gelen sözde kişisel veri maskelenir; günlük görünür', (tester) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final carried = MeshPacket.parse(
+      signedPacket(
+        clientId: 'clientid-pii1',
+        text: 'Adam 0532 123 45 67 numarasını bağırdı',
+        heardAt: now,
+        own: false,
+        keyId: 'baskaAnahtar',
+      ).payload,
+      hops: 1,
+      receivedAt: now,
+    )!;
+    app.underground.store.add(carried, now: now);
+    await tester.pumpWidget(
+      AppScope(
+        controller: app,
+        child: const MaterialApp(home: UndergroundScreen()),
+      ),
+    );
+    expect(find.textContaining('[telefon]'), findsOneWidget);
+    expect(find.textContaining('0532'), findsNothing);
+    await tester.scrollUntilVisible(find.text('Field log'), 200);
+    expect(find.text('Field log'), findsOneWidget);
   });
 }

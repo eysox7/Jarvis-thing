@@ -38,8 +38,15 @@ abstract class MeshLink {
 // fazla [maxHops] telefondan geçer; süresi dolan söz kimseye sunulmaz. Böylece vagonda tek bir kişi
 // sinyal bulduğunda herkesin sözü sunucuya ulaşır.
 class Gossip {
-  Gossip({required this.store, required this.link, this.maxHops = 8, int Function()? clock, this.onReceived})
-    : _clock = clock ?? (() => DateTime.now().millisecondsSinceEpoch);
+  Gossip({
+    required this.store,
+    required this.link,
+    this.maxHops = 8,
+    int Function()? clock,
+    this.onReceived,
+    this.accept,
+    this.onLog,
+  }) : _clock = clock ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   static const version = 1;
   static const _batch = 50;
@@ -49,6 +56,10 @@ class Gossip {
   final int maxHops;
   final int Function() _clock;
   final void Function(MeshPacket packet)? onReceived;
+  // Gelen söz kabul edilsin mi (ör. nefret söylemi içeren söz alınmaz ve yayılmaz).
+  final bool Function(MeshPacket packet)? accept;
+  // Saha denemeleri için olay günlüğü.
+  final void Function(String message)? onLog;
 
   // Bağlı telefonlar ve onların bildiği sözler (söyledikleri ya da bizim gönderdiklerimiz).
   final Map<String, Set<String>> _peers = {};
@@ -85,10 +96,13 @@ class Gossip {
       case PeerConnected(:final peer):
         _peers[peer] = {};
         _activeAt[peer] = _clock();
-        await _send(peer, {'t': 'inv', 'ids': store.offer(_clock(), maxHops: maxHops)});
+        final offer = store.offer(_clock(), maxHops: maxHops);
+        onLog?.call('Bağlandı: $peer (elimizde ${offer.length} söz)');
+        await _send(peer, {'t': 'inv', 'ids': offer});
       case PeerDisconnected(:final peer):
         _peers.remove(peer);
         _activeAt.remove(peer);
+        onLog?.call('Bağlantı bitti: $peer');
       case PeerMessage(:final peer, :final bytes):
         await _message(peer, bytes);
     }
@@ -109,7 +123,10 @@ class Gossip {
         final ids = _ids(message['ids']);
         known.addAll(ids);
         final want = ids.where((id) => !store.knows(id)).take(_batch).toList();
-        if (want.isNotEmpty) await _send(peer, {'t': 'want', 'ids': want});
+        if (want.isNotEmpty) {
+          onLog?.call('$peer ${ids.length} söz biliyor, ${want.length} tanesi bizde yok: isteniyor');
+          await _send(peer, {'t': 'want', 'ids': want});
+        }
       case 'want':
         for (final id in _ids(message['ids']).take(_batch)) {
           final packet = store[id];
@@ -124,7 +141,14 @@ class Gossip {
         final packet = MeshPacket.parse(payload, hops: hops + 1, receivedAt: now);
         if (packet == null) return;
         known.add(packet.id);
+        if (store.knows(packet.id)) return;
+        if (accept?.call(packet) == false) {
+          store.forget(packet.id, now: now);
+          onLog?.call('Söz geri çevrildi (denetim): ${packet.id}');
+          return;
+        }
         if (!store.add(packet, now: now)) return;
+        onLog?.call('Söz alındı: ${packet.note.placeName} (${packet.hops}. telefon)');
         _activeAt[peer] = now;
         onReceived?.call(packet);
         await _spread(packet, except: peer);
@@ -144,8 +168,9 @@ class Gossip {
   Future<void> _send(String peer, Map<String, Object?> message) async {
     try {
       await link.send(peer, Uint8List.fromList(utf8.encode(jsonEncode({'v': version, ...message}))));
-    } catch (_) {
+    } catch (e) {
       // Telefon uzaklaştı; bağlantı kopunca PeerDisconnected gelir.
+      onLog?.call('Gönderilemedi ($peer): $e');
     }
   }
 

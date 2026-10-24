@@ -1,8 +1,16 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Play Store imzası: android/key.properties (storeFile, storePassword, keyAlias, keyPassword). Dosya
+// yoksa sürüm derlemesi hata ayıklama anahtarıyla imzalanır (pilot). Anahtar depoya eklenmez.
+val keystoreFile = rootProject.file("key.properties")
+val keystore = Properties().apply { if (keystoreFile.exists()) FileInputStream(keystoreFile).use { load(it) } }
 
 android {
     namespace = "app.overheard.overheard"
@@ -28,13 +36,23 @@ android {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
     }
 
+    signingConfigs {
+        if (keystoreFile.exists()) {
+            create("upload") {
+                storeFile = file(keystore.getProperty("storeFile"))
+                storePassword = keystore.getProperty("storePassword")
+                keyAlias = keystore.getProperty("keyAlias")
+                keyPassword = keystore.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         release {
-            // Pilot: hata ayıklama anahtarıyla imzalanır (Play Store için kendi anahtarınla değiştir).
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (keystoreFile.exists()) "upload" else "debug")
             // Cihazda denenmemiş eklentilerde (Nearby) R8'in bir şeyi silmesi riskine girilmez.
             isMinifyEnabled = false
             isShrinkResources = false

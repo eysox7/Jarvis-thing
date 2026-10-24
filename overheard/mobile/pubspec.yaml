@@ -1,7 +1,7 @@
 name: overheard
 description: "Overheard: duyduğunu haritaya bırak"
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ^3.13.7
@@ -19,7 +19,7 @@ dependencies:
   path_provider: ^2.1.6
   permission_handler: ^13.0.2
   pointycastle: ^4.0.0
-  shared_preferences: ^2.5.6
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:

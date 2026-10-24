@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/app.dart';
+import '../core/moderation.dart';
 import '../l10n/strings.dart';
 import '../mesh/packet.dart';
 import '../mesh/underground.dart';
@@ -92,11 +93,39 @@ class UndergroundScreen extends StatelessWidget {
               child: Text(t('ug.empty'), style: theme.textTheme.bodyMedium),
             )
           else
-            for (final packet in packets) _PacketTile(packet: packet),
+            for (final packet in packets) _PacketTile(packet: packet, onHide: () => underground.hide(packet.id)),
+          const SizedBox(height: 16),
+          // İki telefonla saha denemesinde ne olduğunu görmek için.
+          Card(
+            child: ExpansionTile(
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: Text(t('ug.log')),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              children: [
+                if (underground.log.isEmpty)
+                  Text(t('ug.logEmpty'), style: theme.textTheme.bodySmall)
+                else
+                  for (final line in underground.log.take(100))
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${_clock(line.at)}  ${line.message}',
+                        style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                      ),
+                    ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+String _clock(int at) {
+  final time = DateTime.fromMillisecondsSinceEpoch(at);
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(time.hour)}:${two(time.minute)}:${two(time.second)}';
 }
 
 class _Stat extends StatelessWidget {
@@ -120,9 +149,10 @@ class _Stat extends StatelessWidget {
 }
 
 class _PacketTile extends StatelessWidget {
-  const _PacketTile({required this.packet});
+  const _PacketTile({required this.packet, required this.onHide});
 
   final MeshPacket packet;
+  final VoidCallback onHide;
 
   @override
   Widget build(BuildContext context) {
@@ -137,18 +167,31 @@ class _PacketTile extends StatelessWidget {
     final who = note.anonymous || note.author == null ? t('oh.anonymous') : note.author!;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
+        padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('“${note.text}”', style: theme.textTheme.titleMedium?.copyWith(fontFamily: 'serif')),
-            const SizedBox(height: 6),
-            Text('${note.placeName} · ${timeAgo(note.heardAt)} · $who', style: theme.textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Text('$origin · $state', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary)),
+            Expanded(child: _body(theme, note, who, origin, state)),
+            // Rahatsız edici bulduğun taşınan sözü telefondan silebilirsin; bir daha alınmaz.
+            if (!packet.own)
+              PopupMenuButton<void>(
+                itemBuilder: (_) => [PopupMenuItem(onTap: onHide, child: Text(t('ug.hide')))],
+              ),
           ],
         ),
       ),
     );
   }
+
+  Widget _body(ThemeData theme, MeshNote note, String who, String origin, String state) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Yeraltından gelen söz sunucuya varmadan okunur: kişisel veri ve küfür maskelenir.
+      Text('“${displayText(note.text)}”', style: theme.textTheme.titleMedium?.copyWith(fontFamily: 'serif')),
+      const SizedBox(height: 6),
+      Text('${note.placeName} · ${timeAgo(note.heardAt)} · $who', style: theme.textTheme.bodySmall),
+      const SizedBox(height: 4),
+      Text('$origin · $state', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary)),
+    ],
+  );
 }

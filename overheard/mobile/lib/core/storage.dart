@@ -44,6 +44,7 @@ class MemoryVault implements Vault {
 abstract class Files {
   Future<Map<String, dynamic>?> load(String name);
   Future<void> save(String name, Map<String, dynamic> json);
+  Future<void> clear();
 }
 
 class DiskFiles implements Files {
@@ -67,6 +68,14 @@ class DiskFiles implements Files {
     await temp.writeAsString(jsonEncode(json), flush: true);
     await temp.rename(file.path);
   }
+
+  @override
+  Future<void> clear() async {
+    final dir = await getApplicationSupportDirectory();
+    await for (final entity in dir.list()) {
+      if (entity is File && entity.path.endsWith('.json')) await entity.delete();
+    }
+  }
 }
 
 class MemoryFiles implements Files {
@@ -78,4 +87,7 @@ class MemoryFiles implements Files {
 
   @override
   Future<void> save(String name, Map<String, dynamic> json) async => docs[name] = jsonEncode(json);
+
+  @override
+  Future<void> clear() async => docs.clear();
 }

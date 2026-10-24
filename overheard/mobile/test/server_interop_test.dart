@@ -46,6 +46,8 @@ void main() {
         'OVERHEARD_DB': '${temp!.path}/test.db',
         'OVERHEARD_DEMO': 'true',
         'OVERHEARD_AI_MODERATION': 'false',
+        // Sunucu testlerindeki gibi: aynı adresten çok sayıda hesap açılır.
+        'OVERHEARD_RATE_SCALE': '100',
       },
     );
     server!.stdout.drain<void>();
@@ -90,7 +92,7 @@ void main() {
       underground: Underground(
         store: store,
         files: files,
-        linkFactory: () => net.join(name),
+        linkFactory: (_) => net.join(name),
         radio: FakeRadio(),
         courier: Courier(api, store),
       ),
@@ -191,6 +193,81 @@ void main() {
       expect(carried.id, outcome.packet!.id);
       expect(carried.state, PacketState.failed);
       expect(carried.error, 'not_there_then');
+    });
+
+    test('tepki, mesaj ve yanıt; okunmamış rozeti', () async {
+      final author = await phone('A', unique('yazar'));
+      final reader = await phone('B', unique('okur'));
+      await author.checkIn();
+      final pier = author.composePlaces().firstWhere((p) => p.id == 'ist-kadikoy-iskele');
+      final posted = await author.compose(text: 'İskelede biri: "Simit de artık abonelikle."', place: pier);
+      expect(posted.viaMesh, isFalse);
+      final id = posted.overheard!.id;
+
+      await reader.checkIn();
+      var seen = await reader.overheard(id);
+      expect(seen.locked, isFalse);
+      expect(seen.canMessage, isTrue);
+      seen = await reader.react(id, 'heart');
+      expect(seen.reactions['heart'], 1);
+      expect(seen.myReactions, ['heart']);
+
+      final conversationId = await reader.messageAbout(id, 'Ben de oradaydım, çok güldüm!');
+      await author.refreshProfile();
+      expect(author.profile.unread, 1);
+      final list = await author.conversations();
+      expect(list.single.id, conversationId);
+      expect(list.single.unread, isTrue);
+      final chat = await author.conversation(conversationId);
+      expect(chat.role, 'owner');
+      expect(chat.messages.single.body, 'Ben de oradaydım, çok güldüm!');
+      await author.sendMessage(conversationId, 'Simitçi abi efsane');
+      final back = await reader.conversation(conversationId);
+      expect(back.messages.map((m) => (m.body, m.fromMe)), [
+        ('Ben de oradaydım, çok güldüm!', true),
+        ('Simitçi abi efsane', false),
+      ]);
+      expect((await author.conversations()).single.unread, isFalse);
+    });
+
+    test('şikâyet ve engelleme: engellenenin sözleri haritadan kalkar, yazışılamaz', () async {
+      final author = await phone('A', unique('yazar'));
+      final reader = await phone('B', unique('okur'));
+      await author.checkIn();
+      final pier = author.composePlaces().firstWhere((p) => p.id == 'ist-kadikoy-iskele');
+      final id = (await author.compose(text: 'İskelede biri: "Vapur da tatile çıkmış."', place: pier)).overheard!.id;
+      await reader.checkIn();
+      await reader.report(id);
+      await reader.blockAuthor(id);
+      await reader.loadCity('istanbul');
+      expect(reader.map!.overheards.any((o) => o.id == id), isFalse);
+      await expectLater(
+        reader.messageAbout(id, 'merhaba'),
+        throwsA(isA<ApiException>().having((e) => e.status, 'status', anyOf(403, 404))),
+      );
+    });
+
+    test('hesap silme: sunucudaki hesap ve telefondaki her şey gider', () async {
+      final handle = unique('silinen');
+      final app = await phone('A', handle);
+      await app.checkIn();
+      final pier = app.composePlaces().firstWhere((p) => p.id == 'ist-kadikoy-iskele');
+      app.api.baseUrl = _unreachable;
+      (app.locator as FakeLocator).fix = null;
+      await app.compose(text: 'Silinecek bir söz burada', place: pier);
+      expect(app.underground.packets, isNotEmpty);
+      app.api.baseUrl = base;
+      await expectLater(app.deleteAccount('yanlış parola'), throwsA(isA<ApiException>()));
+      expect(app.me, isNotNull);
+      await app.deleteAccount('metro-parola-1');
+      expect(app.me, isNull);
+      expect(app.hasKey, isFalse);
+      expect(app.underground.packets, isEmpty);
+      expect(await app.vault.read('device_key'), isNull);
+      await expectLater(
+        app.signIn(handle, 'metro-parola-1'),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 'bad_credentials')),
+      );
     });
   });
 }

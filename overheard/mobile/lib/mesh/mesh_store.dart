@@ -31,6 +31,17 @@ class MeshStore {
     return _packets.containsKey(packet.id);
   }
 
+  void clear() {
+    _packets.clear();
+    _dropped.clear();
+  }
+
+  // Sözü unutur (gizlendi ya da denetimden geçmedi); bir süre yeniden istenmez.
+  void forget(String id, {required int now}) {
+    _packets.remove(id);
+    _dropped[id] = now;
+  }
+
   // Başkalarına sunulacak sözlerin kimlikleri: süresi dolmamış, atlama sınırına varmamış (en yeni önce).
   List<String> offer(int now, {required int maxHops, int limit = 200}) =>
       packets.where((p) => fresh(p, now) && p.hops < maxHops).take(limit).map((p) => p.id).toList();

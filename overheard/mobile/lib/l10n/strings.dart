@@ -1,9 +1,9 @@
 import 'dart:ui';
 
 import '../core/api.dart';
-import 'server_strings.g.dart';
+import 'web_strings.g.dart';
 
-// Uygulama metinleri (Türkçe ve İngilizce). Sunucu hata metinleri web uygulamasından üretilir.
+// Uygulama metinleri (Türkçe ve İngilizce). Hata, sohbet, profil ve rozet metinleri web uygulamasından üretilir.
 const _strings = <String, Map<String, String>>{
   'tr': {
     'app.tagline': 'Duyduğunu haritaya bırak.',
@@ -65,7 +65,12 @@ const _strings = <String, Map<String, String>>{
     'ug.failed': 'gönderilemedi',
     'ug.received': 'Yeraltından bir söz geldi: {place}',
     'ug.permissions': 'Yeraltı modu için Bluetooth, yakındaki cihazlar ve konum izni gerekiyor.',
-    'ug.unavailable': 'Bu telefonda yakındaki cihaz bağlantısı başlatılamadı (Google Play Hizmetleri gerekir).',
+    'ug.unavailable':
+        'Yakındaki cihaz bağlantısı başlatılamadı. Bluetooth ve konum açık mı? (Google Play Hizmetleri de gerekir.)',
+    'ug.hide': 'Bu telefondan sil',
+    'ug.log': 'Saha günlüğü',
+    'ug.logEmpty':
+        'Henüz bir olay yok. Yeraltı modunu açınca telefon bulma, bağlanma ve söz alışverişi burada görünür.',
     'ug.notification': 'Yeraltı modu açık',
     'ug.notificationText': 'Sözler yakındaki telefonlara geçiyor',
     'ug.flushed': '{n} söz sunucuya ulaştı.',
@@ -141,7 +146,12 @@ const _strings = <String, Map<String, String>>{
     'ug.failed': 'could not be sent',
     'ug.received': 'An overheard came from underground: {place}',
     'ug.permissions': 'Underground mode needs Bluetooth, nearby devices and location permissions.',
-    'ug.unavailable': "Couldn't start nearby connections on this phone (Google Play services required).",
+    'ug.unavailable':
+        "Couldn't start nearby connections. Are Bluetooth and location on? (Google Play services are required too.)",
+    'ug.hide': 'Remove from this phone',
+    'ug.log': 'Field log',
+    'ug.logEmpty':
+        'Nothing yet. Once underground mode is on, finding phones, connecting and exchanging overheards show up here.',
     'ug.notification': 'Underground mode is on',
     'ug.notificationText': 'Overheards are passing to nearby phones',
     'ug.flushed': '{n} overheards reached the server.',
@@ -164,7 +174,7 @@ String _fill(String template, Map<String, Object?> vars) =>
 
 String t(String key, [Map<String, Object?> vars = const {}]) {
   final template =
-      _strings[lang]![key] ?? serverStrings[lang]![key] ?? _strings['tr']![key] ?? serverStrings['tr']![key] ?? key;
+      _strings[lang]![key] ?? webStrings[lang]![key] ?? _strings['tr']![key] ?? webStrings['tr']![key] ?? key;
   return _fill(template, vars);
 }
 
@@ -177,7 +187,7 @@ String errorText(Object error) {
     _ => ('default', const <String, dynamic>{}),
   };
   for (final key in ['errors.$code', 'location.$code']) {
-    if (serverStrings[lang]!.containsKey(key)) return t(key, extra);
+    if (webStrings[lang]!.containsKey(key)) return t(key, extra);
   }
   return t('errors.default');
 }
