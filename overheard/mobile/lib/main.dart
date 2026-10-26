@@ -6,6 +6,7 @@ import 'core/api.dart';
 import 'core/google_auth.dart';
 import 'core/location.dart';
 import 'core/storage.dart';
+import 'l10n/strings.dart';
 import 'mesh/courier.dart';
 import 'mesh/mesh_store.dart';
 import 'mesh/nearby_link.dart';
@@ -38,7 +39,7 @@ void main() {
       store: store,
       files: files,
       linkFactory: (log) => NearbyLink(onLog: log),
-      radio: AndroidRadio(),
+      radio: AndroidRadio(channelName: t('ug.title')),
       courier: Courier(api, store),
     ),
   );

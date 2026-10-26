@@ -31,6 +31,8 @@ class Api {
   final http.Client _client;
   // Oturum çerezi değiştiğinde (giriş, çıkış) kalıcı depoya yazmak için.
   void Function(String? session)? onSession;
+  // Her istekte sunucuya ulaşılıp ulaşılamadığı (metroda bağlantının gidip geldiğini izlemek için).
+  void Function(bool online)? onReachability;
 
   Future<Map<String, dynamic>> get(String path) => _send('GET', path);
 
@@ -62,8 +64,10 @@ class Api {
       response = await _client.send(request).then(http.Response.fromStream).timeout(timeout);
     } on Exception {
       // Zaman aşımı, DNS, soket, TLS: hepsi "bağlantı yok" demektir (metroda olağan).
+      onReachability?.call(false);
       throw ApiException(0, 'offline');
     }
+    onReachability?.call(true);
     _readSession(response.headers['set-cookie']);
     Object? data;
     try {

@@ -2,34 +2,34 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:nearby_connections/nearby_connections.dart';
-
 import 'gossip.dart';
+import 'mesh_channel.dart';
 
-// Android: Google Nearby Connections. Bluetooth, BLE ve Wi-Fi arasından uygun olanı kendisi seçer;
-// internet istemez. Her telefon aynı anda hem görünür (advertise) hem arar (discover) ve bulduğuna
-// bağlanır (P2P_CLUSTER: çoktan çoğa). Bağlantı onayı otomatiktir; sözler imzalıdır ve zaten
-// yanındakilerin okuyacağı metinlerdir. Kullanıcı adı yerine her açılışta değişen rastgele bir ad
-// duyurulur. Kalabalıkta bağlantı yuvası sınırlı olduğundan, alışverişi biten telefondan kopulur ve
-// bir süre ona yeniden bağlanılmaz; böylece sırayla herkese ulaşılır.
+// Android: Google Nearby Connections (uygulamanın kendi katmanı, MeshPlugin.kt). Bluetooth, BLE ve
+// Wi-Fi arasından uygun olanı Nearby seçer; internet istemez. Her telefon aynı anda hem görünür hem
+// arar ve bulduğuna bağlanır (P2P_CLUSTER: çoktan çoğa). Gelen bağlantılar Android tarafında
+// kendiliğinden kabul edilir. Kullanıcı adı yerine her açılışta değişen rastgele bir ad duyurulur.
+// Kalabalıkta bağlantı yuvası sınırlı olduğundan, alışverişi biten telefondan kopulur ve bir süre ona
+// yeniden bağlanılmaz; böylece sırayla herkese ulaşılır.
 class NearbyLink implements MeshLink {
-  NearbyLink({Nearby? nearby, Random? random, this.onLog}) : _nearby = nearby ?? Nearby() {
+  NearbyLink({MeshChannel? channel, Random? random, this.onLog, this.cooldown = const Duration(seconds: 60)})
+    : _channel = channel ?? MeshChannel() {
     final source = random ?? Random.secure();
-    _name = 'oh-${List.generate(6, (_) => source.nextInt(36).toRadixString(36)).join()}';
+    name = 'oh-${List.generate(6, (_) => source.nextInt(36).toRadixString(36)).join()}';
   }
 
   static const serviceId = 'app.overheard.mesh';
-  static const strategy = Strategy.P2P_CLUSTER;
-  static const cooldown = Duration(seconds: 60);
 
-  final Nearby _nearby;
+  late final String name;
   final void Function(String message)? onLog;
-  late final String _name;
+  final Duration cooldown;
+  final MeshChannel _channel;
   final _events = StreamController<LinkEvent>.broadcast();
   final Set<String> _connected = {};
   final Set<String> _pending = {};
   final Map<String, String> _names = {};
   final Map<String, DateTime> _rested = {};
+  StreamSubscription<Map<Object?, Object?>>? _subscription;
   bool _running = false;
 
   @override
@@ -38,45 +38,27 @@ class NearbyLink implements MeshLink {
   @override
   Future<bool> start() async {
     if (_running) return true;
-    var advertising = false, discovering = false;
+    _subscription ??= _channel.events.listen(_handle);
     try {
-      advertising = await _nearby.startAdvertising(
-        _name,
-        strategy,
-        onConnectionInitiated: _initiated,
-        onConnectionResult: _result,
-        onDisconnected: _lost,
-        serviceId: serviceId,
+      final result = await _channel.call<Map<Object?, Object?>>('start', {'name': name, 'serviceId': serviceId});
+      final advertising = result?['advertising'] == true, discovering = result?['discovering'] == true;
+      onLog?.call(
+        'Bu telefon $name olarak görünür: ${advertising ? 'evet' : 'hayır'}, arıyor: ${discovering ? 'evet' : 'hayır'}',
       );
+      _running = advertising || discovering;
     } catch (e) {
-      onLog?.call('Görünür olunamadı: $e');
+      onLog?.call('Yakındaki cihaz bağlantısı başlatılamadı: $e');
+      _running = false;
     }
-    try {
-      discovering = await _nearby.startDiscovery(
-        _name,
-        strategy,
-        onEndpointFound: _found,
-        onEndpointLost: (_) {},
-        serviceId: serviceId,
-      );
-    } catch (e) {
-      onLog?.call('Arama başlatılamadı: $e');
-    }
-    _running = advertising || discovering;
-    onLog?.call(
-      'Bu telefon $_name olarak görünür: ${advertising ? 'evet' : 'hayır'}, arıyor: ${discovering ? 'evet' : 'hayır'}',
-    );
     return _running;
   }
 
   @override
   Future<void> stop() async {
     _running = false;
-    for (final call in [_nearby.stopAdvertising, _nearby.stopDiscovery, _nearby.stopAllEndpoints]) {
-      try {
-        await call();
-      } catch (_) {}
-    }
+    try {
+      await _channel.call<void>('stop');
+    } catch (_) {}
     for (final peer in _connected) {
       _events.add(PeerDisconnected(peer));
     }
@@ -84,73 +66,73 @@ class NearbyLink implements MeshLink {
     _pending.clear();
   }
 
-  void _found(String id, String name, String service) {
+  void _handle(Map<Object?, Object?> event) {
+    final id = event['id'] as String?;
+    switch (event['type']) {
+      case 'found':
+        _found(id!, event['name'] as String? ?? '');
+      case 'initiated':
+        _pending.add(id!);
+        _names[id] = event['name'] as String? ?? id;
+      case 'connected':
+        _pending.remove(id);
+        if (_connected.add(id!)) {
+          onLog?.call('Bağlandı: ${_names[id] ?? id}');
+          _events.add(PeerConnected(id));
+        }
+      case 'failed':
+        _pending.remove(id);
+        onLog?.call('Bağlanılamadı (${_names[id] ?? id}): ${event['code']}');
+      case 'disconnected':
+        _lost(id!);
+      case 'payload':
+        final bytes = event['bytes'];
+        if (bytes is Uint8List) _events.add(PeerMessage(id!, bytes));
+      case 'log':
+        onLog?.call(event['message'] as String? ?? '');
+    }
+  }
+
+  void _found(String id, String peerName) {
     if (!_running || _connected.contains(id) || _pending.contains(id)) return;
-    final rested = _rested[name];
+    final rested = _rested[peerName];
     if (rested != null && DateTime.now().difference(rested) < cooldown) return;
+    _names[id] = peerName;
+    onLog?.call('Telefon bulundu: $peerName');
     // İki telefon birbirini aynı anda bulursa ikisi birden istemesin: adı küçük olan ister, öbürü
     // biraz bekler (karşı taraf onu göremiyorsa yine de bağlansın diye).
-    _names[id] = name;
-    onLog?.call('Telefon bulundu: $name');
-    final delay = _name.compareTo(name) < 0 ? Duration.zero : const Duration(seconds: 4);
+    final delay = name.compareTo(peerName) < 0 ? Duration.zero : const Duration(seconds: 4);
     Timer(delay, () => _request(id));
   }
 
   Future<void> _request(String id) async {
     if (!_running || _connected.contains(id) || _pending.contains(id)) return;
     _pending.add(id);
-    try {
-      await _nearby.requestConnection(
-        _name,
-        id,
-        onConnectionInitiated: _initiated,
-        onConnectionResult: _result,
-        onDisconnected: _lost,
-      );
-    } catch (e) {
-      _pending.remove(id);
-      onLog?.call('Bağlantı isteği olmadı (${_names[id] ?? id}): $e');
-    }
-  }
-
-  void _initiated(String id, ConnectionInfo info) {
-    _pending.add(id);
-    _names[id] = info.endpointName;
-    _nearby.acceptConnection(id, onPayLoadRecieved: _payload).catchError((Object e) {
-      onLog?.call('Bağlantı kabul edilemedi (${info.endpointName}): $e');
-      return false;
-    });
-  }
-
-  void _result(String id, Status status) {
-    _pending.remove(id);
-    if (status != Status.CONNECTED) onLog?.call('Bağlanılamadı (${_names[id] ?? id}): ${status.name}');
-    if (status == Status.CONNECTED && _connected.add(id)) {
-      onLog?.call('Bağlandı: ${_names[id] ?? id}');
-      _events.add(PeerConnected(id));
-    }
+    final ok = await _channel.call<bool>('connect', {'id': id}).catchError((Object _) => false);
+    if (ok != true) _pending.remove(id);
   }
 
   void _lost(String id) {
     _pending.remove(id);
-    if (_connected.remove(id)) _events.add(PeerDisconnected(id));
-  }
-
-  void _payload(String id, Payload payload) {
-    final bytes = payload.bytes;
-    if (payload.type == PayloadType.BYTES && bytes != null) _events.add(PeerMessage(id, bytes));
+    if (_connected.remove(id)) {
+      onLog?.call('Bağlantı bitti: ${_names[id] ?? id}');
+      _events.add(PeerDisconnected(id));
+    }
   }
 
   @override
-  Future<void> send(String peer, Uint8List bytes) => _nearby.sendBytesPayload(peer, bytes);
+  Future<void> send(String peer, Uint8List bytes) async {
+    final ok = await _channel.call<bool>('send', {'id': peer, 'bytes': bytes});
+    if (ok != true) throw StateError('gönderilemedi');
+  }
 
   // Alışverişi biten telefondan kopulur; bir süre ona yeniden bağlanılmaz.
   @override
   Future<void> disconnect(String peer) async {
-    final name = _names[peer];
-    if (name != null) _rested[name] = DateTime.now();
+    final peerName = _names[peer];
+    if (peerName != null) _rested[peerName] = DateTime.now();
     try {
-      await _nearby.disconnectFromEndpoint(peer);
+      await _channel.call<void>('disconnect', {'id': peer});
     } catch (_) {}
     _lost(peer);
   }

@@ -20,8 +20,14 @@ kullanır.
   imzalanıp yeraltı ağına bırakılır.
 - **Yeraltı modu**: telefonlar birbirini internetsiz ve dokunmadan bulur (Google Nearby Connections,
   `P2P_CLUSTER`), sözleri telefondan telefona yayar ve bağlantı bulan telefon sunucuya ulaştırır.
-  Telefon cepteyken de sürsün diye kalıcı bildirimli ön plan hizmeti çalışır. Gelen sözler hemen
-  okunur ("yeraltında duyulanlar"); rahatsız edici bulunan söz telefondan silinebilir.
+  Gelen sözler hemen okunur ("yeraltında duyulanlar"); rahatsız edici bulunan söz telefondan silinebilir.
+- **Kesintisiz yeraltı**: **Otomatik** açıkken (varsayılan) mod hatta binince ya da sunucuya 30 sn
+  ulaşılamayınca kendiliğinden açılır; bağlantı dönüp hattan inince (10 dk sonra) kendi açtığını
+  kapatır. Açılırken konum tazelenir (binilen hat söz kanıtı olur). Telefon cepteyken, ekran kapalıyken
+  ve uygulama son uygulamalardan kaydırılsa bile sürer: Nearby katmanı ve ön plan hizmeti uygulamanın
+  kendi Android kodudur (`MeshPlugin.kt`, `MeshService.kt`), Flutter motoru süreç boyunca önbellekte
+  yaşar. Bildirimde yakındaki telefon sayısı ve **Kapat** düğmesi var; kapatırsan otomatik mod o
+  yolculukta yeniden açmaz. Bağlantı geri geldiği an bekleyen sözler gönderilir.
 - **Saha günlüğü** (Yeraltı sekmesinin altında): telefon bulundu, bağlandı, söz istendi/alındı,
   gönderilemedi, sunucuya ulaştı... İki telefonla denerken ne olduğunu gösterir.
 - **Söz ayrıntısı**: tepkiler (😂 😮 ❤️, o sırada oradaysan 👂), yazana mesaj, şikâyet, yazarı engelleme.
@@ -66,7 +72,7 @@ Gerekenler: Flutter 3.47+ (Dart 3.13), Android SDK (platform 36 ve 37, build-too
 cd overheard/mobile
 flutter pub get
 flutter analyze
-flutter test                      # 30 test: birim, ekran, denetim eşliği, gerçek sunucuyla uçtan uca (node gerekir)
+flutter test                      # 43 test: birim, ekran, denetim eşliği, gerçek sunucuyla uçtan uca (node gerekir)
 flutter build apk --release --split-per-abi --target-platform android-arm64
 ```
 
@@ -140,4 +146,7 @@ flutter build apk --release --split-per-abi --target-platform android-arm64
   biçimi platformdan bağımsızdır.
 - Bluetooth aktarımı bu ortamda gerçek telefonlarda denenmedi; yayılma protokolü bellek içi ağla,
   imza ve sunucu uyumu gerçek sunucuyla test edildi.
-- Uygulama kapatılınca (görev listesinden kaydırılınca) yeraltı modu durur.
+- Android 12+ arka plandan ön plan hizmeti başlatmaya izin vermez: otomatik mod uygulama ekrandayken
+  açılır (hatta binerken check-in, bağlantı kopunca). Açıldıktan sonra ekran kapansa da, uygulama
+  kaydırılsa da sürer. Telefon yeniden başlatılınca ya da "Durmaya zorla" ile kapanır.
+- Sürekli Bluetooth/Wi-Fi taraması pil harcar; bu yüzden otomatik mod bağlantı dönünce kapanır.

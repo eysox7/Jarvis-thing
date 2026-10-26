@@ -174,8 +174,10 @@ void main() {
       expect(overheard.placeId, 'ist-kadikoy-iskele');
       expect(overheard.public, isTrue);
 
-      // Yazar sonra bağlanınca kendi kopyası da "ulaştı" olur (sunucu aynı sözü ikinci kez yazmaz).
-      expect(await author.underground.flush(), 1);
+      // Yazar bağlanınca kendi kopyası kendiliğinden gönderilir ve "ulaştı" olur (sunucu aynı sözü
+      // ikinci kez yazmaz).
+      await author.underground.flush();
+      await settle();
       expect(author.underground.packets.single.state, PacketState.delivered);
       expect(author.underground.packets.single.overheardId, carried.overheardId);
     });

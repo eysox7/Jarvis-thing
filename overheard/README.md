@@ -94,7 +94,8 @@ balonların altında sokak haritası görünür.</sub>
   yokken yazılan söz, aynı paket biçimiyle Bluetooth/Wi-Fi üzerinden (Google Nearby Connections)
   yanındaki telefonlara kendiliğinden geçer ve telefondan telefona yayılır; bağlantı bulan telefon
   sunucuya ulaştırır. Sunucu sözün kaç telefondan geçtiğini (`hops`) tutar; internetsiz yazılmış
-  sözler haritada 📡 ile görünür.
+  sözler haritada 📡 ile görünür. Yeraltı modu hatta binince ya da bağlantı kopunca kendiliğinden
+  açılır ve uygulama kapatılsa da sürer (bildirimden kapatılır).
 - **Sakin semtler.** Hiç sözün olmadığı bir yerde harita "Bu civarda henüz söz yok, ilkini sen
   bırak" der; yakında bir Overheard Kafe varsa onu da gösterir. Bir mekânın ya da hattın ilk sözünü
   bırakan 🚩 **Öncü** rozetini alır.
@@ -376,7 +377,7 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 | --- | --- |
 | `npm test` | 118 API/birim testi: Google kimlik belgesi doğrulama ve Google ile giriş, ters vekil arkasında köken denetimi, yerel/herkese açık görünürlük ve anlık mekân kuralı, check-in, söz, tepki, tanıklar, anonimlik, mesajlaşma, rozetler, moderasyon, konum denetimleri, QR, kafe, hatlar, çevrimdışı ve kulaktan kulağa söz, ölçek, göçler, yedekleme |
 | `npm run test:e2e` | 23 tarayıcı senaryosu (Playwright + Chromium): iki kullanıcıyla uçtan uca akış, ayrılınca yeniden kilitlenme ve herkese açık söz, tanık ve anonim sohbet, keşif kartı, rozetler, tanıtım, dil değişimi, moderasyon paneli, yoğun bölge, Google Maps uyarlayıcısı (taklit API ile), QR, kafe, çevrimdışı ve kulaktan kulağa |
-| `cd mobile && flutter test` | 30 Android uygulaması testi (Google ile giriş ve bağlantı dosyası dahil): imza (web/sunucu biçimi), paket, telefondan telefona yayılma (bellek içi ağda zincir, üçgen, atlama ve süre sınırı, denetim), içerik denetiminin Node sürümüyle eşliği, ekranlar ve gerçek sunucuyla uçtan uca (Dart'ta imzalanan sözün Node'da doğrulanması, tepki, mesajlaşma, şikâyet/engelleme, hesap silme) |
+| `cd mobile && flutter test` | 43 Android uygulaması testi (Google ile giriş, bağlantı dosyası, otomatik yeraltı modu ve Android katmanıyla konuşan bağlantı dahil): imza (web/sunucu biçimi), paket, telefondan telefona yayılma (bellek içi ağda zincir, üçgen, atlama ve süre sınırı, denetim), içerik denetiminin Node sürümüyle eşliği, ekranlar ve gerçek sunucuyla uçtan uca (Dart'ta imzalanan sözün Node'da doğrulanması, tepki, mesajlaşma, şikâyet/engelleme, hesap silme) |
 
 Testler bellek içi veritabanıyla gerçek bir HTTP sunucusu açar; dış ağa çıkmaz (harita karoları
 ve Google Maps API'si testte taklit edilir).

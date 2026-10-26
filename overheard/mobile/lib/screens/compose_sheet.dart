@@ -77,7 +77,7 @@ class _ComposeSheetState extends State<ComposeSheet> {
             content: Text('📡 ${t('compose.mesh')}${app.underground.running ? '' : ' ${t('compose.meshOn')}'}'),
             action: app.underground.running
                 ? null
-                : SnackBarAction(label: t('ug.title'), onPressed: () => app.underground.start()),
+                : SnackBarAction(label: t('ug.title'), onPressed: () => app.startUnderground()),
           ),
         );
       } else {

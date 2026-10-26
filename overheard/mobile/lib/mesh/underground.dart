@@ -50,6 +50,11 @@ class Underground extends ChangeNotifier {
   MeshLink? _link;
   Gossip? _gossip;
   StreamSubscription<LinkEvent>? _linkEvents;
+  StreamSubscription<void>? _stopRequests;
+  // Otomatik mod mu açtı (otomatik mod yalnızca kendi açtığını kapatır).
+  bool startedByAuto = false;
+  // Kullanıcı bildirimdeki "Kapat"a bastı (otomatik mod bir süre yeniden açmasın).
+  void Function()? onUserStop;
   Timer? _tick;
   Timer? _save;
   bool _busy = false;
@@ -74,11 +79,12 @@ class Underground extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<UndergroundStart> start() async {
+  // Elle açılışta izin sorulur; otomatik açılışta yalnızca izin zaten verilmişse açılır.
+  Future<UndergroundStart> start({bool auto = false}) async {
     if (running || _busy) return UndergroundStart.ok;
     _busy = true;
     try {
-      if (!await radio.permit()) {
+      if (!await (auto ? radio.granted() : radio.permit())) {
         _write('İzin verilmedi (Bluetooth, yakındaki cihazlar, konum)');
         return UndergroundStart.permissions;
       }
@@ -100,11 +106,17 @@ class Underground extends ChangeNotifier {
         _write('Yakındaki cihaz bağlantısı başlatılamadı');
         return UndergroundStart.unavailable;
       }
-      _write('Yeraltı modu açıldı');
+      _write(auto ? 'Yeraltı modu kendiliğinden açıldı' : 'Yeraltı modu açıldı');
       _link = link;
       _gossip = gossip;
+      startedByAuto = auto;
       _tick = Timer.periodic(const Duration(seconds: 15), (_) => _maintain());
-      await radio.keepAlive(title: t('ug.notification'), text: t('ug.notificationText'));
+      _stopRequests = radio.stopRequests.listen((_) {
+        _write('Bildirimden kapatıldı');
+        onUserStop?.call();
+        stop();
+      });
+      if (!await _notify()) _write('Kalıcı bildirim açılamadı (uygulama öndeyken yeniden denenecek)');
       notifyListeners();
       return UndergroundStart.ok;
     } finally {
@@ -113,8 +125,12 @@ class Underground extends ChangeNotifier {
   }
 
   Future<void> stop() async {
+    if (!running) return;
     _tick?.cancel();
     _tick = null;
+    await _stopRequests?.cancel();
+    _stopRequests = null;
+    startedByAuto = false;
     await _gossip?.stop();
     await _linkEvents?.cancel();
     await _link?.stop();
@@ -160,10 +176,17 @@ class Underground extends ChangeNotifier {
       unawaited(link.disconnect(peer));
     }
     unawaited(flush());
-    unawaited(
-      radio.update(title: t('ug.notification'), text: peers > 0 ? t('ug.on', {'n': peers}) : t('ug.notificationText')),
-    );
+    unawaited(_notify());
   }
+
+  // Kalıcı bildirim: hizmeti başlatır ya da yakındaki telefon sayısıyla günceller.
+  Future<bool> _notify() => radio
+      .keepAlive(
+        title: t('ug.notification'),
+        text: peers > 0 ? t('ug.on', {'n': peers}) : t('ug.notificationText'),
+        stop: t('ug.stop'),
+      )
+      .catchError((Object _) => false);
 
   void _onReceived(MeshPacket packet) {
     _received.add(packet);

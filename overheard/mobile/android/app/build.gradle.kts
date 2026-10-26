@@ -79,3 +79,9 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Yeraltı modu: telefonlar arası internetsiz bağlantı (MeshPlugin) ve ön plan hizmeti bildirimi.
+    implementation("com.google.android.gms:play-services-nearby:19.3.0")
+    implementation("androidx.core:core-ktx:1.17.0")
+}

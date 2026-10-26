@@ -49,10 +49,17 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // Uygulamaya dönünce (metrodan çıkınca) bekleyenler gönderilir, harita tazelenir.
+  // Uygulamaya dönünce (metrodan çıkınca) bekleyenler gönderilir, harita tazelenir; yeraltı modu
+  // açıksa ya da otomatikse konum da tazelenir (binilen hat söz kanıtı olur).
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) AppScope.read(context).refresh().catchError((_) {});
+    final app = AppScope.read(context);
+    app.setForeground(state == AppLifecycleState.resumed);
+    if (state != AppLifecycleState.resumed) return;
+    app.refresh().catchError((_) {});
+    if (app.underground.running || app.auto.enabled) {
+      app.checkIn(timeout: const Duration(seconds: 8)).then((_) => app.autoTick(), onError: (_) {});
+    }
   }
 
   @override

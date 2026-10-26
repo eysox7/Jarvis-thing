@@ -77,24 +77,28 @@ void main() {
       ),
     );
 
-    expect(find.text('“Kendi sözüm”'), findsOneWidget);
-    expect(find.text('“Yanımdakinin sözü”'), findsOneWidget);
-    expect(find.textContaining('passed through 2 phones'), findsOneWidget);
-    expect(find.textContaining('waiting for signal'), findsNWidgets(2));
     expect(find.text('Off'), findsOneWidget);
+    // İlk anahtar yeraltı modu, ikincisi otomatik mod.
+    expect(find.byType(Switch), findsNWidgets(2));
+    expect(find.text('Automatic'), findsOneWidget);
 
-    radio.granted = false;
-    await tester.tap(find.byType(Switch));
+    radio.allowed = false;
+    await tester.tap(find.byType(Switch).first);
     await tester.pumpAndSettle();
     expect(find.text('Underground mode needs Bluetooth, nearby devices and location permissions.'), findsOneWidget);
     expect(app.underground.running, isFalse);
 
-    radio.granted = true;
-    await tester.tap(find.byType(Switch));
+    radio.allowed = true;
+    await tester.tap(find.byType(Switch).first);
     await tester.pumpAndSettle();
     expect(app.underground.running, isTrue);
     expect(radio.alive, isTrue);
     expect(find.text('On · looking for nearby phones'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('“Yanımdakinin sözü”'), 200);
+    expect(find.text('“Kendi sözüm”'), findsOneWidget);
+    expect(find.textContaining('passed through 2 phones'), findsOneWidget);
+    expect(find.textContaining('waiting for signal'), findsNWidgets(2));
     await tester.runAsync(app.underground.stop);
   });
 

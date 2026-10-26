@@ -11,6 +11,7 @@ import '../core/location.dart';
 import '../core/models.dart';
 import '../core/moderation.dart';
 import '../core/storage.dart';
+import '../mesh/auto_underground.dart';
 import '../mesh/device_key.dart';
 import '../mesh/packet.dart';
 import '../mesh/underground.dart';
@@ -57,6 +58,8 @@ class AppController extends ChangeNotifier {
   }) : _clock = clock ?? (() => DateTime.now().millisecondsSinceEpoch) {
     // Yeraltı modundaki değişiklikler (yeni söz, yakındaki telefon) ekranları da yeniler.
     underground.addListener(notifyListeners);
+    underground.onUserStop = auto.userStopped;
+    api.onReachability = _reachable;
   }
 
   final Api api;
@@ -95,6 +98,13 @@ class AppController extends ChangeNotifier {
   String? _keyOwner;
   Future<void>? _keying;
   Timer? _flushTimer;
+  Timer? _autoTimer;
+  // Otomatik yeraltı modu: hatta binince ya da bağlantı kopunca açılır, çıkınca kapanır.
+  final auto = AutoUnderground();
+  // Uygulama ekranda mı (Android arka plandan ön plan hizmeti başlatmaya izin vermez).
+  bool foreground = true;
+  // Sunucudan en son ne zaman haber alındı (yanıt ya da bağlantı hatası).
+  int _lastHeard = 0;
 
   String get server => api.baseUrl;
   bool get hasKey => _key != null && keyId != null && _keyOwner == me?.handle;
@@ -131,7 +141,79 @@ class AppController extends ChangeNotifier {
     _flushTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       if (underground.waiting > 0 || underground.carried > 0) unawaited(underground.flush());
     });
+    auto.enabled = await vault.read('auto_underground') != '0';
+    _autoTimer = Timer.periodic(const Duration(seconds: 20), (_) => autoTick(probe: true));
     if (me != null) unawaited(refresh());
+  }
+
+  // --- Kesintisiz yeraltı ---
+
+  // Sunucuya ulaşılabilirlik değişti. Bağlantı geri geldiği an bekleyen sözler yola çıkar.
+  void _reachable(bool online) {
+    _lastHeard = _clock();
+    final was = auto.online;
+    auto.reachability(online, _clock());
+    if (online && !was) {
+      if (underground.waiting > 0 || underground.carried > 0) unawaited(underground.flush());
+      notifyListeners();
+    } else if (!online && was) {
+      notifyListeners();
+    }
+  }
+
+  bool get online => auto.online;
+
+  // Son check-in'e göre bir hattasın (biniş; içeride kalma süresi dolmadı).
+  bool get onLine => composePlaces().any((p) => p.line);
+
+  // Otomatik modun kararını uygular. [probe]: bağlantı yoksa ya da bir dakikadır sunucudan haber
+  // alınmadıysa sunucu yoklanır (metroya girildiğini başka bir istek beklemeden fark etmek için).
+  Future<void> autoTick({bool probe = false}) async {
+    if (me == null) return;
+    if (probe && server.isNotEmpty && (!auto.online || _clock() - _lastHeard > 60000)) {
+      try {
+        await api.get('/healthz');
+      } on ApiException {
+        // Hâlâ bağlantı yok.
+      }
+    }
+    auto.onLine = onLine;
+    switch (auto.decide(running: underground.running, startedByAuto: underground.startedByAuto, now: _clock())) {
+      case AutoAction.start:
+        if (foreground) await startUnderground(auto: true);
+      case AutoAction.stop:
+        await underground.stop();
+      case AutoAction.none:
+        break;
+    }
+  }
+
+  Future<void> setAutoUnderground(bool on) async {
+    auto.enabled = on;
+    await vault.write('auto_underground', on ? null : '0');
+    notifyListeners();
+    if (on) unawaited(autoTick());
+  }
+
+  // Yeraltı modunu açar ve (bağlantı varsa) konumu tazeler: binilen hat söz kanıtı olur.
+  Future<UndergroundStart> startUnderground({bool auto = false}) async {
+    final result = await underground.start(auto: auto);
+    if (result == UndergroundStart.ok && this.auto.online) {
+      unawaited(checkIn(timeout: const Duration(seconds: 8)).then((_) {}, onError: (_) {}));
+    }
+    return result;
+  }
+
+  // Elle kapatma: otomatik mod bu yolculukta yeniden açmaz.
+  Future<void> stopUnderground() async {
+    auto.userStopped();
+    await underground.stop();
+  }
+
+  // Ekran öne geldi (true) ya da arkaya gitti (false).
+  void setForeground(bool value) {
+    foreground = value;
+    if (value) unawaited(autoTick(probe: true));
   }
 
   // Bağlıyken: hesap, şehir listesi, cihaz anahtarı, harita ve bekleyen sözler.
@@ -513,6 +595,7 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     _flushTimer?.cancel();
+    _autoTimer?.cancel();
     underground.removeListener(notifyListeners);
     super.dispose();
   }

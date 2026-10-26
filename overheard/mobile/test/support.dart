@@ -76,20 +76,31 @@ class MemoryLink implements MeshLink {
 }
 
 class FakeRadio implements MeshRadio {
-  bool granted = true;
+  bool allowed = true;
   bool alive = false;
+  // Android arka plandan ön plan hizmeti başlatmaya izin vermediğinde false.
+  bool canKeepAlive = true;
+  int prompts = 0;
+  final stops = StreamController<void>.broadcast();
 
   @override
-  Future<bool> permit() async => granted;
+  Future<bool> permit() async {
+    prompts++;
+    return allowed;
+  }
 
   @override
-  Future<void> keepAlive({required String title, required String text}) async => alive = true;
+  Future<bool> granted() async => allowed;
 
   @override
-  Future<void> update({required String title, required String text}) async {}
+  Future<bool> keepAlive({required String title, required String text, required String stop}) async =>
+      alive = canKeepAlive;
 
   @override
   Future<void> release() async => alive = false;
+
+  @override
+  Stream<void> get stopRequests => stops.stream;
 }
 
 class FakeLocator implements Locator {

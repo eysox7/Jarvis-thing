@@ -191,6 +191,13 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       `connect.json`'dan bulur (birden çok konum, elle adres önce gelir). Pages sitesi (tanıtım, APK,
       gizlilik, koşullar, hesap silme, canlı sunucu durumu), GitHub Actions (testler, pilot anahtarlı
       APK, site), Codespaces yapılandırması. Depoda sabit pilot imza anahtarı (Google SHA-1 değişmez).
+- [x] **29d. Kesintisiz yeraltı** — Nearby katmanı ve ön plan hizmeti uygulamanın kendi Android kodu
+      (uygulama bağlamıyla; ekran kapanınca kopmaz), Flutter motoru önbellekte: mod, uygulama son
+      uygulamalardan kaydırılsa da sürer; bildirimde yakındaki telefon sayısı ve Kapat. Otomatik mod:
+      hatta binince ya da sunucuya 30 sn ulaşılamayınca açılır, bağlantı dönüp hattan inince (10 dk)
+      kendi açtığını kapatır; kullanıcı kapatırsa o yolculukta yeniden açmaz. Açılışta ve uygulamaya
+      dönüşte konum tazelenir (hat kanıtı); bağlantı geri geldiği an bekleyen sözler gönderilir.
+      Eski nearby_connections ve flutter_foreground_task eklentileri kaldırıldı.
 - [ ] **30. iPhone'da yeraltı modu** — `MeshLink` için Multipeer Connectivity (iPhone ↔ iPhone) ve
       BLE GATT (Android ↔ iPhone) bağlantı katmanı; iOS'ta arka plan Bluetooth kısıtları.
 - [ ] **31. Gizli sözler (mini oyun)** — İnternetsiz yazılmış sözler (`offline`, `hops`) özel:

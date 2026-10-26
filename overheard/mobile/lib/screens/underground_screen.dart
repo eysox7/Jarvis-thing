@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/app.dart';
+import '../app/controller.dart';
 import '../core/moderation.dart';
 import '../l10n/strings.dart';
 import '../mesh/packet.dart';
@@ -11,10 +12,10 @@ import '../mesh/underground.dart';
 class UndergroundScreen extends StatelessWidget {
   const UndergroundScreen({super.key});
 
-  Future<void> _toggle(BuildContext context, Underground underground, bool on) async {
+  Future<void> _toggle(BuildContext context, AppController app, bool on) async {
     final messenger = ScaffoldMessenger.of(context);
-    if (!on) return underground.stop();
-    final result = await underground.start();
+    if (!on) return app.stopUnderground();
+    final result = await app.startUnderground();
     final problem = switch (result) {
       UndergroundStart.permissions => t('ug.permissions'),
       UndergroundStart.unavailable => t('ug.unavailable'),
@@ -31,14 +32,19 @@ class UndergroundScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final underground = AppScope.of(context).underground;
+    final app = AppScope.of(context);
+    final underground = app.underground;
     final theme = Theme.of(context);
     final packets = underground.packets;
-    final status = !underground.running
-        ? t('ug.off')
-        : underground.peers > 0
-        ? t('ug.on', {'n': underground.peers})
-        : t('ug.searching');
+    final status = [
+      !underground.running
+          ? t('ug.off')
+          : underground.peers > 0
+          ? t('ug.on', {'n': underground.peers})
+          : t('ug.searching'),
+      if (underground.running && underground.startedByAuto) t('ug.autoStarted'),
+      if (!app.online) t('ug.noSignal'),
+    ].join(' · ');
     return Scaffold(
       appBar: AppBar(title: Text(t('ug.title'))),
       body: ListView(
@@ -52,7 +58,7 @@ class UndergroundScreen extends StatelessWidget {
                 children: [
                   SwitchListTile(
                     value: underground.running,
-                    onChanged: (on) => _toggle(context, underground, on),
+                    onChanged: (on) => _toggle(context, app, on),
                     contentPadding: EdgeInsets.zero,
                     secondary: Icon(
                       Icons.bluetooth_searching,
@@ -61,6 +67,15 @@ class UndergroundScreen extends StatelessWidget {
                     ),
                     title: Text(t('ug.title'), style: theme.textTheme.titleMedium),
                     subtitle: Text(status),
+                  ),
+                  // Otomatik: hatta binince ya da bağlantı kopunca açılır, çıkınca kapanır.
+                  SwitchListTile(
+                    value: app.auto.enabled,
+                    onChanged: app.setAutoUnderground,
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(t('ug.auto')),
+                    subtitle: Text(t('ug.autoHint')),
                   ),
                   const SizedBox(height: 8),
                   Text(t('ug.how'), style: theme.textTheme.bodySmall),

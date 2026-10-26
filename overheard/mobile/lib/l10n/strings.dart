@@ -79,6 +79,11 @@ const _strings = <String, Map<String, String>>{
     'ug.unavailable':
         'Yakındaki cihaz bağlantısı başlatılamadı. Bluetooth ve konum açık mı? (Google Play Hizmetleri de gerekir.)',
     'ug.hide': 'Bu telefondan sil',
+    'ug.stop': 'Kapat',
+    'ug.auto': 'Otomatik',
+    'ug.autoHint': 'Hatta binince ya da bağlantı kopunca kendiliğinden açılır; bağlantı dönüp hattan inince kapanır. Uygulamayı kapatsan da sürer.',
+    'ug.autoStarted': 'kendiliğinden açıldı',
+    'ug.noSignal': 'bağlantı yok',
     'ug.log': 'Saha günlüğü',
     'ug.logEmpty':
         'Henüz bir olay yok. Yeraltı modunu açınca telefon bulma, bağlanma ve söz alışverişi burada görünür.',
@@ -171,6 +176,11 @@ const _strings = <String, Map<String, String>>{
     'ug.unavailable':
         "Couldn't start nearby connections. Are Bluetooth and location on? (Google Play services are required too.)",
     'ug.hide': 'Remove from this phone',
+    'ug.stop': 'Turn off',
+    'ug.auto': 'Automatic',
+    'ug.autoHint': 'Turns on when you board a line or lose signal, and off once you are back online and off the line. Keeps going even if you close the app.',
+    'ug.autoStarted': 'turned on automatically',
+    'ug.noSignal': 'no signal',
     'ug.log': 'Field log',
     'ug.logEmpty':
         'Nothing yet. Once underground mode is on, finding phones, connecting and exchanging overheards show up here.',
