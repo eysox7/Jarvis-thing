@@ -21,6 +21,22 @@ import androidx.core.content.ContextCompat
 class MeshService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        running = this
+    }
+
+    override fun onDestroy() {
+        if (running === this) running = null
+        super.onDestroy()
+    }
+
+    // Çalışan hizmetin bildirimini günceller (yakındaki telefon sayısı). Hizmeti yeniden başlatmak
+    // gerekmez; Android 12+ uygulama arka plandayken buna zaten izin vermez.
+    fun show(title: String, text: String, stop: String, channel: String) {
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(title, text, stop, channel))
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             MeshPlugin.instance?.emit(mapOf("type" to "stopRequested"))
@@ -69,19 +85,28 @@ class MeshService : Service() {
         private const val EXTRA_STOP = "stop"
         private const val EXTRA_CHANNEL = "channel"
 
-        // Hizmeti başlatır ya da bildirimini günceller. Android 12+ arka plandan ön plan hizmeti
-        // başlatmaya izin vermez; o durumda false döner (uygulama öne gelince yeniden denenir).
-        fun start(context: Context, title: String, text: String, stop: String, channel: String): Boolean = try {
-            val intent = Intent(context, MeshService::class.java)
-                .putExtra(EXTRA_TITLE, title)
-                .putExtra(EXTRA_TEXT, text)
-                .putExtra(EXTRA_STOP, stop)
-                .putExtra(EXTRA_CHANNEL, channel)
-            ContextCompat.startForegroundService(context, intent)
-            true
-        } catch (e: RuntimeException) {
-            Log.w("Overheard", "Yeraltı hizmeti başlatılamadı", e)
-            false
+        @Volatile
+        private var running: MeshService? = null
+
+        // Hizmeti başlatır (çalışıyorsa yalnızca bildirimini günceller). Android 12+ arka plandan ön
+        // plan hizmeti başlatmaya izin vermez; o durumda false döner (uygulama öne gelince yeniden denenir).
+        fun start(context: Context, title: String, text: String, stop: String, channel: String): Boolean {
+            running?.let {
+                it.show(title, text, stop, channel)
+                return true
+            }
+            return try {
+                val intent = Intent(context, MeshService::class.java)
+                    .putExtra(EXTRA_TITLE, title)
+                    .putExtra(EXTRA_TEXT, text)
+                    .putExtra(EXTRA_STOP, stop)
+                    .putExtra(EXTRA_CHANNEL, channel)
+                ContextCompat.startForegroundService(context, intent)
+                true
+            } catch (e: RuntimeException) {
+                Log.w("Overheard", "Yeraltı hizmeti başlatılamadı", e)
+                false
+            }
         }
 
         fun stop(context: Context) {
