@@ -99,6 +99,8 @@ void main() {
     expect(app.underground.running, isTrue);
     expect(radio.alive, isTrue);
     expect(find.text('On · looking for nearby phones'), findsOneWidget);
+    // Kilit ekranındaki bildirim kendi bekleyen sözünü de sayar.
+    expect(radio.text, 'Overheards are passing to nearby phones · 1 of yours waiting for signal');
 
     await tester.scrollUntilVisible(find.text('“Yanımdakinin sözü”'), 200);
     expect(find.text('“Kendi sözüm”'), findsOneWidget);

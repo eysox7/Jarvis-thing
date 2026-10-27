@@ -189,11 +189,15 @@ class Underground extends ChangeNotifier {
     unawaited(_notify());
   }
 
-  // Kalıcı bildirim: hizmeti başlatır ya da yakındaki telefon sayısıyla günceller.
+  // Kalıcı bildirim: hizmeti başlatır ya da yakındaki telefon ve sinyal bekleyen söz sayısıyla günceller
+  // (kilit ekranından sözünün yolda olup olmadığı görülür).
   Future<bool> _notify() => radio
       .keepAlive(
         title: t('ug.notification'),
-        text: peers > 0 ? t('ug.on', {'n': peers}) : t('ug.notificationText'),
+        text: [
+          peers > 0 ? t('ug.on', {'n': peers}) : t('ug.notificationText'),
+          if (waiting > 0) t('ug.notificationWaiting', {'n': waiting}),
+        ].join(' · '),
         stop: t('ug.stop'),
       )
       .catchError((Object _) => false);

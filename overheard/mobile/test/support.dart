@@ -81,6 +81,8 @@ class FakeRadio implements MeshRadio {
   // Android arka plandan ön plan hizmeti başlatmaya izin vermediğinde false.
   bool canKeepAlive = true;
   int prompts = 0;
+  // Son bildirim metni.
+  String? text;
   final stops = StreamController<void>.broadcast();
 
   @override
@@ -93,8 +95,10 @@ class FakeRadio implements MeshRadio {
   Future<bool> granted() async => allowed;
 
   @override
-  Future<bool> keepAlive({required String title, required String text, required String stop}) async =>
-      alive = canKeepAlive;
+  Future<bool> keepAlive({required String title, required String text, required String stop}) async {
+    this.text = text;
+    return alive = canKeepAlive;
+  }
 
   @override
   Future<void> release() async => alive = false;
