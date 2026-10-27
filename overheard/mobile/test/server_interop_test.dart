@@ -166,6 +166,15 @@ void main() {
       expect(await carrier.underground.flush(), 1);
       expect(carried.state, PacketState.delivered);
 
+      // Sunucunun makbuzu Bluetooth'tan yazara geçer: sinyal bulmadan sözünün ulaştığını görür.
+      expect(carried.receipt, isNotNull);
+      await settle();
+      final own = author.underground.packets.single;
+      expect(own.state, PacketState.delivered);
+      expect(own.receipt, carried.receipt);
+      expect(own.overheardId, carried.overheardId);
+      expect(author.underground.waiting, 0);
+
       author.api.baseUrl = base;
       final overheard = await author.overheard(carried.overheardId!);
       expect(overheard.mine, isTrue);
@@ -174,12 +183,8 @@ void main() {
       expect(overheard.placeId, 'ist-kadikoy-iskele');
       expect(overheard.public, isTrue);
 
-      // Yazar bağlanınca kendi kopyası kendiliğinden gönderilir ve "ulaştı" olur (sunucu aynı sözü
-      // ikinci kez yazmaz).
-      await author.underground.flush();
-      await settle();
-      expect(author.underground.packets.single.state, PacketState.delivered);
-      expect(author.underground.packets.single.overheardId, carried.overheardId);
+      // Yazar bağlanınca makbuzu olan sözünü yeniden göndermez.
+      expect(await author.underground.flush(), 0);
     });
 
     test('yolda değiştirilen söz reddedilir; taşıyan bir daha göndermez', () async {

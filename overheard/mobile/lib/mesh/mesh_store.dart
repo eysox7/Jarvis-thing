@@ -1,4 +1,5 @@
 import 'packet.dart';
+import 'receipt.dart';
 
 // Telefondaki kulaktan kulağa deposu: kendi sözlerin ve yanından geçenlerden aldıkların. Yalnızca
 // süresi dolmamış sözler (sunucu 6 saatten eski çevrimdışı sözü kabul etmez) başkalarına sunulur ve
@@ -40,6 +41,18 @@ class MeshStore {
   void forget(String id, {required int now}) {
     _packets.remove(id);
     _dropped[id] = now;
+  }
+
+  // Sunucunun makbuzu geldi: söz ulaşmış, artık gönderilmez. Değişiklik olduysa true.
+  bool settle(String id, String receipt) {
+    final packet = _packets[id];
+    if (packet == null || packet.receipt != null) return false;
+    packet
+      ..state = PacketState.delivered
+      ..error = null
+      ..overheardId ??= Receipt.overheard(receipt)
+      ..receipt = receipt;
+    return true;
   }
 
   // Başkalarına sunulacak sözlerin kimlikleri: süresi dolmamış, atlama sınırına varmamış (en yeni önce).

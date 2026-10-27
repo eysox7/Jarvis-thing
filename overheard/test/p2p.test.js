@@ -63,6 +63,28 @@ describe('Kulaktan kulağa (eşten eşe)', () => {
     assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM overheards WHERE client_id = ?').get(it.c).n, 1);
   });
 
+  test('sunucu ulaşan söze imzalı teslim makbuzu verir; makbuz yapılandırmadaki anahtarla doğrulanır', async () => {
+    const it = item();
+    const payload = await authorDevice.sign(it);
+    const r = await carrier.post('/api/overheards/relay', { p: payload });
+    const [data, sig] = r.data.receipt.split('.');
+    const receipt = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'));
+    assert.equal(receipt.i, `${authorDevice.keyId}:${it.c}`);
+    assert.equal(receipt.o, srv.db.prepare('SELECT id FROM overheards WHERE client_id = ?').get(it.c).id);
+    assert.ok(Math.abs(receipt.d - Date.now()) < MIN);
+    const { receiptKey } = (await client(srv.base).get('/api/config')).data;
+    assert.deepEqual(Object.keys(receiptKey).sort(), ['crv', 'kty', 'x', 'y']);
+    const key = await webcrypto.subtle.importKey('jwk', receiptKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    const verify = (d, s) => webcrypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, Buffer.from(s, 'base64url'), Buffer.from(d, 'base64url'));
+    assert.equal(await verify(data, sig), true);
+    // Makbuz değiştirilemez.
+    const forged = Buffer.from(JSON.stringify({ ...receipt, i: `${authorDevice.keyId}:baska` })).toString('base64url');
+    assert.equal(await verify(forged, sig), false);
+    // Aynı söz yeniden gelince de makbuz döner; anahtar sunucu yeniden başlasa da aynı kalır.
+    assert.ok((await carrier.post('/api/overheards/relay', { p: payload })).data.receipt);
+    assert.equal(srv.db.prepare("SELECT COUNT(*) AS n FROM app_secrets WHERE name = 'receipt_key'").get().n, 1);
+  });
+
   test('Bluetooth ağında kaç telefondan geçtiği kaydedilir; söz "internetsiz yazıldı" diye görünür', async () => {
     const viaMesh = item({ v: 'p' });
     const r = await carrier.post('/api/overheards/relay', { p: await authorDevice.sign(viaMesh), hops: 3 });

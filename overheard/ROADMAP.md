@@ -198,6 +198,11 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       kendi açtığını kapatır; kullanıcı kapatırsa o yolculukta yeniden açmaz. Açılışta ve uygulamaya
       dönüşte konum tazelenir (hat kanıtı); bağlantı geri geldiği an bekleyen sözler gönderilir.
       Eski nearby_connections ve flutter_foreground_task eklentileri kaldırıldı.
+- [x] **29e. Teslim makbuzları** — Sunucu ulaşan sözü kendi anahtarıyla imzalar (ECDSA P-256; açık
+      anahtar `/api/config` `receiptKey`). Makbuz Bluetooth ağında yayılır: aynı sözü taşıyanlar artık
+      göndermez, yazar sinyal bulmadan sözünün ulaştığını görür. Uydurma makbuz telefonda reddedilir.
+      Ayrıca: sunucu çökmesi metro sanılmaz (genel internet denetimi), Google başka hesaba bağlıysa
+      hesap değiştirilmez, Google kapalıyken de parolasız hesap silinebilir.
 - [ ] **30. iPhone'da yeraltı modu** — `MeshLink` için Multipeer Connectivity (iPhone ↔ iPhone) ve
       BLE GATT (Android ↔ iPhone) bağlantı katmanı; iOS'ta arka plan Bluetooth kısıtları.
 - [ ] **31. Gizli sözler (mini oyun)** — İnternetsiz yazılmış sözler (`offline`, `hops`) özel:

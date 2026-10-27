@@ -378,6 +378,8 @@ class AppController extends ChangeNotifier {
     if (list is List && list.isNotEmpty) cities = [for (final c in list) City.fromJson(c as Map<String, dynamic>)];
     demoMode = config['demoMode'] == true;
     googleClientId = config['googleClientId'] as String?;
+    // Yapılandırma dosyaya da yazılır: makbuzlar metroda, sinyalsiz doğrulanır.
+    underground.receiptKey = (config['receiptKey'] as Map?)?.cast<String, dynamic>();
   }
 
   // Bağlıyken bir kez: cihaz anahtarı üretilir, açık yarısı sunucuya kaydedilir. Özel yarı yalnızca

@@ -13,6 +13,7 @@ import { transaction } from './db.js';
 export const SESSION_COOKIE = 'oh_session';
 
 export function registerApi(router, { db, config, events, rateLimit, ai = null, google = { enabled: false, clientId: null } }) {
+  const receipts = p2p.receiptSigner(db);
   const limit = (key, max, windowMs) => {
     if (!rateLimit(key, Math.ceil(max * config.rateLimitScale), windowMs)) throw new HttpError(429, 'rate_limited');
   };
@@ -78,6 +79,8 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null, 
     aiModeration: Boolean(ai),
     // Google ile giriş açıksa web istemci kimliği (web düğmesi ve Android serverClientId).
     googleClientId: google.enabled ? google.clientId : null,
+    // Teslim makbuzlarını doğrulayan açık anahtar (uygulama çevrimdışı kullanmak için saklar).
+    receiptKey: receipts.publicJwk,
   }));
 
   // --- Hesap ---
@@ -338,7 +341,7 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null, 
     const carrier = requireActive(ctx);
     limit(`relay:${carrier.id}`, 60, 3600000);
     const request = await readJson(ctx.req);
-    const { author, body } = await p2p.openRelay(db, request.p);
+    const { author, body, packetId } = await p2p.openRelay(db, request.p);
     // Bluetooth ağında kaç telefondan geçtiği (uygulama bildirir; QR ile gelen tek atlamadır).
     const hops = Number.isInteger(request.hops) ? Math.min(Math.max(request.hops, 0), 32) : null;
     if (author.banned) throw new HttpError(403, 'banned');
@@ -352,7 +355,13 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null, 
       events.publish(author.id, 'relayed', { overheardId: result.id, placeName: result.placeName, carrier: carrier.handle });
     }
     // Taşıyana kendi gözünden söz: yerel ve o artık orada değilse metin dönmez.
-    return { overheard: domain.getOverheard(db, config, carrier, result.id), duplicate: Boolean(result.duplicate), newBadges: [] };
+    // Makbuz: taşıyan bunu Bluetooth ağında yayar; aynı sözü taşıyanlar göndermeye uğraşmaz.
+    return {
+      overheard: domain.getOverheard(db, config, carrier, result.id),
+      duplicate: Boolean(result.duplicate),
+      receipt: receipts.sign(packetId, result.id),
+      newBadges: [],
+    };
   });
 
   router.get('/api/overheards/:id', (ctx) => ({ overheard: domain.getOverheard(db, config, ctx.user, ctx.params.id) }));

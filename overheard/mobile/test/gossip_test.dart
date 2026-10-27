@@ -2,12 +2,23 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:overheard/core/b64.dart';
 import 'package:overheard/core/moderation.dart';
+import 'package:overheard/mesh/device_key.dart';
 import 'package:overheard/mesh/gossip.dart';
 import 'package:overheard/mesh/mesh_store.dart';
 import 'package:overheard/mesh/packet.dart';
+import 'package:overheard/mesh/receipt.dart';
 
 import 'support.dart';
+
+// Sunucunun makbuz anahtarı (gerçekte sunucuda; açık yarısı /api/config'ten gelir).
+final server = DeviceKey.generate();
+
+String receiptFor(String id, {DeviceKey? key, int at = 1700000000000}) {
+  final data = utf8.encode(jsonEncode({'i': id, 'd': at}));
+  return '${b64url(data)}.${b64url((key ?? server).sign(data))}';
+}
 
 class Phone {
   Phone(MemoryNetwork network, String name, int Function() clock, {int maxHops = 8, bool Function(MeshPacket)? accept})
@@ -19,6 +30,8 @@ class Phone {
       clock: clock,
       onReceived: received.add,
       accept: accept,
+      verifyReceipt: (receipt, id) => Receipt.valid(receipt, id, server.publicJwk),
+      onSettled: settled.addAll,
       onLog: log.add,
     )..start();
   }
@@ -26,6 +39,7 @@ class Phone {
   final MemoryLink link;
   final store = MeshStore();
   final received = <MeshPacket>[];
+  final settled = <String>[];
   final log = <String>[];
   late final Gossip gossip;
 }
@@ -179,5 +193,67 @@ void main() {
     expect(c.store[good.id]?.hops, 2);
     expect(b.received.map((p) => p.id), [good.id]);
     expect(b.log.any((line) => line.startsWith('Söz geri çevrildi')), isTrue);
+  });
+
+  test('teslim makbuzu yayılır: aynı sözü taşıyanlar artık göndermez, sonradan alan makbuzuyla alır', () async {
+    final a = phone('A'), b = phone('B'), c = phone('C');
+    await net.connect('A', 'B');
+    await net.connect('B', 'C');
+    final packet = signedPacket(heardAt: now);
+    await a.gossip.publish(packet);
+    await settle();
+    expect(c.store.pending(now).single.id, packet.id);
+
+    // A sinyal buldu, sözü ulaştırdı; makbuz B'den C'ye geçer.
+    final receipt = receiptFor(packet.id);
+    a.store.settle(packet.id, receipt);
+    await a.gossip.announce([a.store[packet.id]!]);
+    await settle();
+    for (final phone in [b, c]) {
+      expect(phone.store[packet.id]!.state, PacketState.delivered);
+      expect(phone.store[packet.id]!.receipt, receipt);
+      expect(phone.store.pending(now), isEmpty);
+      expect(phone.settled, [packet.id]);
+    }
+
+    // Sonradan gelen D sözü makbuzuyla alır; hiç göndermeye kalkmaz.
+    final d = phone('D');
+    await net.connect('C', 'D');
+    expect(d.store[packet.id]!.state, PacketState.delivered);
+    expect(d.store.pending(now), isEmpty);
+
+    // Elinde makbuzsuz kopya olan E bağlanınca envanterinden makbuzu alır.
+    final e = phone('E');
+    e.store.add(signedPacket(heardAt: now, own: false), now: now);
+    await net.connect('E', 'D');
+    expect(e.store[packet.id]!.state, PacketState.delivered);
+  });
+
+  test('uydurma ya da başka söze ait makbuz yok sayılır', () async {
+    final a = phone('A'), b = phone('B');
+    await net.connect('A', 'B');
+    final packet = signedPacket(heardAt: now);
+    await a.gossip.publish(packet);
+    await settle();
+    final other = signedPacket(clientId: 'clientid-0002', heardAt: now);
+    final forged = receiptFor(packet.id, key: DeviceKey.generate());
+    final valid = receiptFor(other.id);
+    // Başka sözün geçerli imzası, bu sözün kimliğiyle.
+    final swapped = '${receiptFor(packet.id).split('.').first}.${valid.split('.').last}';
+    for (final receipt in [forged, valid, swapped, 'bozuk', 'a.b.c']) {
+      for (final message in [
+        {
+          'v': 1,
+          't': 'ack',
+          'r': [receipt],
+        },
+        {'v': 1, 't': 'pkt', 'p': packet.payload, 'h': 0, 'k': receipt},
+      ]) {
+        await net.links['A']!.send('B', Uint8List.fromList(utf8.encode(jsonEncode(message))));
+      }
+    }
+    await settle();
+    expect(b.store[packet.id]!.state, PacketState.pending);
+    expect(b.settled, isEmpty);
   });
 }

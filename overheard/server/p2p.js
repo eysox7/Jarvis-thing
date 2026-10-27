@@ -3,7 +3,7 @@
 // o ulaştırır. İmza yazarın cihaz anahtarıyla (ECDSA P-256) atılır; anahtarın açık yarısı yazar
 // bağlıyken sunucuya kaydedilmiştir. Böylece taşıyan kişi sözü değiştiremez ve başkası adına söz
 // uyduramaz; "o sırada oradaydım" kanıtı da yazarındır (createOfflineOverheard).
-import { webcrypto } from 'node:crypto';
+import { createPrivateKey, createPublicKey, generateKeyPairSync, sign, webcrypto } from 'node:crypto';
 import { HttpError } from './http.js';
 import { newId } from './auth.js';
 
@@ -49,10 +49,13 @@ export async function openRelay(db, payload) {
   }
   if (!item || typeof item !== 'object') throw new HttpError(400, 'bad_relay');
   const author = { id: key.id, handle: key.handle, isGuest: Boolean(key.is_guest), banned: key.banned_at != null };
+  // Sözün ağdaki kimliği (uygulamadaki MeshPacket.id): teslim makbuzu bununla imzalanır.
+  const packetId = `${keyId}:${item.c}`;
   // Kısa alan adları QR'a sığsın diye; burada çevrimdışı söz biçimine açılır. "n" (mekân adı) ve
   // "u" (yazar) yalnızca taşıyanın ekranı içindir, sunucu kendi kaydına bakar.
   return {
     author,
+    packetId,
     body: {
       clientId: item.c,
       text: item.t,
@@ -62,6 +65,29 @@ export async function openRelay(db, payload) {
       anonymous: Boolean(item.a),
       ephemeral: Boolean(item.e),
       fix: item.f ?? null,
+    },
+  };
+}
+
+// Teslim makbuzu: sunucu, taşınan sözün kendisine ulaştığını kendi anahtarıyla (ECDSA P-256) imzalar:
+// "<veri>.<imza>" (base64url), veri {"i": ağdaki söz kimliği, "o": sunucudaki söz, "d": zaman}. Makbuz
+// Bluetooth ağında yayılır;
+// elinde aynı söz olan telefonlar onu artık sunucuya taşımaz, yazar da sinyal bulmadan sözünün
+// ulaştığını görür. Açık anahtar /api/config'te (receiptKey); özel anahtar app_secrets'ta kalır.
+export function receiptSigner(db) {
+  const read = () => db.prepare("SELECT value FROM app_secrets WHERE name = 'receipt_key'").get()?.value;
+  if (!read()) {
+    const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    db.prepare("INSERT OR IGNORE INTO app_secrets (name, value) VALUES ('receipt_key', ?)").run(JSON.stringify(privateKey.export({ format: 'jwk' })));
+  }
+  const privateKey = createPrivateKey({ key: JSON.parse(read()), format: 'jwk' });
+  const { kty, crv, x, y } = createPublicKey(privateKey).export({ format: 'jwk' });
+  return {
+    publicJwk: { kty, crv, x, y },
+    sign(packetId, overheardId, at = Date.now()) {
+      const data = Buffer.from(JSON.stringify({ i: packetId, o: overheardId, d: at }));
+      // r||s (64 bayt): uygulamanın ve web'in imza biçimi.
+      return `${data.toString('base64url')}.${sign('sha256', data, { key: privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url')}`;
     },
   };
 }

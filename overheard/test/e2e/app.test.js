@@ -82,7 +82,8 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await b.page.locator(`.oh-bubble[data-id="${id}"]`).waitFor();
       assert.match(await b.page.locator(`.oh-bubble[data-id="${id}"]`).getAttribute('class'), /is-locked/);
       assert.ok(!(await b.page.content()).includes('Martılar bizden'));
-      await b.page.locator(`.oh-bubble[data-id="${id}"]`).click();
+      // Aynı mekândaki örnek sözlerin balonları üst üste binebilir: tıklama doğrudan bu balona gider.
+      await b.page.locator(`.oh-bubble[data-id="${id}"]`).dispatchEvent('click');
       await b.page.locator('.leaflet-popup', { hasText: 'Kadıköy İskelesi mekânında duyuldu' }).waitFor();
 
       // B mekâna "ışınlanır" (demo) → kilit açılır, aynı anda orada oldukları görülür.
@@ -130,7 +131,7 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await loginAsGuest(b.page);
       const witness = await b.page.evaluate(() => window.overheard.app.state.user.handle);
       await zoomTo(b.page, 40.9925, 29.0236);
-      await b.page.locator(`.oh-bubble[data-id="${id}"]`).click();
+      await b.page.locator(`.oh-bubble[data-id="${id}"]`).dispatchEvent('click');
       await b.page.locator('.leaflet-popup').getByRole('button', { name: /ışınlan/ }).click();
       await b.page.locator('.leaflet-popup .bubble-quote', { hasText: 'beklemedi' }).waitFor();
       await b.page.locator('.leaflet-popup .react[title="Ben de duydum"]').click();

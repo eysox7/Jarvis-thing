@@ -97,6 +97,8 @@ class MeshPacket {
   // Sunucu kabul etmediyse nedeni (ör. not_there_then); söz yine okunur, artık gönderilmez.
   String? error;
   String? overheardId;
+  // Sunucunun teslim makbuzu (receipt.dart): bu telefon ulaştırdı ya da makbuz ağda bize geldi.
+  String? receipt;
 
   String get id => '$keyId:${note.clientId}';
 
@@ -132,6 +134,7 @@ class MeshPacket {
     's': state.name,
     if (error != null) 'e': error,
     if (overheardId != null) 'i': overheardId,
+    if (receipt != null) 'k': receipt,
   };
 
   static MeshPacket? fromJson(Map<String, dynamic> json) {
@@ -145,6 +148,7 @@ class MeshPacket {
     packet.state = PacketState.values.asNameMap()[json['s']] ?? PacketState.pending;
     packet.error = json['e'] as String?;
     packet.overheardId = json['i'] as String?;
+    packet.receipt = json['k'] as String?;
     return packet;
   }
 }

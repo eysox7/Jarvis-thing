@@ -23,7 +23,8 @@ class Courier {
           final result = await api.post('/api/overheards/relay', {'p': packet.payload, 'hops': packet.hops});
           packet
             ..state = PacketState.delivered
-            ..overheardId = (result['overheard'] as Map?)?['id'] as String?;
+            ..overheardId = (result['overheard'] as Map?)?['id'] as String?
+            ..receipt = result['receipt'] as String?;
           sent++;
         } on ApiException catch (e) {
           if (e.offline || e.status == 401 || e.status == 429 || e.status >= 500) break;

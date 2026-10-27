@@ -10,6 +10,7 @@ import 'gossip.dart';
 import 'mesh_store.dart';
 import 'packet.dart';
 import 'radio.dart';
+import 'receipt.dart';
 
 enum UndergroundStart { ok, permissions, unavailable }
 
@@ -46,6 +47,8 @@ class Underground extends ChangeNotifier {
   final Courier courier;
   final int maxHops;
   final int Function() _clock;
+  // Sunucunun teslim makbuzlarını doğrulayan açık anahtarı (/api/config receiptKey).
+  Map<String, dynamic>? receiptKey;
 
   MeshLink? _link;
   Gossip? _gossip;
@@ -98,6 +101,8 @@ class Underground extends ChangeNotifier {
         onReceived: _onReceived,
         // Nefret söylemi içeren söz alınmaz, saklanmaz ve yayılmaz.
         accept: (packet) => !containsSlur(packet.note.text),
+        verifyReceipt: (receipt, id) => Receipt.valid(receipt, id, receiptKey),
+        onSettled: (_) => _changed(),
         onLog: _write,
       )..start();
       _linkEvents = link.events.listen((_) => _changed(save: false));
@@ -162,11 +167,15 @@ class Underground extends ChangeNotifier {
   }
 
   Future<int> flush() async {
-    final before = packets.map((p) => p.state).toList();
+    final before = {for (final p in packets) p.id: p.state};
     final sent = await courier.flush(now: _clock());
-    if (sent > 0) _write('Sunucuya ulaştı: $sent söz');
-    final after = packets.map((p) => p.state).toList();
-    if (!listEquals(before, after)) _changed();
+    final changed = packets.where((p) => before[p.id] != p.state).toList();
+    if (sent > 0) {
+      _write('Sunucuya ulaştı: $sent söz');
+      // Makbuzlar yanındakilere: aynı sözleri taşıyanlar göndermeye uğraşmasın.
+      await _gossip?.announce(changed.where((p) => p.state == PacketState.delivered));
+    }
+    if (changed.isNotEmpty) _changed();
     return sent;
   }
 

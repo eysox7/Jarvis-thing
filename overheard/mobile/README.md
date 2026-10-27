@@ -52,6 +52,10 @@ kullanır.
    geçtiği). Sunucu imzayı yazarın kayıtlı anahtarıyla, "o sırada oradaydı"yı yazarın check-in'i ya
    da paketteki konumla doğrular. Taşıyan sözü değiştiremez, kimse başkası adına söz uyduramaz; aynı
    söz iki kez kaydedilmez.
+   Sunucu kabul ettiği söz için imzalı bir teslim makbuzu döner (`lib/mesh/receipt.dart`). Makbuz
+   aynı dedikodu yoluyla yayılır (`ack`): elinde o söz olan telefonlar onu artık göndermez, yazar da
+   sinyal bulmadan sözünün ulaştığını görür. Makbuz, telefonda saklanan sunucu anahtarıyla
+   (`/api/config` `receiptKey`) doğrulanır; uydurma makbuz yok sayılır.
 5. Haritada internetsiz yazılmış sözler 📡 ile işaretlidir (ileride "gizli söz" oyununa dönüşecek;
    sunucu `offline` ve `hops` alanlarını tutar).
 
