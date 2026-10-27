@@ -3,7 +3,13 @@ import 'package:flutter/services.dart';
 // Uygulamanın kendi Android katmanıyla (MeshPlugin.kt, MeshService.kt) konuşma kanalı. Olaylar tek
 // bir yayında gelir: found, lost, initiated, connected, failed, disconnected, payload, log,
 // stopRequested (bildirimdeki "Kapat").
+//
+// Uygulamada tek bir örnek olmalı ([shared]): Flutter bir olay kanalında yalnızca son dinleyiciyi
+// tutar; iki ayrı örnek aynı kanalı dinlerse ilki olay almaz olur. Aynı örneğin [events] yayınını
+// istediği kadar dinleyici paylaşabilir.
 class MeshChannel {
+  static final shared = MeshChannel();
+
   MeshChannel({MethodChannel? methods, EventChannel? events})
     : _methods = methods ?? const MethodChannel('app.overheard/mesh'),
       _events = events ?? const EventChannel('app.overheard/mesh/events');

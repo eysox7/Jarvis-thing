@@ -54,6 +54,7 @@ class AppController extends ChangeNotifier {
     this.google,
     this.defaultServer = '',
     this.connectUrl = '',
+    this.connectivityUrl = 'https://connectivitycheck.gstatic.com/generate_204',
     int Function()? clock,
   }) : _clock = clock ?? (() => DateTime.now().millisecondsSinceEpoch) {
     // Yeraltı modundaki değişiklikler (yeni söz, yakındaki telefon) ekranları da yeniler.
@@ -72,6 +73,9 @@ class AppController extends ChangeNotifier {
   // Bağlantı dosyası (GitHub Pages): asıl sunucunun adresi buradan öğrenilir; sunucu taşınınca
   // uygulamayı yeniden kurmak gerekmez. Biçim: {"server": "https://...", "message": "..."}.
   final String connectUrl;
+  // Sunucuya ulaşılamayınca genel internet bağlantısı buradan denetlenir: internet varsa sorun
+  // sunucudadır (metro değil) ve yeraltı modu açılmaz.
+  final String connectivityUrl;
   final int Function() _clock;
 
   // Yerinde kalma süreleri (sunucudaki stickyPresenceMs / linePresenceMs ile aynı).
@@ -105,6 +109,9 @@ class AppController extends ChangeNotifier {
   bool foreground = true;
   // Sunucudan en son ne zaman haber alındı (yanıt ya da bağlantı hatası).
   int _lastHeard = 0;
+  int _lastInternetCheck = -1 << 52;
+  Future<void>? _internetCheck;
+  bool _disposed = false;
 
   String get server => api.baseUrl;
   bool get hasKey => _key != null && keyId != null && _keyOwner == me?.handle;
@@ -148,9 +155,27 @@ class AppController extends ChangeNotifier {
 
   // --- Kesintisiz yeraltı ---
 
-  // Sunucuya ulaşılabilirlik değişti. Bağlantı geri geldiği an bekleyen sözler yola çıkar.
+  // Sunucuya ulaşılabilirlik bildirimi. Ulaşılamadıysa genel internet denetlenir.
   void _reachable(bool online) {
     _lastHeard = _clock();
+    if (online) {
+      _setOnline(true);
+    } else {
+      _internetCheck ??= _checkInternet().whenComplete(() => _internetCheck = null);
+    }
+  }
+
+  // Sunucu yanıt vermiyor: internet de yoksa (metro, tünel) bağlantı yok sayılır; internet varsa
+  // sorun sunucudadır. En fazla 15 sn'de bir denetlenir.
+  Future<void> _checkInternet() async {
+    final now = _clock();
+    if (now - _lastInternetCheck < 15000) return;
+    _lastInternetCheck = now;
+    _setOnline(connectivityUrl.isNotEmpty && await api.reachable(connectivityUrl));
+  }
+
+  // Bağlantı durumu değişti. Geri geldiği an bekleyen sözler yola çıkar.
+  void _setOnline(bool online) {
     final was = auto.online;
     auto.reachability(online, _clock());
     if (online && !was) {
@@ -174,7 +199,8 @@ class AppController extends ChangeNotifier {
       try {
         await api.get('/healthz');
       } on ApiException {
-        // Hâlâ bağlantı yok.
+        // Sunucu yanıt vermedi; internet denetimi bitsin.
+        await _internetCheck;
       }
     }
     auto.onLine = onLine;
@@ -241,7 +267,13 @@ class AppController extends ChangeNotifier {
   // Elle girilen adres bağlantı dosyasından önce gelir (yerel sunucuyla deneme için).
   Future<void> setServer(String url, {bool manual = true}) async {
     final clean = url.trim().replaceAll(RegExp(r'/+$'), '');
-    if (manual && clean == api.baseUrl) return;
+    // Aynı adres elle yeniden yazıldıysa da sabitlenir (bağlantı dosyası artık değiştirmez).
+    if (manual && clean == api.baseUrl) {
+      serverDiscovered = false;
+      await vault.write('server_manual', '1');
+      notifyListeners();
+      return;
+    }
     api.baseUrl = clean;
     serverDiscovered = !manual;
     await vault.write('server', clean);
@@ -592,8 +624,15 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  // Kapatıldıktan sonra biten istekler (açılıştaki yenileme, internet denetimi) sessizce düşer.
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _flushTimer?.cancel();
     _autoTimer?.cancel();
     underground.removeListener(notifyListeners);

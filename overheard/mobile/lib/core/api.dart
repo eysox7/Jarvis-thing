@@ -50,6 +50,16 @@ class Api {
     }
   }
 
+  // Bir adrese ulaşılabiliyor mu (yanıt gövdesine bakılmaz; ör. Android'in 204 dönen bağlantı denetimi).
+  Future<bool> reachable(String url) async {
+    try {
+      final response = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 6));
+      return response.statusCode < 400;
+    } on Exception {
+      return false;
+    }
+  }
+
   Future<Map<String, dynamic>> post(String path, [Map<String, Object?> body = const {}]) => _send('POST', path, body);
 
   Future<Map<String, dynamic>> _send(String method, String path, [Object? body]) async {

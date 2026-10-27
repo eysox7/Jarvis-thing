@@ -85,7 +85,8 @@ class Underground extends ChangeNotifier {
     _busy = true;
     try {
       if (!await (auto ? radio.granted() : radio.permit())) {
-        _write('İzin verilmedi (Bluetooth, yakındaki cihazlar, konum)');
+        // Otomatik deneme her 20 sn'de bir tekrarlanır; günlüğe yalnızca elle açılış yazılır.
+        if (!auto) _write('İzin verilmedi (Bluetooth, yakındaki cihazlar, konum)');
         return UndergroundStart.permissions;
       }
       final link = linkFactory(_write);

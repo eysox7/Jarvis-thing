@@ -13,7 +13,7 @@ import 'mesh_channel.dart';
 // yeniden bağlanılmaz; böylece sırayla herkese ulaşılır.
 class NearbyLink implements MeshLink {
   NearbyLink({MeshChannel? channel, Random? random, this.onLog, this.cooldown = const Duration(seconds: 60)})
-    : _channel = channel ?? MeshChannel() {
+    : _channel = channel ?? MeshChannel.shared {
     final source = random ?? Random.secure();
     name = 'oh-${List.generate(6, (_) => source.nextInt(36).toRadixString(36)).join()}';
   }
@@ -56,6 +56,8 @@ class NearbyLink implements MeshLink {
   @override
   Future<void> stop() async {
     _running = false;
+    await _subscription?.cancel();
+    _subscription = null;
     try {
       await _channel.call<void>('stop');
     } catch (_) {}

@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:overheard/mesh/gossip.dart';
 import 'package:overheard/mesh/mesh_channel.dart';
 import 'package:overheard/mesh/nearby_link.dart';
+import 'package:overheard/mesh/radio.dart';
 
 class FakeAndroid {
   FakeAndroid() {
@@ -109,6 +110,28 @@ void main() {
     final link = NearbyLink(channel: android.channel);
     expect(await link.start(), isTrue);
     await expectLater(link.send('E9', Uint8List(1)), throwsStateError);
+  });
+
+  test('bağlantı ve bildirim katmanı aynı kanalı birlikte dinler: ikisi de kendi olayını alır', () {
+    fakeAsync((async) {
+      final android = FakeAndroid();
+      final channel = android.channel;
+      final link = NearbyLink(channel: channel, random: _Zero());
+      final radio = AndroidRadio(channel: channel, channelName: 'Yeraltı modu');
+      final events = <LinkEvent>[];
+      var stops = 0;
+      link.events.listen(events.add);
+      link.start();
+      async.flushMicrotasks();
+      // Yeraltı modu açılırken bildirim katmanı da dinlemeye başlar (Underground.start).
+      radio.stopRequests.listen((_) => stops++);
+      async.flushMicrotasks();
+      android.emit({'type': 'connected', 'id': 'E1'});
+      android.emit({'type': 'stopRequested'});
+      async.flushMicrotasks();
+      expect(events.single, isA<PeerConnected>());
+      expect(stops, 1);
+    });
   });
 }
 

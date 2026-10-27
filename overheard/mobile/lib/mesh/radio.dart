@@ -18,7 +18,7 @@ abstract class MeshRadio {
 }
 
 class AndroidRadio implements MeshRadio {
-  AndroidRadio({MeshChannel? channel, required this.channelName}) : _channel = channel ?? MeshChannel();
+  AndroidRadio({MeshChannel? channel, required this.channelName}) : _channel = channel ?? MeshChannel.shared;
 
   final MeshChannel _channel;
   final String channelName;

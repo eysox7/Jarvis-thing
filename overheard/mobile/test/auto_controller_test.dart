@@ -21,15 +21,8 @@ void main() {
   late FakeRadio radio;
   late AppController app;
 
-  setUp(() async {
-    server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    server.listen((request) {
-      request.response
-        ..headers.contentType = ContentType.json
-        ..write(jsonEncode(request.uri.path == '/healthz' ? {'ok': true} : {'user': null}))
-        ..close();
-    });
-    online = 'http://127.0.0.1:${server.port}';
+  // [connectivity]: genel internet denetiminin adresi (varsayılan: o da yok, yani metro).
+  Future<void> build({String connectivity = '$offline/generate_204'}) async {
     radio = FakeRadio();
     final api = Api(baseUrl: offline);
     final store = MeshStore();
@@ -44,6 +37,7 @@ void main() {
       files: files,
       locator: FakeLocator(),
       clock: () => now,
+      connectivityUrl: connectivity,
       underground: Underground(
         store: store,
         files: files,
@@ -54,6 +48,18 @@ void main() {
       ),
     );
     await app.boot();
+  }
+
+  setUp(() async {
+    server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) {
+      request.response
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode(request.uri.path == '/healthz' ? {'ok': true} : {'user': null}))
+        ..close();
+    });
+    online = 'http://127.0.0.1:${server.port}';
+    await build();
   });
 
   tearDown(() async {
@@ -134,6 +140,18 @@ void main() {
     await app.autoTick(probe: true);
     now += 60000;
     await app.autoTick(probe: true);
+    expect(app.underground.running, isFalse);
+  });
+
+  test('sunucu çöktü ama internet var: metro sayılmaz, açılmaz', () async {
+    app.dispose();
+    await build(connectivity: '$online/generate_204');
+    await app.autoTick(probe: true);
+    now += 31000;
+    await app.autoTick(probe: true);
+    now += 31000;
+    await app.autoTick(probe: true);
+    expect(app.online, isTrue);
     expect(app.underground.running, isFalse);
   });
 }
