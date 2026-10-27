@@ -255,5 +255,16 @@ void main() {
     await settle();
     expect(b.store[packet.id]!.state, PacketState.pending);
     expect(b.settled, isEmpty);
+
+    // Sahte makbuzdan sonra gelen gerçek makbuz o mesajda işlenmez; ayrı mesajda işlenir.
+    final real = receiptFor(packet.id);
+    Future<void> ack(List<String> receipts) =>
+        net.links['A']!.send('B', Uint8List.fromList(utf8.encode(jsonEncode({'v': 1, 't': 'ack', 'r': receipts}))));
+    await ack([forged, real]);
+    await settle();
+    expect(b.store[packet.id]!.state, PacketState.pending);
+    await ack([real]);
+    await settle();
+    expect(b.store[packet.id]!.state, PacketState.delivered);
   });
 }

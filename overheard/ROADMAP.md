@@ -207,6 +207,7 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       BLE GATT (Android ↔ iPhone) bağlantı katmanı; iOS'ta arka plan Bluetooth kısıtları.
 - [ ] **31. Gizli sözler (mini oyun)** — İnternetsiz yazılmış sözler (`offline`, `hops`) özel:
       yeraltında toplanan sözler "gizli söz" olarak açılır, kaç telefondan geçtiği oyunun parçası.
+      Öneri ve açık sorular: [docs/gizli-sozler.md](docs/gizli-sozler.md) (karar bekliyor).
 
 ## Kalite turları (tüm adımlar bitince)
 

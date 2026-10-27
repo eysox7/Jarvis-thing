@@ -208,7 +208,8 @@ class Gossip {
   };
 
   // Geçerli makbuzları uygular; yeni "ulaştı" sayılan sözleri döner. İmza (pahalı) yalnızca elimizde
-  // olup henüz makbuzu olmayan sözler için denetlenir.
+  // olup henüz makbuzu olmayan sözler için denetlenir. Dürüst telefon geçersiz makbuz göndermez: ilk
+  // geçersizde mesajın kalanı bırakılır (sahte makbuz yağmuruyla işlemci yorulmasın).
   List<MeshPacket> _settle(Iterable<String> receipts) {
     final verify = verifyReceipt;
     if (verify == null) return const [];
@@ -216,7 +217,8 @@ class Gossip {
     for (final receipt in receipts) {
       final id = Receipt.subject(receipt);
       final packet = id == null ? null : store[id];
-      if (packet == null || packet.receipt != null || !verify(receipt, packet.id)) continue;
+      if (packet == null || packet.receipt != null) continue;
+      if (!verify(receipt, packet.id)) break;
       if (store.settle(packet.id, receipt)) settled.add(packet);
     }
     return settled;
