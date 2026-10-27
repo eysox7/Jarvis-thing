@@ -323,25 +323,26 @@ class Profile {
     this.badges = const [],
     this.unread = 0,
     this.banned = false,
-    this.passwordLogin = true,
     this.googleLinked = false,
+    this.deleteWith = 'password',
   });
 
   final Map<String, int> stats;
   final List<({String id, bool earned})> badges;
   final int unread;
   final bool banned;
-  // Giriş yolları: hesabın parolası var mı, Google bağlı mı (hesap silmede hangisi sorulacak).
-  final bool passwordLogin;
   final bool googleLinked;
+  // Hesap silmenin onayı: password, google (Google ile yeniden giriş), handle (Google sunucuda
+  // kapatıldıysa kullanıcı adını yazmak) ya da none (misafir).
+  final String deleteWith;
 
   Profile copyWith({int? unread}) => Profile(
     stats: stats,
     badges: badges,
     unread: unread ?? this.unread,
     banned: banned,
-    passwordLogin: passwordLogin,
     googleLinked: googleLinked,
+    deleteWith: deleteWith,
   );
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
@@ -352,7 +353,7 @@ class Profile {
     ],
     unread: _i(j['unread']),
     banned: _b((j['user'] as Map?)?['banned']),
-    passwordLogin: (j['auth'] as Map?)?['password'] != false,
     googleLinked: _b((j['auth'] as Map?)?['google']),
+    deleteWith: (j['auth'] as Map?)?['confirm'] as String? ?? 'password',
   );
 }

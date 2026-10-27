@@ -18,9 +18,9 @@ class MeScreen extends StatelessWidget {
   Future<void> _delete(BuildContext context) async {
     final app = AppScope.read(context);
     final password = TextEditingController();
-    final guest = app.me?.isGuest ?? false;
-    // Parolası olmayan (Google ile açılmış) hesap silmeyi Google hesabını seçerek onaylar.
-    final viaGoogle = !guest && !app.profile.passwordLogin && app.profile.googleLinked;
+    // Parolası olmayan (Google ile açılmış) hesap silmeyi Google hesabını seçerek onaylar; Google
+    // sunucuda kapatıldıysa kullanıcı adını yazar. Misafire bir şey sorulmaz.
+    final confirm = (app.me?.isGuest ?? false) ? 'none' : app.profile.deleteWith;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -30,13 +30,13 @@ class MeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(t('profile.deleteConfirm')),
-            if (viaGoogle) ...[
+            if (confirm == 'google') ...[
               const SizedBox(height: 12),
               Text(t('me.deleteGoogle')),
-            ] else if (!guest) ...[
+            ] else if (confirm != 'none') ...[
               const SizedBox(height: 12),
-              Text(t('profile.deletePassword')),
-              TextField(controller: password, obscureText: true, autofocus: true),
+              Text(t(confirm == 'handle' ? 'profile.deleteHandle' : 'profile.deletePassword')),
+              TextField(controller: password, obscureText: confirm != 'handle', autofocus: true),
             ],
           ],
         ),

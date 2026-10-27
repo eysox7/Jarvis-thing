@@ -33,7 +33,8 @@ export const api = {
   config: () => request('GET', '/api/config'),
   me: () => request('GET', '/api/me'),
   register: (handle, password, acceptTerms) => request('POST', '/api/auth/register', { handle, password, acceptTerms }),
-  deleteAccount: (password, googleIdToken) => request('POST', '/api/me/delete', googleIdToken ? { googleIdToken } : { password }),
+  // proof: { password } | { googleIdToken } | { handle } — /api/me auth.confirm söyler.
+  deleteAccount: (proof = {}) => request('POST', '/api/me/delete', proof),
   google: (idToken, extra = {}) => request('POST', '/api/auth/google', { idToken, ...extra }),
   login: (handle, password) => request('POST', '/api/auth/login', { handle, password }),
   guest: () => request('POST', '/api/auth/guest', {}),

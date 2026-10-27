@@ -319,7 +319,7 @@ void main() {
       expect(google.requests.last, 'dart-test-client');
       await app.refresh();
       expect(app.profile.googleLinked, isTrue);
-      expect(app.profile.passwordLogin, isFalse);
+      expect(app.profile.deleteWith, 'google');
       expect(app.hasKey, isTrue);
 
       // Çıkıp yeniden Google ile girince aynı hesap.
@@ -332,7 +332,7 @@ void main() {
       final member = await phone('B', unique('uye'), google: other);
       await member.linkGoogle();
       expect(member.profile.googleLinked, isTrue);
-      expect(member.profile.passwordLogin, isTrue);
+      expect(member.profile.deleteWith, 'password');
 
       // Parolasız hesabın silinmesi Google hesabı seçilerek onaylanır.
       google.next = googleTokens['yeni'];

@@ -146,6 +146,13 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null, 
   };
   const googleUser = (sub) => db.prepare(`SELECT u.* FROM user_identities i JOIN users u ON u.id = i.user_id
                                           WHERE i.provider = 'google' AND i.subject = ?`).get(sub);
+  // Hesap silmenin onayı: parola; parolasız (Google ile açılmış) hesapta taze bir Google girişi; Google
+  // bu sunucuda kapatıldıysa hesap yine silinebilsin diye kullanıcı adını yazmak. Misafirde onay yok.
+  const deleteConfirm = (user) => {
+    if (user.isGuest) return 'none';
+    if (db.prepare('SELECT password_login FROM users WHERE id = ?').get(user.id)?.password_login) return 'password';
+    return google.enabled ? 'google' : 'handle';
+  };
   const freeHandle = (wanted) => {
     const base = HANDLE_RE.test(wanted) ? wanted : suggestHandle(wanted);
     const taken = db.prepare('SELECT 1 FROM users WHERE handle = ?');
@@ -157,31 +164,56 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null, 
     throw new HttpError(409, 'handle_taken');
   };
 
+  // Aynı Google hesabıyla aynı anda iki istek: ikincisi birincinin açtığı kaydı bulur.
+  const isConflict = (err) => err?.code === 'ERR_SQLITE_ERROR' && /UNIQUE|PRIMARY KEY/i.test(err.message);
+
   router.post('/api/auth/google', async (ctx) => {
     limit(`google:${clientIp(ctx.req, config.trustProxy)}`, 30, 3600000);
     const body = await readJson(ctx.req);
     const identity = await googleIdentity(body.idToken);
+    const signIn = (user) => {
+      // Kalıcı bir hesapla oturum açıkken başka hesaba bağlı Google: hesap değiştirilmez (misafir
+      // hesabı ise bırakılıp Google'ın hesabına girilir).
+      if (ctx.user && !ctx.user.isGuest && ctx.user.id !== user.id) throw new HttpError(409, 'google_linked_elsewhere');
+      if (ctx.user?.id === user.id) return { user: publicUser(user), linked: true };
+      startSession(ctx, user.id);
+      return { user: publicUser(user), created: false };
+    };
     const linked = googleUser(identity.sub);
-    if (linked) {
-      startSession(ctx, linked.id);
-      return { user: publicUser(linked), created: false };
-    }
+    if (linked) return signIn(linked);
     const now = Date.now();
     if (ctx.user) {
-      db.prepare("INSERT INTO user_identities (provider, subject, user_id, created_at) VALUES ('google', ?, ?, ?)").run(identity.sub, ctx.user.id, now);
-      if (ctx.user.isGuest) db.prepare('UPDATE users SET is_guest = 0, password_login = 0 WHERE id = ?').run(ctx.user.id);
-      return { user: publicUser({ ...ctx.user, isGuest: false }), linked: true };
+      // Misafir hesabı kalıcı olur; "misafir_…" adı istenen ya da Google adından türetilen adla değişir.
+      const handle = ctx.user.isGuest ? freeHandle(String(body.handle || identity.name || '')) : ctx.user.handle;
+      try {
+        transaction(db, () => {
+          db.prepare("INSERT INTO user_identities (provider, subject, user_id, created_at) VALUES ('google', ?, ?, ?)").run(identity.sub, ctx.user.id, now);
+          if (ctx.user.isGuest) db.prepare('UPDATE users SET handle = ?, is_guest = 0, password_login = 0 WHERE id = ?').run(handle, ctx.user.id);
+        });
+      } catch (err) {
+        const winner = isConflict(err) && googleUser(identity.sub);
+        if (!winner) throw isConflict(err) ? new HttpError(409, 'handle_taken') : err;
+        return signIn(winner);
+      }
+      return { user: publicUser({ ...ctx.user, handle, isGuest: false }), linked: true };
     }
     if (body.acceptTerms !== true) throw new HttpError(400, 'terms_required');
     limit(`register:${clientIp(ctx.req, config.trustProxy)}`, 10, 3600000);
     const handle = freeHandle(String(body.handle || identity.name || ''));
     const passHash = await hashPassword(randomBytes(24).toString('hex'));
-    const userId = transaction(db, () => {
-      const { lastInsertRowid } = db.prepare(`INSERT INTO users (handle, pass_hash, created_at, terms_accepted_at, password_login)
-                                              VALUES (?, ?, ?, ?, 0)`).run(handle, passHash, now, now);
-      db.prepare("INSERT INTO user_identities (provider, subject, user_id, created_at) VALUES ('google', ?, ?, ?)").run(identity.sub, Number(lastInsertRowid), now);
-      return Number(lastInsertRowid);
-    });
+    let userId;
+    try {
+      userId = transaction(db, () => {
+        const { lastInsertRowid } = db.prepare(`INSERT INTO users (handle, pass_hash, created_at, terms_accepted_at, password_login)
+                                                VALUES (?, ?, ?, ?, 0)`).run(handle, passHash, now, now);
+        db.prepare("INSERT INTO user_identities (provider, subject, user_id, created_at) VALUES ('google', ?, ?, ?)").run(identity.sub, Number(lastInsertRowid), now);
+        return Number(lastInsertRowid);
+      });
+    } catch (err) {
+      const winner = isConflict(err) && googleUser(identity.sub);
+      if (!winner) throw isConflict(err) ? new HttpError(409, 'handle_taken') : err;
+      return signIn(winner);
+    }
     startSession(ctx, userId);
     return { user: publicUser({ handle, isGuest: false }), created: true };
   });
@@ -201,10 +233,11 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null, 
       progress: domain.progress(db, ctx.user),
       // Personeli olduğun Overheard Kafeler (kafe paneli için).
       venues: venues.staffVenues(db, ctx.user.id),
-      // Giriş yolları: parola (hesap silmede sorulur) ve Google (parolasız hesapta silmeyi onaylar).
+      // Giriş yolları (parola, Google) ve hesap silmenin nasıl onaylanacağı (confirm).
       auth: {
         password: !ctx.user.isGuest && Boolean(db.prepare('SELECT password_login FROM users WHERE id = ?').get(ctx.user.id)?.password_login),
         google: Boolean(db.prepare("SELECT 1 FROM user_identities WHERE user_id = ? AND provider = 'google'").get(ctx.user.id)),
+        confirm: deleteConfirm(ctx.user),
       },
     };
   });
@@ -250,15 +283,15 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null, 
     const user = requireUser(ctx);
     limit(`delete:${user.id}`, 5, 3600000);
     const body = await readJson(ctx.req);
-    if (!user.isGuest) {
-      const row = db.prepare('SELECT pass_hash, password_login FROM users WHERE id = ?').get(user.id);
-      if (row.password_login) {
-        if (!(await verifyPassword(String(body.password || ''), row.pass_hash))) throw new HttpError(401, 'bad_credentials');
-      } else {
-        // Parolası olmayan (Google ile açılmış) hesap: silme, taze bir Google girişiyle onaylanır.
-        const identity = await googleIdentity(body.googleIdToken);
-        if (googleUser(identity.sub)?.id !== user.id) throw new HttpError(401, 'bad_credentials');
-      }
+    const confirm = deleteConfirm(user);
+    if (confirm === 'password') {
+      const row = db.prepare('SELECT pass_hash FROM users WHERE id = ?').get(user.id);
+      if (!(await verifyPassword(String(body.password || ''), row.pass_hash))) throw new HttpError(401, 'bad_credentials');
+    } else if (confirm === 'google') {
+      const identity = await googleIdentity(body.googleIdToken);
+      if (googleUser(identity.sub)?.id !== user.id) throw new HttpError(401, 'bad_credentials');
+    } else if (confirm === 'handle' && String(body.handle ?? '').trim().toLowerCase() !== user.handle.toLowerCase()) {
+      throw new HttpError(401, 'bad_credentials');
     }
     domain.deleteAccount(db, user);
     ctx.setCookie(serializeCookie(SESSION_COOKIE, '', { maxAge: 0, secure: config.secureCookies }));

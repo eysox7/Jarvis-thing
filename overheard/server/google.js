@@ -9,15 +9,32 @@ import { HttpError } from './http.js';
 export const GOOGLE_CERTS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 const ISSUERS = new Set(['accounts.google.com', 'https://accounts.google.com']);
 const SKEW_S = 300;
+const FORCED_REFRESH_MS = 60000;
 
 const decode = (part) => JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
 
 export function createGoogleVerifier({ clientIds = [], certsUrl = GOOGLE_CERTS_URL, fetchImpl = fetch, now = Date.now } = {}) {
   let cache = { keys: new Map(), expires: 0 };
+  let inflight = null;
+  let forcedAt = -Infinity;
 
-  // Google anahtarları döndürür; önbellek süresi yanıtın Cache-Control başlığından gelir.
+  // Google anahtarları döndürür; önbellek süresi yanıtın Cache-Control başlığından gelir. Aynı anda
+  // gelen istekler tek indirmeyi bekler. Zorla yenileme (bilinmeyen anahtar) en fazla dakikada bir:
+  // uydurma anahtar kimlikli belgelerle Google'a istek yağdırılamaz.
   async function keys(force = false) {
-    if (!force && cache.expires > now()) return cache.keys;
+    if (force) {
+      if (now() - forcedAt < FORCED_REFRESH_MS) return cache.keys;
+      forcedAt = now();
+    } else if (cache.expires > now()) {
+      return cache.keys;
+    }
+    inflight ??= download().finally(() => {
+      inflight = null;
+    });
+    return inflight;
+  }
+
+  async function download() {
     let res;
     try {
       res = await fetchImpl(certsUrl, { signal: AbortSignal.timeout(5000) });
@@ -48,7 +65,7 @@ export function createGoogleVerifier({ clientIds = [], certsUrl = GOOGLE_CERTS_U
       throw invalid();
     }
     if (header.alg !== 'RS256' || typeof header.kid !== 'string') throw invalid();
-    // Bilinmeyen anahtar: Google anahtarlarını yenilemiş olabilir, bir kez tazelenir.
+    // Bilinmeyen anahtar: Google anahtarlarını yenilemiş olabilir, tazelenir.
     const key = (await keys()).get(header.kid) ?? (await keys(true)).get(header.kid);
     if (!key) throw invalid();
     if (!verify('RSA-SHA256', Buffer.from(`${parts[0]}.${parts[1]}`), key, Buffer.from(parts[2], 'base64url'))) throw invalid();

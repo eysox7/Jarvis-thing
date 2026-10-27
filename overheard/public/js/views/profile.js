@@ -103,7 +103,7 @@ function confirmDeleteWithGoogle(app) {
       h('p', { class: 'muted small' }, t('profile.deleteGoogle')),
       googleButton(app.state.config.googleClientId, async (credential) => {
         try {
-          await api.deleteAccount('', credential);
+          await api.deleteAccount({ googleIdToken: credential });
           toast(t('profile.deleted'));
           await app.logout();
         } catch (err) {
@@ -116,20 +116,25 @@ function confirmDeleteWithGoogle(app) {
 // KVKK/GDPR hakları: verilerin bir kopyası ve hesabın kalıcı silinmesi.
 function privacySection(app, auth) {
   const { user } = app.state;
-  const viaGoogle = !user.isGuest && auth && !auth.password && auth.google;
+  // Silme onayı: parola, Google ile yeniden giriş ya da (Google sunucuda kapalıysa) kullanıcı adı.
+  const confirmWith = user.isGuest ? 'none' : (auth?.confirm ?? 'password');
   const remove = h('button', {
     class: 'btn btn-ghost btn-danger btn-block',
     type: 'button',
     onclick: (e) => busy(e.currentTarget, async () => {
-      if (viaGoogle) {
+      if (confirmWith === 'google') {
         confirmDeleteWithGoogle(app);
         return;
       }
       if (!window.confirm(t('profile.deleteConfirm'))) return;
-      const password = user.isGuest ? '' : window.prompt(t('profile.deletePassword'));
-      if (password === null) return;
+      let proof = {};
+      if (confirmWith === 'password' || confirmWith === 'handle') {
+        const value = window.prompt(t(confirmWith === 'password' ? 'profile.deletePassword' : 'profile.deleteHandle'));
+        if (value === null) return;
+        proof = { [confirmWith]: value };
+      }
       try {
-        await api.deleteAccount(password);
+        await api.deleteAccount(proof);
         toast(t('profile.deleted'));
         await app.logout();
       } catch (err) {

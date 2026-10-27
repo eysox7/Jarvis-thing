@@ -575,9 +575,14 @@ class AppController extends ChangeNotifier {
   // Hesap ve sunucudaki tüm veriler kalıcı olarak silinir; telefondaki her şey (anahtar, yeraltı
   // deposu, önbellekler) de temizlenir.
   // Parolası olmayan (Google ile açılmış) hesapta silme, taze bir Google girişiyle onaylanır.
-  Future<void> deleteAccount(String password) async {
-    final viaGoogle = !(me?.isGuest ?? false) && !profile.passwordLogin && profile.googleLinked;
-    await api.post('/api/me/delete', viaGoogle ? {'googleIdToken': await _googleToken()} : {'password': password});
+  // [typed]: onay penceresine yazılan parola ya da kullanıcı adı (profile.deleteWith).
+  Future<void> deleteAccount(String typed) async {
+    await api.post('/api/me/delete', switch (profile.deleteWith) {
+      'google' => {'googleIdToken': await _googleToken()},
+      'handle' => {'handle': typed},
+      'none' => <String, Object?>{},
+      _ => {'password': typed},
+    });
     if (underground.running) await underground.stop();
     underground.clear();
     await files.clear();

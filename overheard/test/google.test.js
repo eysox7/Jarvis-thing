@@ -62,6 +62,20 @@ describe('Google kimlik belgesi doğrulama', () => {
     assert.equal(g.fetches, 2);
   });
 
+  test('bilinmeyen anahtar kimliğiyle Google\'a istek yağdırılamaz; eşzamanlı istekler tek indirmeyi bekler', async () => {
+    const g = fakeGoogle();
+    let clock = Date.now();
+    const verifier = createGoogleVerifier({ clientIds: [CLIENT_ID], fetchImpl: g.fetchImpl, now: () => clock });
+    await Promise.all([1, 2, 3, 4, 5].map(() => verifier.verifyIdToken(g.token())));
+    assert.equal(g.fetches, 1);
+    const forged = g.token({}, { kid: 'uydurma', key: g.keys[0].privateKey });
+    for (let i = 0; i < 10; i++) await verifier.verifyIdToken(forged).catch(() => {});
+    assert.equal(g.fetches, 2);
+    clock += 61000;
+    await verifier.verifyIdToken(forged).catch(() => {});
+    assert.equal(g.fetches, 3);
+  });
+
   test('Google adından kullanıcı adı', () => {
     assert.equal(suggestHandle('Ayşe Yılmaz'), 'ayse_yilmaz');
     assert.equal(suggestHandle('Çağrı Öztürk-İnce'), 'cagri_ozturk_inc');
@@ -101,7 +115,7 @@ describe('Google ile giriş', () => {
     assert.equal(first.data.created, true);
     assert.equal(first.data.user.handle, 'ayse');
     const me = (await c.get('/api/me')).data;
-    assert.deepEqual(me.auth, { password: false, google: true });
+    assert.deepEqual(me.auth, { password: false, google: true, confirm: 'google' });
 
     // Aynı adlı başka biri: ad çakışmaz.
     const other = await client(srv.base).post('/api/auth/google', { idToken: g.token({ sub: 'g-2' }), acceptTerms: true });
@@ -117,21 +131,55 @@ describe('Google ile giriş', () => {
     assert.equal((await client(srv.base).post('/api/auth/login', { handle: 'ayse', password: 'herhangi-bir-parola' })).status, 401);
   });
 
-  test('misafir hesabı Google\'a bağlanınca kalıcı olur; parola hesabı da bağlanabilir', async () => {
+  test('misafir hesabı Google\'a bağlanınca kalıcı olur ve misafir adı değişir; parola hesabı da bağlanabilir', async () => {
     const guest = client(srv.base);
     const { handle } = (await guest.post('/api/auth/guest')).data.user;
-    const linked = await guest.post('/api/auth/google', { idToken: g.token({ sub: 'g-guest' }) });
+    const linked = await guest.post('/api/auth/google', { idToken: g.token({ sub: 'g-guest', given_name: 'Kalıcı' }) });
     assert.equal(linked.data.linked, true);
     assert.equal(linked.data.user.isGuest, false);
-    assert.deepEqual((await guest.get('/api/me')).data.auth, { password: false, google: true });
+    assert.equal(linked.data.user.handle, 'kalici');
+    assert.notEqual(linked.data.user.handle, handle);
+    const me = (await guest.get('/api/me')).data;
+    assert.equal(me.user.handle, 'kalici');
+    assert.deepEqual(me.auth, { password: false, google: true, confirm: 'google' });
     const back = await client(srv.base).post('/api/auth/google', { idToken: g.token({ sub: 'g-guest' }) });
-    assert.equal(back.data.user.handle, handle);
+    assert.equal(back.data.user.handle, 'kalici');
 
     const member = client(srv.base);
     await member.register('parolali_uye');
     await member.post('/api/auth/google', { idToken: g.token({ sub: 'g-member' }) });
-    assert.deepEqual((await member.get('/api/me')).data.auth, { password: true, google: true });
+    assert.deepEqual((await member.get('/api/me')).data.auth, { password: true, google: true, confirm: 'password' });
     assert.equal((await client(srv.base).post('/api/auth/google', { idToken: g.token({ sub: 'g-member' }) })).data.user.handle, 'parolali_uye');
+    // Zaten bağlı: yeniden bağlamak zararsız.
+    assert.equal((await member.post('/api/auth/google', { idToken: g.token({ sub: 'g-member' }) })).data.linked, true);
+  });
+
+  test('başka hesaba bağlı Google: üye hesap değiştirilmez (409), misafir o hesaba geçer', async () => {
+    const owner = client(srv.base);
+    await owner.post('/api/auth/google', { idToken: g.token({ sub: 'g-owner', given_name: 'Sahip' }), acceptTerms: true });
+    const member = client(srv.base);
+    await member.register('baska_uye');
+    const res = await member.post('/api/auth/google', { idToken: g.token({ sub: 'g-owner' }) });
+    assert.equal(res.status, 409);
+    assert.equal(res.data.error, 'google_linked_elsewhere');
+    assert.equal((await member.get('/api/me')).data.user.handle, 'baska_uye');
+
+    const guest = client(srv.base);
+    await guest.post('/api/auth/guest');
+    const switched = await guest.post('/api/auth/google', { idToken: g.token({ sub: 'g-owner' }) });
+    assert.equal(switched.data.created, false);
+    assert.equal((await guest.get('/api/me')).data.user.handle, 'Sahip');
+  });
+
+  test('aynı Google hesabıyla aynı anda iki kayıt: tek hesap açılır, ikisi de ona girer', async () => {
+    const [a, b] = await Promise.all([1, 2].map(() =>
+      client(srv.base).post('/api/auth/google', { idToken: g.token({ sub: 'g-race', given_name: 'Yarış' }), acceptTerms: true })));
+    assert.equal(a.status, 200);
+    assert.equal(b.status, 200);
+    assert.deepEqual([a.data.created, b.data.created].sort(), [false, true]);
+    assert.equal(a.data.user.handle, b.data.user.handle);
+    assert.equal(srv.db.prepare("SELECT COUNT(*) AS n FROM user_identities WHERE subject = 'g-race'").get().n, 1);
+    assert.equal(srv.db.prepare("SELECT COUNT(*) AS n FROM users WHERE handle LIKE 'yaris%'").get().n, 1);
   });
 
   test('parolasız hesap, taze Google girişiyle silinir', async () => {
@@ -144,6 +192,23 @@ describe('Google ile giriş', () => {
     // Silinen Google hesabıyla yeniden gelen yeni bir hesap açar.
     const fresh = await client(srv.base).post('/api/auth/google', { idToken: g.token({ sub: 'g-del', given_name: 'Silinecek' }) });
     assert.equal(fresh.data.error, 'terms_required');
+  });
+
+  test('Google sonradan kapatılırsa parolasız hesap kullanıcı adını yazarak silinir', async () => {
+    const verifier = createGoogleVerifier({ clientIds: [CLIENT_ID], fetchImpl: g.fetchImpl });
+    const own = await startTestServer({ googleClientIds: [CLIENT_ID], google: verifier });
+    try {
+      const c = client(own.base);
+      await c.post('/api/auth/google', { idToken: g.token({ sub: 'g-off', given_name: 'Kapali' }), acceptTerms: true });
+      verifier.enabled = false;
+      assert.equal((await c.get('/api/me')).data.auth.confirm, 'handle');
+      assert.equal((await c.post('/api/me/delete', { handle: 'baskasi' })).data.error, 'bad_credentials');
+      // Büyük/küçük harf fark etmez.
+      assert.equal((await c.post('/api/me/delete', { handle: ' kapali ' })).status, 200);
+      assert.equal(own.db.prepare("SELECT COUNT(*) AS n FROM users WHERE handle = 'Kapali'").get().n, 0);
+    } finally {
+      await own.close();
+    }
   });
 });
 
