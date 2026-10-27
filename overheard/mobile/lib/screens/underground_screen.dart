@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../app/app.dart';
 import '../app/controller.dart';
+import '../core/api.dart';
 import '../core/moderation.dart';
 import '../l10n/strings.dart';
 import '../mesh/packet.dart';
 import '../mesh/underground.dart';
+import 'overheard_sheet.dart';
 
 // Yeraltı modu: internetsiz, telefondan telefona söz aktarımı. Gelen sözler burada hemen okunur;
 // yanındaki telefondan geldiyse sen de onun yanındasın demektir.
@@ -22,6 +24,17 @@ class UndergroundScreen extends StatelessWidget {
       UndergroundStart.ok => null,
     };
     if (problem != null) messenger.showSnackBar(SnackBar(content: Text(problem)));
+  }
+
+  // Sunucuya ulaşmış söz (kendi ulaştırdığın ya da makbuzu ağda gelen) sunucudaki hâliyle açılır.
+  Future<void> _open(BuildContext context, AppController app, String id) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final overheard = await app.overheard(id);
+      if (context.mounted) await showOverheard(context, overheard);
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(errorText(e))));
+    }
   }
 
   Future<void> _flush(BuildContext context, Underground underground) async {
@@ -108,7 +121,12 @@ class UndergroundScreen extends StatelessWidget {
               child: Text(t('ug.empty'), style: theme.textTheme.bodyMedium),
             )
           else
-            for (final packet in packets) _PacketTile(packet: packet, onHide: () => underground.hide(packet.id)),
+            for (final packet in packets)
+              _PacketTile(
+                packet: packet,
+                onHide: () => underground.hide(packet.id),
+                onOpen: packet.overheardId == null ? null : () => _open(context, app, packet.overheardId!),
+              ),
           const SizedBox(height: 16),
           // İki telefonla saha denemesinde ne olduğunu görmek için.
           Card(
@@ -164,10 +182,11 @@ class _Stat extends StatelessWidget {
 }
 
 class _PacketTile extends StatelessWidget {
-  const _PacketTile({required this.packet, required this.onHide});
+  const _PacketTile({required this.packet, required this.onHide, this.onOpen});
 
   final MeshPacket packet;
   final VoidCallback onHide;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -181,18 +200,22 @@ class _PacketTile extends StatelessWidget {
     final origin = packet.own ? t('ug.own') : '📡 ${t('oh.hops', {'n': packet.hops})}';
     final who = note.anonymous || note.author == null ? t('oh.anonymous') : note.author!;
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: _body(theme, note, who, origin, state)),
-            // Rahatsız edici bulduğun taşınan sözü telefondan silebilirsin; bir daha alınmaz.
-            if (!packet.own)
-              PopupMenuButton<void>(
-                itemBuilder: (_) => [PopupMenuItem(onTap: onHide, child: Text(t('ug.hide')))],
-              ),
-          ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _body(theme, note, who, origin, state)),
+              // Rahatsız edici bulduğun taşınan sözü telefondan silebilirsin; bir daha alınmaz.
+              if (!packet.own)
+                PopupMenuButton<void>(
+                  itemBuilder: (_) => [PopupMenuItem(onTap: onHide, child: Text(t('ug.hide')))],
+                ),
+            ],
+          ),
         ),
       ),
     );

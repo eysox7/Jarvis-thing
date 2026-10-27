@@ -1,3 +1,8 @@
+import 'package:http/testing.dart';
+import 'package:http/http.dart' as http;
+
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:overheard/app/app.dart';
@@ -189,5 +194,59 @@ void main() {
     expect(find.textContaining('0532'), findsNothing);
     await tester.scrollUntilVisible(find.text('Field log'), 200);
     expect(find.text('Field log'), findsOneWidget);
+  });
+
+  testWidgets('yeraltı: sunucuya ulaşmış söze dokununca sunucudaki hâli açılır', (tester) async {
+    final api = Api(
+      baseUrl: 'http://sunucu.test',
+      client: MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'overheard': {
+              'id': 'srv1',
+              'placeId': 'ist-kadikoy-iskele',
+              'placeName': 'Kadıköy İskelesi',
+              'text': 'Sunucudaki söz',
+              'offline': true,
+              'hops': 1,
+            },
+          }),
+          request.url.path == '/api/overheards/srv1' ? 200 : 404,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        ),
+      ),
+    );
+    final store = MeshStore();
+    final files = MemoryFiles();
+    final online = AppController(
+      api: api,
+      vault: MemoryVault(),
+      files: files,
+      locator: FakeLocator(),
+      underground: Underground(
+        store: store,
+        files: files,
+        linkFactory: (_) => MemoryNetwork().join('A'),
+        radio: FakeRadio(),
+        courier: Courier(api, store),
+      ),
+    );
+    addTearDown(online.dispose);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final packet = signedPacket(clientId: 'clientid-done', text: 'Yolda yazdım', heardAt: now - 60000);
+    store.add(packet, now: now);
+    packet
+      ..state = PacketState.delivered
+      ..overheardId = 'srv1';
+    await tester.pumpWidget(
+      AppScope(
+        controller: online,
+        child: const MaterialApp(home: UndergroundScreen()),
+      ),
+    );
+    await tester.scrollUntilVisible(find.text('“Yolda yazdım”'), 200);
+    await tester.tap(find.text('“Yolda yazdım”'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Sunucudaki söz'), findsOneWidget);
   });
 }
