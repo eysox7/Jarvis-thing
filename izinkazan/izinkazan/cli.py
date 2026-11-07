@@ -3,7 +3,8 @@
     python -m izinkazan izle    --ayar ayarlar.json --kaynak video.mp4 [--goster]
     python -m izinkazan puanla  --ayar ayarlar.json [--gun 2026-11-07]
     python -m izinkazan rapor   --ayar ayarlar.json [--gun ...]
-    python -m izinkazan izin    --ayar ayarlar.json --isci Ayşe --saat 8
+    python -m izinkazan izin    --ayar ayarlar.json --isci Ayşe --saat 8 [--tarih 2026-11-13]
+    python -m izinkazan avans   --ayar ayarlar.json --isci Ayşe --tl 500
     python -m izinkazan panel   --ayar ayarlar.json [--port 8000]
     python -m izinkazan bolge-ciz --kaynak video.mp4
     python -m izinkazan demo    [--ayar ayarlar.json]
@@ -18,7 +19,8 @@ from datetime import date, datetime, timedelta
 
 from . import config as cfg
 from .counter import Person, WorkCounter
-from .scoring import izin_saati, puanla
+from . import odul
+from .scoring import puanla
 from .storage import Depo
 
 
@@ -114,25 +116,39 @@ def komut_rapor(a) -> None:
     d = ozet(depo, ayar, a.gun)
     print(f"== {d['gun']} {'(kayıtlı)' if d['kaydedildi'] else '(önizleme — puanla ile kaydet)'} ==")
     _tablo(d["ortalama"], d["sonuclar"], ayar)
-    print("\n== Bakiye ==")
-    print(f"{'Çalışan':<18}{'Kazanılan':>10}{'Kullanılan':>11}{'Bakiye':>8}{'İzin':>9}")
+    print("\n== Bakiye ve kullanılabilir haklar ==")
+    print(f"{'Çalışan':<18}{'Kazanılan':>10}{'Harcanan':>10}{'Bakiye':>8}{'İzin (bu hafta)':>17}{'Avans (bu ay)':>15}")
     for b in d["bakiyeler"]:
-        print(f"{b['isci']:<18}{b['kazanilan']:>10}{b['kullanilan']:>11}{b['bakiye']:>8}{b['izin_saat']:>7.0f} sa")
+        print(f"{b['isci']:<18}{b['kazanilan']:>10}{b['kullanilan']:>10}{b['bakiye']:>8}"
+              f"{b['izin_saat_bu_hafta']:>14g} sa{b['avans_tl_bu_ay']:>12,.0f} TL")
     depo.kapat()
+
+
+def _harca(a, islem):
+    ayar = cfg.yukle(a.ayar)
+    depo = Depo(ayar.veritabani)
+    try:
+        sonuc = islem(depo, ayar)
+    except odul.KuralHatasi as e:
+        depo.kapat()
+        sys.exit(f"Reddedildi: {e}")
+    h = odul.haklar(depo, ayar.izin, ayar.avans, a.isci, sonuc["bakiye"], date.fromisoformat(sonuc["tarih"]))
+    depo.kapat()
+    return sonuc, h
 
 
 def komut_izin(a) -> None:
-    ayar = cfg.yukle(a.ayar)
-    depo = Depo(ayar.veritabani)
-    puan = int(round(a.saat * ayar.gun_basina_puan / ayar.gunluk_saat))
-    try:
-        depo.izin_kullan(a.isci, puan, f"{a.saat:g} saat izin")
-    except ValueError as e:
-        sys.exit(f"Hata: {e}")
-    kalan = depo.bakiye(a.isci)
-    print(f"{a.isci}: {a.saat:g} saat izin için {puan} puan düşüldü. Kalan {kalan} puan "
-          f"(= {izin_saati(kalan, ayar.gun_basina_puan, ayar.gunluk_saat):g} saat).")
-    depo.kapat()
+    sonuc, h = _harca(a, lambda depo, ayar: odul.izin_al(depo, ayar.izin, a.isci, a.saat, a.tarih))
+    print(f"✔ {a.isci}: {sonuc['tarih']} için {a.saat:g} saat izin, {sonuc['puan']} puan düşüldü. "
+          f"Kalan bakiye {sonuc['bakiye']} puan.")
+    print(f"  O hafta kalan izin hakkı: {h['izin_saat_bu_hafta']:g} saat")
+
+
+def komut_avans(a) -> None:
+    sonuc, h = _harca(a, lambda depo, ayar: odul.avans_al(depo, ayar.avans, a.isci, a.tl, a.tarih))
+    print(f"✔ {a.isci}: {a.tl:,.0f} TL nakit avans, {sonuc['puan']} puan düşüldü. "
+          f"Kalan bakiye {sonuc['bakiye']} puan.")
+    print(f"  O ay kalan avans hakkı: {h['avans_tl_bu_ay']:,.0f} TL")
 
 
 def komut_panel(a) -> None:
@@ -251,11 +267,19 @@ def ana(argv=None) -> None:
     s.add_argument("--gun")
     s.set_defaults(f=komut_rapor)
 
-    s = alt.add_parser("izin", help="Puanla izin kullan")
+    s = alt.add_parser("izin", help="Puanla izin kullan (haftada en çok 1 gün)")
     s.add_argument("--ayar", required=True)
     s.add_argument("--isci", required=True)
     s.add_argument("--saat", type=float, required=True)
+    s.add_argument("--tarih", help="izin günü (YYYY-MM-DD), varsayılan bugün")
     s.set_defaults(f=komut_izin)
+
+    s = alt.add_parser("avans", help="Puanla nakit avans çek (aylık sınırlı)")
+    s.add_argument("--ayar", required=True)
+    s.add_argument("--isci", required=True)
+    s.add_argument("--tl", type=float, required=True)
+    s.add_argument("--tarih", help="avans tarihi (YYYY-MM-DD), varsayılan bugün")
+    s.set_defaults(f=komut_avans)
 
     s = alt.add_parser("panel", help="Web panelini aç")
     s.add_argument("--ayar", required=True)

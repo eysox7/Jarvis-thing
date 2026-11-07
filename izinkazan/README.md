@@ -1,8 +1,9 @@
 # İzinKazan
 
 Kamera görüntüsünden **YOLO** ile çalışanların hareketini takip eder, her
-istasyonda yapılan **işi sayar**, günün sonunda **ortalamanın üstünde iş
-yapanlara puan** verir. Biriken puan **izin saatine** dönüşür.
+istasyonda yapılan **işi sayar**, günün sonunda **ortalamanın belirgin
+üstünde iş yapanlara puan** verir. Biriken puan **izne** (haftada en çok
+1 gün) ya da **nakit avansa** (aylık sınırlı) çevrilir.
 
 ```
 kamera ─► YOLO (poz + ByteTrack) ─► iş döngüsü sayacı ─► SQLite ─► puanlama ─► panel / izin bakiyesi
@@ -30,12 +31,35 @@ oran > 1 + esik  →  puan = taban + (oran − 1) × 100 × katsayi   (en çok t
 aksi hâlde       →  0
 ```
 
-Varsayılan: `taban 10, katsayi 0.5, tavan 50, esik 0`.
-Örnek: ortalama 40, Ayşe 50 iş → oran 1.25 → 10 + 25×0.5 = **23 puan**.
+Varsayılan: `taban 5, katsayi 0.5, tavan 30, esik 0.10`. Yani puan için
+ortalamanın **en az %10 üstüne** çıkmak gerekir.
+
+| Ortalama 40 iken | Oran | Puan |
+|---|---|---|
+| 43 iş | 1.075 | 0 (eşiğin altında) |
+| 50 iş | 1.25 | 5 + 12.5 = **18** |
+| 60 iş ve üstü | ≥ 1.50 | **30** (tavan) |
+
 Ortalamada ya da altında kalan puan kaybetmez, sadece kazanmaz.
 
-**4. İzin.** `gun_basina_puan` (varsayılan 100) puan = 1 gün (`gunluk_saat`,
-varsayılan 8 saat). `izin` komutu bakiyeden düşer; yetersiz bakiye reddedilir.
+**4. Puan harcama: izin veya nakit avans.** İkisi de aynı bakiyeden düşer.
+
+| | Fiyat | Sınır |
+|---|---|---|
+| **İzin** | 1 gün (8 saat) = **150 puan**, saatlik de alınabilir | **Haftada en çok 8 saat** (1 gün), Pazartesi–Pazar, iznin kullanıldığı güne göre |
+| **Nakit avans** | **1 puan = 5 TL** | **Ayda en çok 2.000 TL**, tek seferde en az 100 TL |
+
+Bu sayılar "bir gün çalış, bir gün izin" olmasın diye seçildi:
+
+- 1 gün izin = 150 puan = **5 gün boyunca tavan puan** (her gün ortalamanın %50
+  üstü). Yani haftada 1 gün izin ancak olağanüstü performansla kazanılır.
+- Ortalamanın %25 üstünde çalışan biri günde ~18 puan alır, yaklaşık
+  **2 haftada 1 gün** izin biriktirir.
+- Puan biriktirilmiş olsa bile haftalık sınır aşılamaz: 1000 puanı olan biri
+  de aynı haftaya 2 gün izin koyamaz.
+
+Hepsi `ayarlar.json` içinden değiştirilebilir (`puan`, `izin`, `avans`
+blokları). Avansı tamamen kapatmak için `"avans": {"acik": false}`.
 
 ## Kurulum
 
@@ -68,7 +92,15 @@ python -m izinkazan puanla --ayar ayarlar.json [--gun 2026-11-07]
 # 5) Rapor, panel, izin
 python -m izinkazan rapor --ayar ayarlar.json
 python -m izinkazan panel --ayar ayarlar.json --port 8000   # http://127.0.0.1:8000
-python -m izinkazan izin  --ayar ayarlar.json --isci Ayşe --saat 4
+python -m izinkazan izin  --ayar ayarlar.json --isci Ayşe --saat 8 --tarih 2026-11-13
+python -m izinkazan avans --ayar ayarlar.json --isci Ayşe --tl 500
+```
+
+Sınırı aşan talep nedeniyle birlikte reddedilir:
+
+```
+Reddedildi: Haftalık izin sınırı: 2026-11-09 haftasında Ayşe 8 saat kullanmış, en çok 8 saat. O hafta kalan: 0 saat
+Reddedildi: Aylık avans sınırı: Ayşe bu ay 1800 TL çekmiş, en çok 2000 TL. Kalan: 200 TL
 ```
 
 Gün sonu puanlamayı otomatikleştirmek için cron:
@@ -84,7 +116,8 @@ Gün sonu puanlamayı otomatikleştirmek için cron:
 | `istasyonlar[].isci` | O istasyonda yapılan iş bu kişiye yazılır. Boşsa `kisi-<takipNo>` |
 | `istasyonlar[].min_saniye / max_saniye / cikis_toleransi` | Döngü süresi sınırları |
 | `puan.taban / katsayi / tavan / esik / min_calisan` | Puan kuralı |
-| `izin.gun_basina_puan / gunluk_saat` | Puan → izin dönüşümü |
+| `izin.gun_basina_puan / gunluk_saat / haftalik_max_saat` | İzin fiyatı ve haftalık sınır |
+| `avans.acik / puan_basina_tl / aylik_max_tl / min_tl` | Avans fiyatı ve aylık sınır |
 
 **Kimlik:** İşi kişiye istasyon ataması üzerinden yazar; bu, takip numarası
 değişse de (kişi kadrajdan çıkıp girince) doğru kalır. Vardiya değişiminde
@@ -96,8 +129,9 @@ ayar dosyasındaki `isci` alanını güncelleyin.
 python -m unittest discover -s tests -v
 ```
 
-Geometri, sayaç (kısa temas, uzun bekleme, tespit kopması), puanlama, veritabanı
-ve izin bakiyesi test edilir; YOLO gerektirmez.
+Geometri, sayaç (kısa temas, uzun bekleme, tespit kopması), puanlama, veritabanı,
+haftalık izin ve aylık avans sınırları, eski veritabanının yükseltilmesi test
+edilir; YOLO gerektirmez.
 
 ## Dosyalar
 
@@ -105,10 +139,11 @@ ve izin bakiyesi test edilir; YOLO gerektirmez.
 izinkazan/
   detector.py   YOLO poz + ByteTrack → kişiler ve bilek noktaları
   counter.py    istasyon bölgeleri, iş döngüsü durum makinesi
-  scoring.py    ortalamaya göre puan, puan → izin saati
+  scoring.py    ortalamaya göre puan
+  odul.py       izin ve nakit avans: fiyatlar, haftalık/aylık sınırlar
   storage.py    SQLite: iş olayları, puan defteri, bakiye
   panel.py      bağımlılıksız web paneli (/ ve /api/ozet)
-  cli.py        izle · puanla · rapor · izin · panel · bolge-ciz · demo
+  cli.py        izle · puanla · rapor · izin · avans · panel · bolge-ciz · demo
 ```
 
 ## Önemli: hukuk ve adalet
@@ -117,6 +152,9 @@ izinkazan/
   önceden yazılı bilgilendirin (aydınlatma metni), amacı "performans ve izin
   ödülü" ile sınırlayın, saklama süresini belirleyin. İzinKazan görüntü
   **kaydetmez**; veritabanında yalnızca iş sayısı ve zaman tutulur.
+- **Avans ve bordro.** Avans olarak ödenen tutarın maaştan mahsup mu
+  edileceği, prim mi sayılacağı muhasebe/bordro kararıdır; İzinKazan sadece
+  puan defterini tutar, ödeme yapmaz. Kullanmadan önce muhasebeyle netleştirin.
 - **Ödül, ceza değil.** Sistem sadece ortalamanın üstüne çıkanı ödüllendirir;
   altında kalanı cezalandırmak için kullanılmamalı.
 - **Eşit koşul.** Farklı zorluktaki istasyonları aynı ortalamada karşılaştırmak

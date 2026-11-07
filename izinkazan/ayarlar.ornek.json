@@ -28,15 +28,23 @@
   ],
 
   "puan": {
-    "taban": 10,
+    "taban": 5,
     "katsayi": 0.5,
-    "tavan": 50,
-    "esik": 0.0,
+    "tavan": 30,
+    "esik": 0.10,
     "min_calisan": 2
   },
 
   "izin": {
-    "gun_basina_puan": 100,
-    "gunluk_saat": 8
+    "gun_basina_puan": 150,
+    "gunluk_saat": 8,
+    "haftalik_max_saat": 8
+  },
+
+  "avans": {
+    "acik": true,
+    "puan_basina_tl": 5,
+    "aylik_max_tl": 2000,
+    "min_tl": 100
   }
 }

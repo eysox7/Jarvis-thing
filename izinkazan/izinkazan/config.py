@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 from .counter import Station
+from .odul import AvansKurali, IzinKurali
 from .scoring import PuanKurali
 
 
@@ -17,8 +18,8 @@ class Ayarlar:
     model: str = "yolo11n-pose.pt"
     guven: float = 0.4
     nokta: str = "bilek"            # bilek | merkez | alt
-    gun_basina_puan: int = 100
-    gunluk_saat: float = 8.0
+    izin: IzinKurali = field(default_factory=IzinKurali)
+    avans: AvansKurali = field(default_factory=AvansKurali)
     veritabani: str = "izinkazan.db"
 
 
@@ -47,7 +48,7 @@ def yukle(yol: str) -> Ayarlar:
         model=ham.get("model", "yolo11n-pose.pt"),
         guven=float(ham.get("guven", 0.4)),
         nokta=ham.get("nokta", "bilek"),
-        gun_basina_puan=int(izin.get("gun_basina_puan", 100)),
-        gunluk_saat=float(izin.get("gunluk_saat", 8.0)),
+        izin=IzinKurali(**izin),
+        avans=AvansKurali(**ham.get("avans", {})),
         veritabani=ham.get("veritabani", "izinkazan.db"),
     )

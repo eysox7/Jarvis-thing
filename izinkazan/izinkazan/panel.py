@@ -7,7 +7,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from .config import Ayarlar
-from .scoring import izin_saati, puanla
+from .odul import haklar
+from .scoring import puanla
 from .storage import Depo
 
 SAYFA = """<!doctype html><html lang="tr"><head><meta charset="utf-8">
@@ -28,16 +29,19 @@ th{color:var(--soluk);font-weight:500;font-size:13px}.n{text-align:right;font-va
 <h1>İzinKazan</h1><p class="alt">YOLO ile iş takibi · ortalamanın üstüne çıkan puan kazanır · puan izne dönüşür</p>
 <section><h2>Günlük tablo <select id="gun"></select></h2><div class="ozet" id="ozet"></div>
 <table><thead><tr><th>Çalışan</th><th class="n">İş</th><th>Ortalamaya göre</th><th class="n">Oran</th><th class="n">Puan</th></tr></thead><tbody id="tablo"></tbody></table></section>
-<section><h2>Puan ve izin bakiyesi</h2><table><thead><tr><th>Çalışan</th><th class="n">Kazanılan</th><th class="n">Kullanılan</th><th class="n">Bakiye</th><th class="n">İzin hakkı</th></tr></thead><tbody id="bakiye"></tbody></table></section>
+<section><h2>Puan bakiyesi ve haklar</h2><p class="alt" id="kural"></p><table><thead><tr><th>Çalışan</th><th class="n">Kazanılan</th><th class="n">Harcanan</th><th class="n">Bakiye</th><th class="n">İzin · bu hafta</th><th class="n">Avans · bu ay</th></tr></thead><tbody id="bakiye"></tbody></table></section>
+<section><h2>Son harcamalar</h2><table><thead><tr><th>Tarih</th><th>Çalışan</th><th>Tür</th><th class="n">Miktar</th><th class="n">Puan</th></tr></thead><tbody id="harcama"></tbody></table></section>
 <section><h2>Son işler</h2><table><thead><tr><th>Zaman</th><th>İstasyon</th><th>Çalışan</th><th class="n">Süre (sn)</th></tr></thead><tbody id="isler"></tbody></table></section>
 </main><script>
-const $=s=>document.querySelector(s),e=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+const tl=v=>Number(v).toLocaleString('tr-TR',{maximumFractionDigits:0})+' TL',$=s=>document.querySelector(s),e=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
 async function yukle(gun){const r=await fetch('/api/ozet'+(gun?'?gun='+gun:''));const d=await r.json();
 const sel=$('#gun');sel.innerHTML=d.gunler.map(g=>`<option ${g===d.gun?'selected':''}>${g}</option>`).join('')||`<option>${d.gun}</option>`;
 const mx=Math.max(1,...d.sonuclar.map(s=>s.is_sayisi));
 $('#ozet').innerHTML=`<span><b>${d.toplam}</b>toplam iş</span><span><b>${d.ortalama.toFixed(1)}</b>ortalama</span><span><b>${d.sonuclar.filter(s=>s.puan>0).length}</b>puan alan</span>`+(d.kaydedildi?'':'<span><b>önizleme</b>henüz puanlanmadı</span>');
 $('#tablo').innerHTML=d.sonuclar.map(s=>`<tr><td>${e(s.isci)}</td><td class=n>${s.is_sayisi}</td><td><div class="bar ${s.oran>1?'ust':''}"><i style="width:${s.is_sayisi/mx*100}%"></i></div></td><td class=n>${s.oran.toFixed(2)}</td><td class="n ${s.puan?'puan':''}">${s.puan||'–'}</td></tr>`).join('')||'<tr><td colspan=5>Bu gün için kayıt yok.</td></tr>';
-$('#bakiye').innerHTML=d.bakiyeler.map(b=>`<tr><td>${e(b.isci)}</td><td class=n>${b.kazanilan}</td><td class=n>${b.kullanilan}</td><td class="n puan">${b.bakiye}</td><td class=n>${b.izin_saat} saat</td></tr>`).join('')||'<tr><td colspan=5>Henüz puan yok.</td></tr>';
+$('#bakiye').innerHTML=d.bakiyeler.map(b=>`<tr><td>${e(b.isci)}</td><td class=n>${b.kazanilan}</td><td class=n>${b.kullanilan}</td><td class="n puan">${b.bakiye}</td><td class=n>${b.izin_saat_bu_hafta} saat</td><td class=n>${tl(b.avans_tl_bu_ay)}</td></tr>`).join('')||'<tr><td colspan=6>Henüz puan yok.</td></tr>';
+const k=d.kurallar;$('#kural').textContent=`1 gün izin = ${k.gun_basina_puan} puan · haftada en çok ${k.haftalik_max_saat} saat izin`+(k.avans_acik?` · 1 puan = ${k.puan_basina_tl} TL · ayda en çok ${tl(k.aylik_max_tl)} avans`:' · avans kapalı');
+$('#harcama').innerHTML=d.harcamalar.map(h=>`<tr><td>${e(h.kullanim_tarihi)}</td><td>${e(h.isci)}</td><td>${h.tur==='izin'?'İzin':'Avans'}</td><td class=n>${h.tur==='izin'?h.miktar+' saat':tl(h.miktar)}</td><td class=n>−${h.puan}</td></tr>`).join('')||'<tr><td colspan=5>Henüz harcama yok.</td></tr>';
 $('#isler').innerHTML=d.isler.map(i=>`<tr><td>${e(i.zaman.replace("T"," "))}</td><td>${e(i.istasyon)}</td><td>${e(i.isci)}</td><td class=n>${i.sure}</td></tr>`).join('');}
 $('#gun').onchange=ev=>yukle(ev.target.value);yukle();setInterval(()=>yukle($('#gun').value),10000);
 </script></body></html>"""
@@ -56,11 +60,15 @@ def ozet(depo: Depo, ayar: Ayarlar, gun: str | None = None) -> dict:
         sonuclar = [s.sozluk() for s in ss]
     bakiyeler = depo.bakiyeler()
     for b in bakiyeler:
-        b["izin_saat"] = izin_saati(b["bakiye"], ayar.gun_basina_puan, ayar.gunluk_saat)
+        b.update(haklar(depo, ayar.izin, ayar.avans, b["isci"], b["bakiye"]))
     return {
         "gun": gun, "gunler": gunler, "ortalama": ortalama, "kaydedildi": bool(kayitli),
         "toplam": sum(s["is_sayisi"] for s in sonuclar), "sonuclar": sonuclar,
         "bakiyeler": bakiyeler, "isler": depo.son_isler(30, gun),
+        "harcamalar": depo.harcamalar(limit=20),
+        "kurallar": {"gun_basina_puan": ayar.izin.gun_basina_puan, "haftalik_max_saat": ayar.izin.haftalik_max_saat,
+                     "avans_acik": ayar.avans.acik, "puan_basina_tl": ayar.avans.puan_basina_tl,
+                     "aylik_max_tl": ayar.avans.aylik_max_tl},
     }
 
 

@@ -23,13 +23,16 @@ CREATE INDEX IF NOT EXISTS isler_tarih ON isler(tarih);
 
 CREATE TABLE IF NOT EXISTS puanlar (
     id        INTEGER PRIMARY KEY,
-    donem     TEXT NOT NULL,          -- puanlanan dönem (gün) ya da 'izin:<zaman>'
+    donem     TEXT NOT NULL,          -- puanlanan dönem (gün) ya da '<tur>:<zaman>:<kimlik>'
     isci      TEXT NOT NULL,
     is_sayisi INTEGER NOT NULL DEFAULT 0,
     ortalama  REAL NOT NULL DEFAULT 0,
-    puan      INTEGER NOT NULL,       -- izin kullanımında negatif
+    puan      INTEGER NOT NULL,       -- harcamada negatif
     aciklama  TEXT,
     olusturma TEXT NOT NULL,
+    tur       TEXT NOT NULL DEFAULT 'kazanc',   -- kazanc | izin | avans
+    miktar    REAL,                             -- izin: saat, avans: TL
+    kullanim_tarihi TEXT,                       -- izin günü / avans tarihi (YYYY-MM-DD)
     UNIQUE(donem, isci)
 );
 """
@@ -40,6 +43,18 @@ class Depo:
         self.db = sqlite3.connect(yol)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SEMA)
+        self._yukselt()
+
+    def _yukselt(self) -> None:
+        """Eski sürüm veritabanına yeni sütunları ekler."""
+        var = {r[1] for r in self.db.execute("PRAGMA table_info(puanlar)")}
+        ekle = {"tur": "TEXT NOT NULL DEFAULT 'kazanc'", "miktar": "REAL", "kullanim_tarihi": "TEXT"}
+        for ad, tip in ekle.items():
+            if ad not in var:
+                self.db.execute(f"ALTER TABLE puanlar ADD COLUMN {ad} {tip}")
+        if "tur" not in var:  # eski izin kayıtları
+            self.db.execute("UPDATE puanlar SET tur='izin' WHERE puan < 0")
+        self.db.commit()
 
     def kapat(self) -> None:
         self.db.close()
@@ -74,17 +89,39 @@ class Depo:
                   f"oran {s.oran:.2f}", simdi) for s in sonuclar],
             )
 
-    def izin_kullan(self, isci: str, puan: int, aciklama: str = "") -> None:
+    def harca(self, isci: str, tur: str, puan: int, miktar: float, tarih: str, aciklama: str = "") -> None:
+        """Puan harcar (izin / avans). Limit kontrolleri ``odul`` modülündedir."""
+        if tur not in ("izin", "avans"):
+            raise ValueError(f"Bilinmeyen harcama türü: {tur}")
         if puan <= 0:
             raise ValueError("Kullanılacak puan pozitif olmalı")
-        if self.bakiye(isci) < puan:
-            raise ValueError(f"{isci} için yeterli puan yok (bakiye {self.bakiye(isci)})")
         simdi = datetime.now().isoformat(timespec="seconds")
         with self.db:
+            bakiye = self.bakiye(isci)
+            if bakiye < puan:
+                raise ValueError(f"{isci} için yeterli puan yok (gereken {puan}, bakiye {bakiye})")
             self.db.execute(
-                "INSERT INTO puanlar (donem, isci, puan, aciklama, olusturma) VALUES (?,?,?,?,?)",
-                (f"izin:{simdi}:{uuid.uuid4().hex[:8]}", isci, -puan, aciklama or "izin kullanımı", simdi),
+                "INSERT INTO puanlar (donem, isci, puan, aciklama, olusturma, tur, miktar, kullanim_tarihi)"
+                " VALUES (?,?,?,?,?,?,?,?)",
+                (f"{tur}:{simdi}:{uuid.uuid4().hex[:8]}", isci, -puan, aciklama, simdi, tur, miktar, tarih),
             )
+
+    def kullanim_toplami(self, isci: str, tur: str, baslangic: str, bitis: str) -> float:
+        """[baslangic, bitis] tarih aralığında kullanılan izin saati ya da avans TL'si."""
+        r = self.db.execute(
+            "SELECT COALESCE(SUM(miktar),0) FROM puanlar WHERE isci=? AND tur=?"
+            " AND kullanim_tarihi BETWEEN ? AND ?", (isci, tur, baslangic, bitis)).fetchone()
+        return float(r[0])
+
+    def harcamalar(self, isci: Optional[str] = None, limit: int = 50) -> List[dict]:
+        q = ("SELECT isci, tur, miktar, -puan AS puan, kullanim_tarihi, aciklama FROM puanlar"
+             " WHERE tur IN ('izin','avans')")
+        args: list = []
+        if isci:
+            q += " AND isci = ?"
+            args.append(isci)
+        rows = self.db.execute(q + " ORDER BY id DESC LIMIT ?", (*args, limit))
+        return [dict(r) for r in rows]
 
     def bakiye(self, isci: str) -> int:
         r = self.db.execute("SELECT COALESCE(SUM(puan),0) FROM puanlar WHERE isci = ?", (isci,)).fetchone()
@@ -95,6 +132,8 @@ class Depo:
             "SELECT isci,"
             " COALESCE(SUM(CASE WHEN puan > 0 THEN puan END),0) kazanilan,"
             " COALESCE(-SUM(CASE WHEN puan < 0 THEN puan END),0) kullanilan,"
+            " COALESCE(SUM(CASE WHEN tur='izin' THEN miktar END),0) izin_saat_kullanilan,"
+            " COALESCE(SUM(CASE WHEN tur='avans' THEN miktar END),0) avans_tl_kullanilan,"
             " SUM(puan) bakiye"
             " FROM puanlar GROUP BY isci ORDER BY bakiye DESC, isci")
         return [dict(r) for r in rows]
@@ -102,7 +141,7 @@ class Depo:
     def donem_sonuclari(self, donem: str) -> List[dict]:
         rows = self.db.execute(
             "SELECT isci, is_sayisi, ortalama, puan, aciklama FROM puanlar"
-            " WHERE donem = ? ORDER BY is_sayisi DESC, isci", (donem,))
+            " WHERE donem = ? AND tur = 'kazanc' ORDER BY is_sayisi DESC, isci", (donem,))
         return [dict(r) for r in rows]
 
     def son_isler(self, limit: int = 50, tarih: Optional[str] = None) -> List[dict]:

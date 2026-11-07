@@ -4,11 +4,12 @@ import tempfile
 import unittest
 from datetime import datetime
 
+from izinkazan import odul
 from izinkazan.config import yukle
 from izinkazan.counter import Person, Station, WorkCounter
 from izinkazan.geometry import point_in_polygon
 from izinkazan.panel import ozet
-from izinkazan.scoring import PuanKurali, izin_saati, puanla
+from izinkazan.scoring import PuanKurali, Sonuc, izin_saati, puanla
 from izinkazan.storage import Depo
 
 KARE = [(0, 0), (10, 0), (10, 10), (0, 10)]
@@ -70,16 +71,19 @@ class Puanlama(unittest.TestCase):
         ort, ss = puanla({"A": 50, "B": 40, "C": 30})
         self.assertEqual(ort, 40)
         p = {s.isci: s.puan for s in ss}
-        self.assertEqual(p, {"A": 23, "B": 0, "C": 0})  # 10 + 25*0.5 = 22.5 → 23
+        self.assertEqual(p, {"A": 18, "B": 0, "C": 0})  # 5 + 25*0.5 = 17.5 → 18
 
     def test_kadro_sifirlari_ortalamaya_dahil(self):
         ort, ss = puanla({"A": 30}, kadro=["A", "B", "C"])
         self.assertEqual(ort, 10)
-        self.assertEqual({s.isci: s.puan for s in ss}["A"], 50)  # tavan
+        self.assertEqual({s.isci: s.puan for s in ss}["A"], 30)  # tavan
 
     def test_esik_ve_tek_kisi(self):
-        _, ss = puanla({"A": 42, "B": 38}, PuanKurali(esik=0.1))
+        # ortalama 40; 43 iş = %7.5 üstü, varsayılan %10 eşiğin altında
+        _, ss = puanla({"A": 43, "B": 37})
         self.assertTrue(all(s.puan == 0 for s in ss))
+        _, ss = puanla({"A": 43, "B": 37}, PuanKurali(esik=0.0))
+        self.assertGreater(ss[0].puan, 0)
         _, ss = puanla({"A": 42})
         self.assertEqual(ss[0].puan, 0)
 
@@ -88,8 +92,8 @@ class Puanlama(unittest.TestCase):
         self.assertTrue(all(s.puan == 0 for s in ss))
 
     def test_izin_saati(self):
-        self.assertEqual(izin_saati(100), 8)
-        self.assertEqual(izin_saati(30), 2)
+        self.assertEqual(izin_saati(150), 8)
+        self.assertEqual(izin_saati(40), 2)
         self.assertEqual(izin_saati(-5), 0)
 
 
@@ -113,12 +117,12 @@ class DepoTest(unittest.TestCase):
         ort, ss = puanla({"A": 60, "B": 40})
         d.donem_puanla("2026-11-07", ort, ss)
         d.donem_puanla("2026-11-07", ort, ss)  # tekrar puanlama çiftlemez
-        self.assertEqual(d.bakiye("A"), 20)
+        self.assertEqual(d.bakiye("A"), 15)  # oran 1.2 → 5 + 10
 
-        d.izin_kullan("A", 10)
-        self.assertEqual(d.bakiye("A"), 10)
+        d.harca("A", "izin", 10, 1, "2026-11-09")
+        self.assertEqual(d.bakiye("A"), 5)
         with self.assertRaises(ValueError):
-            d.izin_kullan("A", 11)
+            d.harca("A", "avans", 6, 30, "2026-11-09")
         d.kapat()
 
     def test_ayar_ve_panel(self):
@@ -129,6 +133,81 @@ class DepoTest(unittest.TestCase):
         ayar.veritabani = self.db
         d = Depo(self.db)
         json.dumps(ozet(d, ayar))  # boş veritabanında da çalışmalı
+        d.kapat()
+
+
+class Odul(unittest.TestCase):
+    """Haftalık izin ve aylık avans sınırları."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.d = Depo(os.path.join(self.dir.name, "t.db"))
+        # 1500 puan: limit olmasa 10 gün izne yeterdi
+        self.d.donem_puanla("2026-11-01", 10, [Sonuc("A", 99, 2.0, 1500)])
+        self.ik, self.ak = odul.IzinKurali(), odul.AvansKurali()
+
+    def tearDown(self):
+        self.d.kapat()
+        self.dir.cleanup()
+
+    def test_haftada_bir_gun(self):
+        r = odul.izin_al(self.d, self.ik, "A", 8, "2026-11-10")      # Salı
+        self.assertEqual(r["puan"], 150)
+        with self.assertRaises(odul.KuralHatasi):                      # aynı hafta Cuma
+            odul.izin_al(self.d, self.ik, "A", 1, "2026-11-13")
+        odul.izin_al(self.d, self.ik, "A", 8, "2026-11-16")           # sonraki Pazartesi: olur
+        self.assertEqual(self.d.bakiye("A"), 1200)
+
+    def test_yarim_gunler_haftalik_toplama_sayilir(self):
+        odul.izin_al(self.d, self.ik, "A", 4, "2026-11-09")
+        odul.izin_al(self.d, self.ik, "A", 4, "2026-11-15")           # Pazar, aynı hafta
+        with self.assertRaises(odul.KuralHatasi):
+            odul.izin_al(self.d, self.ik, "A", 1, "2026-11-11")
+
+    def test_tek_seferde_gunluk_saati_asamaz(self):
+        with self.assertRaises(odul.KuralHatasi):
+            odul.izin_al(self.d, self.ik, "A", 16, "2026-11-10")
+
+    def test_bakiye_yetmezse_izin_yok(self):
+        self.d.donem_puanla("2026-11-02", 10, [Sonuc("B", 20, 2.0, 100)])  # 150 gerekir
+        with self.assertRaises(odul.KuralHatasi):
+            odul.izin_al(self.d, self.ik, "B", 8, "2026-11-10")
+        self.assertEqual(self.d.bakiye("B"), 100)
+
+    def test_aylik_avans_siniri(self):
+        r = odul.avans_al(self.d, self.ak, "A", 1500, "2026-11-05")
+        self.assertEqual(r["puan"], 300)                               # 1500 / 5 TL
+        with self.assertRaises(odul.KuralHatasi):
+            odul.avans_al(self.d, self.ak, "A", 600, "2026-11-20")    # ay toplamı 2100 > 2000
+        odul.avans_al(self.d, self.ak, "A", 500, "2026-11-20")
+        odul.avans_al(self.d, self.ak, "A", 1000, "2026-12-01")       # yeni ay
+        with self.assertRaises(odul.KuralHatasi):
+            odul.avans_al(self.d, self.ak, "A", 50, "2026-12-02")     # min 100 TL
+
+    def test_avans_kapali(self):
+        with self.assertRaises(odul.KuralHatasi):
+            odul.avans_al(self.d, odul.AvansKurali(acik=False), "A", 500)
+
+    def test_haklar(self):
+        from datetime import date
+        odul.izin_al(self.d, self.ik, "A", 3, "2026-11-10")
+        h = odul.haklar(self.d, self.ik, self.ak, "A", self.d.bakiye("A"), date(2026, 11, 12))
+        self.assertEqual(h["izin_saat_bu_hafta"], 5)
+        self.assertEqual(h["avans_tl_bu_ay"], 2000)
+
+    def test_eski_veritabani_yukseltilir(self):
+        import sqlite3
+        yol = os.path.join(self.dir.name, "eski.db")
+        db = sqlite3.connect(yol)
+        db.executescript("""CREATE TABLE puanlar (id INTEGER PRIMARY KEY, donem TEXT NOT NULL,
+            isci TEXT NOT NULL, is_sayisi INTEGER NOT NULL DEFAULT 0, ortalama REAL NOT NULL DEFAULT 0,
+            puan INTEGER NOT NULL, aciklama TEXT, olusturma TEXT NOT NULL, UNIQUE(donem, isci));
+            INSERT INTO puanlar (donem,isci,puan,olusturma) VALUES ('2026-11-01','A',50,'x'),
+            ('izin:x','A',-12,'x');""")
+        db.close()
+        d = Depo(yol)
+        self.assertEqual(d.bakiye("A"), 38)
+        self.assertEqual(d.harcamalar()[0]["tur"], "izin")
         d.kapat()
 
 
