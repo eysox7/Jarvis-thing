@@ -7,6 +7,9 @@ Tarayıcıda açılır, ana ekrana eklenince yerli uygulama gibi çalışır.
 
 > Tasarım önceliği: **işlevsellik**. Süs yok, iş var.
 
+> Bu depoda ayrıca **[İzinKazan](izinkazan/)** var: YOLO ile iş takibi, ortalamanın
+> üstünde iş yapana puan, puanla izin. Ayrı bir Python projesidir.
+
 ---
 
 ## Ne yapar

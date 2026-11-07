@@ -1,0 +1,42 @@
+{
+  "model": "yolo11n-pose.pt",
+  "guven": 0.4,
+  "nokta": "bilek",
+  "veritabani": "izinkazan.db",
+
+  "kadro": ["Ayşe", "Mehmet", "Zeynep"],
+
+  "istasyonlar": [
+    {
+      "ad": "montaj-1",
+      "isci": "Ayşe",
+      "bolge": [[120, 300], [320, 300], [320, 420], [120, 420]],
+      "min_saniye": 1.0,
+      "max_saniye": 60,
+      "cikis_toleransi": 0.7
+    },
+    {
+      "ad": "montaj-2",
+      "isci": "Mehmet",
+      "bolge": [[420, 300], [620, 300], [620, 420], [420, 420]]
+    },
+    {
+      "ad": "paketleme",
+      "isci": "Zeynep",
+      "bolge": [[720, 280], [940, 280], [940, 430], [720, 430]]
+    }
+  ],
+
+  "puan": {
+    "taban": 10,
+    "katsayi": 0.5,
+    "tavan": 50,
+    "esik": 0.0,
+    "min_calisan": 2
+  },
+
+  "izin": {
+    "gun_basina_puan": 100,
+    "gunluk_saat": 8
+  }
+}

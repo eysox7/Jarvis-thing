@@ -1,0 +1,4 @@
+*.db
+*.pt
+__pycache__/
+runs/
