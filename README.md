@@ -222,3 +222,8 @@ Ortak kullanılan bir cihazda kullanma — `localStorage` şifreli değildir.
 ## Lisans
 
 MIT.
+
+## CGI / sinematik üretim
+
+Casper Excalibur G870 için Blender render profilleri, toplu render ve NVENC video
+kodlama betikleri: [`cgi/`](cgi/README.md).
