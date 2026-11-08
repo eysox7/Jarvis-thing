@@ -4,8 +4,13 @@ Bu klasör, G870 dizüstünde **en kısa sürede, en iyi görüntüyü** almak i
 ayarlar ve betikler içerir. Akış: **Blender** (modelleme + render) →
 **görüntü dizisi** → **DaVinci Resolve** (kurgu/renk) veya **FFmpeg NVENC** (hızlı video).
 
+> **Claude ile otomatik sahne kurma (MCP):** [blender_mcp/README.md](blender_mcp/README.md)
+> **Gerçek mekânı Gaussian Splat ile almak:** [splat/README.md](splat/README.md)
+
 ```
 cgi/
+├── blender_mcp/           # Claude ↔ Blender köprüsü (MCP sunucusu + eklenti)
+├── splat/                 # Telefon videosu → Gaussian Splat iş akışı
 ├── donanim.ps1            # Donanımı okur, eksikleri ve önerileri söyler
 ├── render.ps1             # Blender'ı arayüzsüz, G870 profiliyle çalıştırır
 ├── kodla.ps1              # PNG dizisi → YouTube / sosyal / master video (NVENC)
@@ -55,11 +60,20 @@ G870 farklı ekran kartlarıyla satıldı; **VRAM** sahnenin ne kadar büyük ol
 | VRAM | Örnek kart | Doku sınırı | Karo | Kalıcı veri |
 |---|---|---|---|---|
 | ≤ 6 GB | RTX 3060 Laptop | 2K | 1024 | kapalı |
-| 8 GB | RTX 4060 / 4070 / 3070 Laptop | 4K | 2048 | açık |
+| 8 GB | **RTX 5050 Laptop** (bu makine), RTX 4060 / 4070 / 3070 Laptop | 4K | 2048 | açık |
 | > 8 GB | — | sınırsız | 2048 | açık |
 
-RTX 40 serisindeysen `kodla.ps1` otomatik olarak **AV1** donanım kodlayıcıyı kullanır
-(aynı kalitede HEVC'den ~%30 daha küçük dosya).
+**Bu makine: RTX 5050 Laptop (8 GB, Blackwell) · 16 GB RAM · ~1 TB SSD**
+
+- RTX 50 serisi için Blender **4.4 veya üstü** gerekir (önerilen: güncel LTS). Eski sürümler
+  kartı OptiX'te görmeyebilir.
+- `kodla.ps1` otomatik olarak **AV1** donanım kodlayıcıyı kullanır (aynı kalitede HEVC'den
+  ~%30 daha küçük dosya).
+- **16 GB RAM en dar boğaz.** Büyük splat sahneleri, simülasyonlar ve Resolve aynı anda
+  açıkken yetmez. 2×16 GB'a (32 GB) yükseltme en ucuz ve en etkili donanım yatırımıdır.
+  O zamana kadar render sırasında tarayıcıyı ve Resolve'u kapat.
+- 1 TB SSD: EXR dizileri dakikada GB'larca yer tutar. Bitmiş işlerin EXR'larını harici
+  diske taşı, `kodla.ps1 -Hedef master` ile tek dosyaya çevirip sakla.
 
 ## 3. Profiller
 
