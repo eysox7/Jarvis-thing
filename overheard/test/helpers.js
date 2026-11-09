@@ -7,7 +7,8 @@ import { seedDemoContent, seedPlaces } from '../server/seed.js';
 // Bellek içi veritabanıyla gerçek bir HTTP sunucusu ayağa kaldırır.
 export async function startTestServer({ demo = false, ai = null, google, ...overrides } = {}) {
   const config = loadConfig({ dbPath: ':memory:', demoMode: demo, rateLimitScale: 100, antiSpoofing: false, ...overrides });
-  const db = openDb(':memory:');
+  // OVERHEARD_DB_DRIVER=libsql ile aynı testler Turso sürücüsüyle de koşar.
+  const db = openDb(':memory:', config);
   seedPlaces(db);
   if (demo) await seedDemoContent(db);
   const app = createApp({ db, config, ai, ...(google ? { google } : {}) });

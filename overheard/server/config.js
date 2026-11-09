@@ -7,7 +7,18 @@ export function loadConfig(overrides = {}) {
   return {
     port: Number(env.PORT) || 8787,
     host: env.HOST || '0.0.0.0',
-    dbPath: env.OVERHEARD_DB || fileURLToPath(new URL('../data/overheard.db', import.meta.url)),
+    // Merkezi veritabanı (Turso): adres ve erişim anahtarı verilirse sunucu Turso'ya bağlanır, yanında
+    // gömülü bir kopya tutar (dbPath). Verilmezse veri yalnızca bu makinedeki dosyadadır.
+    dbUrl: env.OVERHEARD_DB_URL || '',
+    dbToken: env.OVERHEARD_DB_TOKEN || '',
+    // Kopyanın merkezle eşitlenme aralığı (saniye): başka sunucuların yazdıkları bu sürede görünür.
+    dbSyncSeconds: Number(env.OVERHEARD_DB_SYNC_SECONDS) || 5,
+    // sqlite (node:sqlite) ya da libsql; Turso adresi varsa libsql.
+    dbDriver: env.OVERHEARD_DB_DRIVER || (env.OVERHEARD_DB_URL ? 'libsql' : 'sqlite'),
+    // Turso'da gömülü kopyanın dosyası (yerel veritabanı dosyasıyla karışmasın diye ayrı).
+    dbPath: env.OVERHEARD_DB_URL
+      ? env.OVERHEARD_DB_REPLICA || fileURLToPath(new URL('../data/turso-replica.db', import.meta.url))
+      : env.OVERHEARD_DB || fileURLToPath(new URL('../data/overheard.db', import.meta.url)),
     publicDir: fileURLToPath(new URL('../public', import.meta.url)),
     // Demo modu: misafir hesabı, konum simülasyonu ve örnek sözler.
     demoMode: flag(env.OVERHEARD_DEMO, true),

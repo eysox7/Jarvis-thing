@@ -42,7 +42,7 @@ const options = values.endpoint ? { endpoint: values.endpoint } : {};
 const inCity = (p) => cityAt(p.lat, p.lng)?.id === cityId;
 
 const config = loadConfig();
-const db = values['dry-run'] ? null : openDb(config.dbPath);
+const db = values['dry-run'] ? null : openDb(config.dbPath, config);
 const report = (label, items) => {
   console.log(`\n${label}: ${items.length}`);
   for (const p of items.slice(0, 60)) console.log(`  ${p.kind.padEnd(8)} ${p.name}${p.stops ? ` (${p.stops.length} durak)` : ''}`);

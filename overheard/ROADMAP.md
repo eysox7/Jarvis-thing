@@ -203,6 +203,10 @@ Yol haritasındaki adımlar tamamlandı; sıradaki işler kalite turlarıdır.
       göndermez, yazar sinyal bulmadan sözünün ulaştığını görür. Uydurma makbuz telefonda reddedilir.
       Ayrıca: sunucu çökmesi metro sanılmaz (genel internet denetimi), Google başka hesaba bağlıysa
       hesap değiştirilmez, Google kapalıyken de parolasız hesap silinebilir.
+- [x] **29f. Merkezi veritabanı (Turso)** — `OVERHEARD_DB_URL` verilince sunucu Turso'daki tek
+      veritabanını kullanır; yanında gömülü kopya (okumalar yerel, yazmalar merkezde). Şema sürümü
+      tabloda; zincirleme silmeler uygulama içinde (yabancı anahtar denetimine güvenmeden). Testler
+      iki sürücüyle de koşar; `npm run db:check` bağlantıyı denetler.
 - [ ] **30. iPhone'da yeraltı modu** — `MeshLink` için Multipeer Connectivity (iPhone ↔ iPhone) ve
       BLE GATT (Android ↔ iPhone) bağlantı katmanı; iOS'ta arka plan Bluetooth kısıtları.
 - [ ] **31. Gizli sözler (mini oyun)** — İnternetsiz yazılmış sözler (`offline`, `hops`) özel:

@@ -37,6 +37,10 @@ jobs:
           cache-dependency-path: overheard/package-lock.json
       - run: npm ci
       - run: npm test
+      # Aynı testler merkezi veritabanının sürücüsüyle (libsql, yerel dosya) de koşar.
+      - run: npm test
+        env:
+          OVERHEARD_DB_DRIVER: libsql
 
   app:
     name: Android uygulaması

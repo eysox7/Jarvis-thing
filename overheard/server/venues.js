@@ -6,6 +6,7 @@
 //   sözler, rastgele masalara gider. Herkesin birbirini tanıdığı semtlerde kafe bu süreyi uzatabilir.
 // - nearby: yakın mekânların herkese açık sözleri; "kafe içini yazmak müşteriyi rahatsız eder"
 //   diyen işletmeler için. Başka mekânların yerel sözleri basılmaz ("yalnızca orada okunur").
+import { cascadeDelete } from './db.js';
 import { HttpError } from './http.js';
 import { boundingBox, distanceM } from './geo.js';
 import { cleanText } from './domain.js';
@@ -61,7 +62,7 @@ export function saveVenue(db, placeId, body = {}) {
 }
 
 export function removeVenue(db, placeId) {
-  if (!db.prepare('DELETE FROM venues WHERE place_id = ?').run(placeId).changes) throw new HttpError(404, 'venue_not_found');
+  if (!cascadeDelete(db, 'venues', 'place_id = ?', [placeId])) throw new HttpError(404, 'venue_not_found');
 }
 
 export function addStaff(db, placeId, handle) {

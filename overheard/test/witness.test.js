@@ -90,7 +90,7 @@ describe('Veritabanı göçü', () => {
       old.close();
 
       const db = openDb(path);
-      assert.equal(db.prepare('PRAGMA user_version').get().user_version, MIGRATIONS.length);
+      assert.equal(db.prepare('SELECT version FROM _schema_version').get().version, MIGRATIONS.length);
       assert.equal(db.prepare("SELECT kind FROM conversations WHERE id = 'c'").get().kind, 'author');
       assert.equal(db.prepare("SELECT COUNT(*) AS n FROM messages WHERE conversation_id = 'c'").get().n, 1);
       assert.equal(db.prepare('PRAGMA foreign_keys').get().foreign_keys, 1);

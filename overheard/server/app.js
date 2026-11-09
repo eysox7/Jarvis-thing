@@ -8,6 +8,7 @@ import { createEventHub } from './events.js';
 import { createRateLimiter } from './ratelimit.js';
 import { SESSION_COOKIE, registerApi } from './api.js';
 import { createGoogleVerifier } from './google.js';
+import { dbInfo } from './db.js';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -125,7 +126,8 @@ export function createApp({
       const cors = { 'access-control-allow-origin': '*' };
       try {
         db.prepare('SELECT 1').get();
-        return sendJson(res, 200, { ok: true, version: VERSION, demo: config.demoMode }, cors);
+        // db: veri merkezi Turso veritabanında mı (central) yoksa yalnızca bu makinede mi (local).
+        return sendJson(res, 200, { ok: true, version: VERSION, demo: config.demoMode, db: dbInfo(db).central ? 'central' : 'local' }, cors);
       } catch {
         return sendJson(res, 503, { ok: false }, cors);
       }

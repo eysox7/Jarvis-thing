@@ -112,7 +112,7 @@ describe('Veritabanı göçü (v11)', () => {
       old.close();
 
       const db = openDb(path);
-      assert.equal(db.prepare('PRAGMA user_version').get().user_version, MIGRATIONS.length);
+      assert.equal(db.prepare('SELECT version FROM _schema_version').get().version, MIGRATIONS.length);
       assert.deepEqual({ ...db.prepare('SELECT user_id, place_id, source, at FROM presence_anchors').get() }, { user_id: 1, place_id: 'p', source: 'qr', at: now });
       assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'qr_presence'").get().n, 0);
       db.close();

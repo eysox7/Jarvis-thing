@@ -1,8 +1,10 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
 
-// Her sürüm bir öncekinin üzerine uygulanır; PRAGMA user_version hangisinde kaldığımızı tutar.
+// Her sürüm bir öncekinin üzerine uygulanır; _schema_version tablosu hangisinde kaldığımızı tutar
+// (eskiden PRAGMA user_version; Turso'da o salt okunur).
 export const MIGRATIONS = [
   `
   CREATE TABLE users (
@@ -288,37 +290,93 @@ export const MIGRATIONS = [
   `,
 ];
 
-export function openDb(path) {
+// Veritabanı ya bu makinedeki tek bir dosyadır (node:sqlite) ya da Turso'daki merkezi veritabanı.
+// Turso'da sunucunun yanında gömülü bir kopya (embedded replica) durur: okumalar kopyadan yapılır,
+// yazmalar merkeze gider ve hemen kopyaya da yansır; başka sunucuların yazdıkları birkaç saniyede bir
+// eşitlenir. Böylece Codespaces'te, bilgisayarında ya da başka bir yerde açılan sunucular aynı veriyi
+// görür. Turso sürücüsü (libsql) isteğe bağlı pakettir; yalnızca seçilince yüklenir.
+const info = new WeakMap();
+
+export function openDb(path, { dbDriver = 'sqlite', dbUrl = '', dbToken = '', dbSyncSeconds = 5 } = {}) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
-  const db = new DatabaseSync(path);
-  db.exec('PRAGMA foreign_keys = ON;');
-  if (path !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
+  const central = Boolean(dbUrl);
+  let db;
+  if (dbDriver === 'libsql' || central) {
+    const Database = loadLibsql();
+    try {
+      db = central ? new Database(path, { syncUrl: dbUrl, authToken: dbToken, syncPeriod: dbSyncSeconds }) : new Database(path);
+      // Açılışta merkezdeki son hâl alınır (göçler ve tohum verisi ona göre karar verir).
+      if (central) db.sync();
+    } catch (err) {
+      if (!central) throw err;
+      throw new Error(`Merkezi veritabanına bağlanılamadı (${new URL(dbUrl).host}): ${err.message}`, { cause: err });
+    }
+  } else {
+    db = new DatabaseSync(path);
+  }
+  info.set(db, { driver: central ? 'libsql' : dbDriver, central, depth: 0 });
+  pragma(db, 'foreign_keys = ON');
+  if (path !== ':memory:' && !central) db.exec('PRAGMA journal_mode = WAL;');
   migrate(db);
   return db;
 }
 
+// { driver: 'sqlite' | 'libsql', central: Turso'ya bağlı mı }
+export const dbInfo = (db) => {
+  const { driver, central } = info.get(db) ?? { driver: 'sqlite', central: false };
+  return { driver, central };
+};
+
+function loadLibsql() {
+  try {
+    return createRequire(import.meta.url)('libsql');
+  } catch (err) {
+    throw new Error(`Turso sürücüsü (libsql) yüklenemedi: npm install libsql (${err.message})`);
+  }
+}
+
+// Turso'da bazı PRAGMA'lar desteklenmez ya da merkeze iletilmez; yerel dosyada her zaman çalışır.
+function pragma(db, statement) {
+  try {
+    db.exec(`PRAGMA ${statement};`);
+  } catch (err) {
+    if (!info.get(db)?.central) throw err;
+  }
+}
+
 function migrate(db) {
-  const { user_version: current } = db.prepare('PRAGMA user_version').get();
-  if (current >= MIGRATIONS.length) return;
+  // Tek satırlık sürüm tablosu; ilk kez kurulurken eski PRAGMA user_version değeri taşınır.
+  db.exec('CREATE TABLE IF NOT EXISTS _schema_version (id INTEGER PRIMARY KEY CHECK (id = 1), version INTEGER NOT NULL)');
+  const legacy = db.prepare('PRAGMA user_version').get().user_version;
+  db.prepare('INSERT OR IGNORE INTO _schema_version (id, version) VALUES (1, ?)').run(legacy);
+  const version = () => db.prepare('SELECT version FROM _schema_version WHERE id = 1').get().version;
+  if (version() >= MIGRATIONS.length) return;
   // Tablo yeniden kurulurken DROP TABLE'ın bağlı satırları silmemesi için yabancı anahtarlar
   // geçici olarak kapatılır (bu PRAGMA işlem içinde değiştirilemez), sonunda bütünlük denetlenir.
-  db.exec('PRAGMA foreign_keys = OFF;');
+  pragma(db, 'foreign_keys = OFF');
   try {
-    for (let v = current; v < MIGRATIONS.length; v++) {
-      transaction(db, () => {
+    for (let v = version(); v < MIGRATIONS.length; v++) {
+      const applied = transaction(db, () => {
+        // Aynı merkeze bağlı başka bir sunucu bu sürümü az önce uyguladıysa atlanır.
+        if (!db.prepare('UPDATE _schema_version SET version = ? WHERE id = 1 AND version = ?').run(v + 1, v).changes) return false;
         db.exec(MIGRATIONS[v]);
-        db.exec(`PRAGMA user_version = ${v + 1}`);
+        return true;
       });
+      if (!applied) v = version() - 1;
     }
     const broken = db.prepare('PRAGMA foreign_key_check').all();
     if (broken.length) throw new Error(`foreign key check failed: ${JSON.stringify(broken.slice(0, 3))}`);
   } finally {
-    db.exec('PRAGMA foreign_keys = ON;');
+    pragma(db, 'foreign_keys = ON');
   }
 }
 
+// İç içe çağrılabilir: dıştaki işlem hepsini kapsar.
 export function transaction(db, fn) {
+  const state = info.get(db) ?? { depth: 0 };
+  if (state.depth > 0) return fn();
   db.exec('BEGIN');
+  state.depth++;
   try {
     const result = fn();
     db.exec('COMMIT');
@@ -326,5 +384,56 @@ export function transaction(db, fn) {
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
+  } finally {
+    state.depth--;
   }
+}
+
+// Benzersizlik ihlali (UNIQUE / PRIMARY KEY); iki sürücü de SQLite'ın genişletilmiş hata kodunu verir.
+// Merkeze iletilen yazmalarda kod gelmeyebilir; o zaman SQLite'ın iletisine bakılır.
+export function isUniqueViolation(err) {
+  const code = err?.errcode ?? err?.rawCode;
+  return code === 2067 || code === 1555 || /UNIQUE constraint failed/.test(err?.message ?? '');
+}
+
+// Bir satırı ona bağlı her şeyle birlikte siler; yabancı anahtar denetimine güvenmez. Turso'da
+// yabancı anahtar denetimi bağlantı başına açılır ve gömülü kopyanın merkeze ilettiği yazmalarda
+// açık olduğu garanti değil; hesap silindiğinde verisinin gerçekten gitmesi (KVKK/GDPR) buna
+// bırakılamaz. Şemadaki ON DELETE CASCADE / SET NULL tanımları okunur, en alttaki satırlar önce
+// silinir. [where] yalnızca sabit SQL'dir; değerler [params] ile bağlanır. Silinen satır sayısı döner.
+//
+// Yerel dosyada hepsi tek işlemdir. Merkezde her yazma bir gidiş-dönüştür ve Turso açık bir yazma
+// işlemini birkaç saniyede keser; bu yüzden işlem açılmaz, satırı olmayan tablolar (yerel kopyadan
+// okunarak) atlanır. Yarıda kesilirse üstteki satır (ör. hesap) en son silindiği için yeniden
+// denemek işi tamamlar.
+export function cascadeDelete(db, table, where, params = [], depth = 0) {
+  if (depth > 10) throw new Error(`cascade too deep at ${table}`);
+  const run = () => {
+    if (!db.prepare(`SELECT EXISTS (SELECT 1 FROM "${table}" WHERE ${where}) AS found`).get(...params).found) return 0;
+    for (const fk of foreignKeys(db).get(table) ?? []) {
+      const match = `"${fk.from}" IN (SELECT "${fk.to}" FROM "${table}" WHERE ${where})`;
+      if (fk.onDelete === 'CASCADE') cascadeDelete(db, fk.table, match, params, depth + 1);
+      else if (fk.onDelete === 'SET NULL') db.prepare(`UPDATE "${fk.table}" SET "${fk.from}" = NULL WHERE ${match}`).run(...params);
+    }
+    return Number(db.prepare(`DELETE FROM "${table}" WHERE ${where}`).run(...params).changes);
+  };
+  return info.get(db)?.central ? run() : transaction(db, run);
+}
+
+// Üst tablo → ona bağlı (tablo, sütun, hedef sütun, silinince ne olur) listesi; şemadan bir kez okunur.
+const fkGraphs = new WeakMap();
+function foreignKeys(db) {
+  let graph = fkGraphs.get(db);
+  if (graph) return graph;
+  graph = new Map();
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all();
+  for (const { name } of tables) {
+    for (const fk of db.prepare('SELECT * FROM pragma_foreign_key_list(?)').all(name)) {
+      const to = fk.to ?? db.prepare('SELECT name FROM pragma_table_info(?) WHERE pk = 1').get(fk.table).name;
+      if (!graph.has(fk.table)) graph.set(fk.table, []);
+      graph.get(fk.table).push({ table: name, from: fk.from, to, onDelete: fk.on_delete });
+    }
+  }
+  fkGraphs.set(db, graph);
+  return graph;
 }

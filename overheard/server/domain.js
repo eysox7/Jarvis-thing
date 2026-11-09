@@ -4,7 +4,7 @@
 // - Herkese açık söz: herkes, her yerden okuyabilir.
 // Söz bırakmak için her iki durumda da o mekânda olmak gerekir.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { transaction } from './db.js';
+import { cascadeDelete, transaction } from './db.js';
 import { newId } from './auth.js';
 import { HttpError } from './http.js';
 import { boundingBox, distanceM, distanceToPolylineM, isValidCoord, scatterInPlace, scatterOnLine } from './geo.js';
@@ -745,7 +745,7 @@ export function deleteOverheard(db, user, id) {
   const row = db.prepare('SELECT user_id FROM overheards WHERE id = ?').get(id);
   if (!row) throw new HttpError(404, 'overheard_not_found');
   if (row.user_id !== user.id) throw new HttpError(403, 'not_owner');
-  db.prepare('DELETE FROM overheards WHERE id = ?').run(id);
+  cascadeDelete(db, 'overheards', 'id = ?', [id]);
 }
 
 export function toggleReaction(db, config, user, id, kind) {
@@ -1096,8 +1096,7 @@ export function restoreOverheard(db, id) {
 }
 
 export function removeOverheard(db, id) {
-  const { changes } = db.prepare('DELETE FROM overheards WHERE id = ?').run(id);
-  if (!changes) throw new HttpError(404, 'overheard_not_found');
+  if (!cascadeDelete(db, 'overheards', 'id = ?', [id])) throw new HttpError(404, 'overheard_not_found');
 }
 
 export function setBanned(db, handle, banned) {
@@ -1148,8 +1147,9 @@ export function exportUserData(db, user) {
 
 // Hesabı siler; oturumlar, check-in'ler, sözler, tepkiler, konuşmalar ve konum kayıtları
 // yabancı anahtarlarla (ON DELETE CASCADE) birlikte gider. Açtığı mekânlar sahipsiz kalır.
+// Hesap ve ona bağlı her şey (sözler, tepkiler, konuşmalar, konum kayıtları, cihaz anahtarları...).
 export function deleteAccount(db, user) {
-  db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+  cascadeDelete(db, 'users', 'id = ?', [user.id]);
 }
 
 // Saklama süreleri: kesin konum 24 saat, mekân odası mesajları 12 saat, 24 saatlik sözler süresi
@@ -1159,8 +1159,8 @@ export function purgeStaleData(db, config, now = Date.now()) {
     + db.prepare('DELETE FROM presence_anchors WHERE at < ?').run(now - config.locationRetentionMs).changes;
   const rooms = db.prepare('DELETE FROM room_messages WHERE created_at < ?').run(now - config.roomRetentionMs).changes;
   // Süresi dolan 24 saatlik sözler silinir; üzerinden konuşma başlamışsa sohbet bağlamı için kalır.
-  const expired = db.prepare(`DELETE FROM overheards WHERE expires_at IS NOT NULL AND expires_at < ?
-    AND NOT EXISTS (SELECT 1 FROM conversations c WHERE c.overheard_id = overheards.id)`).run(now).changes;
+  const expired = cascadeDelete(db, 'overheards', `expires_at IS NOT NULL AND expires_at < ?
+    AND NOT EXISTS (SELECT 1 FROM conversations c WHERE c.overheard_id = overheards.id)`, [now]);
   const flags = db.prepare('DELETE FROM location_flags WHERE at < ?').run(now - config.flagRetentionMs).changes;
   return { locations: Number(locations), rooms: Number(rooms), expired: Number(expired), flags: Number(flags) };
 }

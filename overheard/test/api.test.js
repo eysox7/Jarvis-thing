@@ -296,7 +296,9 @@ describe('Dağıtım', () => {
     const srv = await startTestServer();
     const r = await fetch(`${srv.base}/healthz`);
     assert.equal(r.status, 200);
-    assert.equal((await r.json()).ok, true);
+    const body = await r.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.db, 'local');
     await srv.close();
   });
 

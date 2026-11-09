@@ -6,6 +6,11 @@ import { join, resolve } from 'node:path';
 import { loadConfig } from './config.js';
 
 const config = loadConfig();
+if (config.dbUrl) {
+  // Merkezi veritabanında asıl veri Turso'dadır; buradaki dosya yalnızca kopyasıdır.
+  console.error('Veri merkezi veritabanında (Turso). Yedek için: turso db export <veritabanı> --output-file overheard-yedek.db');
+  process.exit(1);
+}
 const dir = resolve(process.argv[2] || join(config.dbPath, '..', 'backups'));
 mkdirSync(dir, { recursive: true });
 const target = join(dir, `overheard-${new Date().toISOString().replace(/[:.]/g, '-')}.db`);

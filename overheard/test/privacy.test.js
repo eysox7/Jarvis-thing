@@ -56,6 +56,30 @@ describe('Kişisel veriler (KVKK/GDPR)', () => {
     await client(srv.base).register(`veri_${tag}`);
   });
 
+  test('yabancı anahtar denetimi kapalıyken de (Turso) silinen hesaptan geriye hiçbir satır kalmaz', async () => {
+    const { tag, me, other, id } = await scene();
+    const theirs = (await other.post('/api/overheards', { text: 'Karşı tarafın sözü kalmalı.', ...SPOTS.kadikoyIskele })).data.overheard.id;
+    await me.post('/api/checkins', SPOTS.kadikoyIskele);
+    assert.equal((await me.post(`/api/overheards/${theirs}/reactions`, { kind: 'lol' })).status, 200);
+    assert.equal((await other.post(`/api/overheards/${id}/reactions`, { kind: 'lol' })).status, 200);
+    assert.equal((await me.post(`/api/overheards/${theirs}/report`, { reason: 'spam' })).status, 200);
+    assert.equal((await me.post(`/api/users/karsi_${tag}/block`)).status, 200);
+    const userId = srv.db.prepare('SELECT id FROM users WHERE handle = ?').get(`veri_${tag}`).id;
+    srv.db.exec('PRAGMA foreign_keys = OFF');
+    try {
+      assert.equal((await me.post('/api/me/delete', { password: 'gizli-parola-123' })).status, 200);
+      // Hiçbir tabloda var olmayan bir satıra işaret eden kayıt yok (sahipsiz tepki, mesaj, oturum...).
+      assert.deepEqual(srv.db.prepare('PRAGMA foreign_key_check').all(), []);
+      assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(userId).n, 0);
+      assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM reactions WHERE overheard_id = ?').get(id).n, 0, 'sözüne gelen tepkiler de gider');
+    } finally {
+      srv.db.exec('PRAGMA foreign_keys = ON');
+    }
+    // Karşı tarafın sözü ve hesabı yerinde.
+    assert.equal((await other.get(`/api/overheards/${theirs}`)).status, 200);
+    assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM reactions WHERE overheard_id = ?').get(theirs).n, 0);
+  });
+
   test('misafir hesabı parolasız silinir', async () => {
     const guest = client(srv.base);
     await guest.post('/api/auth/guest');

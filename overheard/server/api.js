@@ -8,7 +8,7 @@ import * as p2p from './p2p.js';
 import { qrMatrix, qrSvg } from './qr.js';
 import { containsSlur } from './moderation.js';
 import { suggestHandle } from './google.js';
-import { transaction } from './db.js';
+import { isUniqueViolation, transaction } from './db.js';
 
 export const SESSION_COOKIE = 'oh_session';
 
@@ -167,8 +167,6 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null, 
     throw new HttpError(409, 'handle_taken');
   };
 
-  // Aynı Google hesabıyla aynı anda iki istek: ikincisi birincinin açtığı kaydı bulur.
-  const isConflict = (err) => err?.code === 'ERR_SQLITE_ERROR' && /UNIQUE|PRIMARY KEY/i.test(err.message);
 
   router.post('/api/auth/google', async (ctx) => {
     limit(`google:${clientIp(ctx.req, config.trustProxy)}`, 30, 3600000);
@@ -194,8 +192,9 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null, 
           if (ctx.user.isGuest) db.prepare('UPDATE users SET handle = ?, is_guest = 0, password_login = 0 WHERE id = ?').run(handle, ctx.user.id);
         });
       } catch (err) {
-        const winner = isConflict(err) && googleUser(identity.sub);
-        if (!winner) throw isConflict(err) ? new HttpError(409, 'handle_taken') : err;
+        // Aynı Google hesabıyla aynı anda iki istek: ikincisi birincinin açtığı kaydı bulur.
+        const winner = isUniqueViolation(err) && googleUser(identity.sub);
+        if (!winner) throw isUniqueViolation(err) ? new HttpError(409, 'handle_taken') : err;
         return signIn(winner);
       }
       return { user: publicUser({ ...ctx.user, handle, isGuest: false }), linked: true };
@@ -213,8 +212,8 @@ export function registerApi(router, { db, config, events, rateLimit, ai = null, 
         return Number(lastInsertRowid);
       });
     } catch (err) {
-      const winner = isConflict(err) && googleUser(identity.sub);
-      if (!winner) throw isConflict(err) ? new HttpError(409, 'handle_taken') : err;
+      const winner = isUniqueViolation(err) && googleUser(identity.sub);
+      if (!winner) throw isUniqueViolation(err) ? new HttpError(409, 'handle_taken') : err;
       return signIn(winner);
     }
     startSession(ctx, userId);

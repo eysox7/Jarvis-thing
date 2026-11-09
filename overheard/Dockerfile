@@ -1,10 +1,12 @@
-# Overheard: Node.js 22.13+ (yerleşik node:sqlite). Tek (isteğe bağlı) çalışma zamanı bağımlılığı
-# yapay zekâ denetimi için Anthropic SDK'sıdır; ANTHROPIC_API_KEY yoksa hiç yüklenmez.
+# Overheard: Node.js 22.13+ (yerleşik node:sqlite). İsteğe bağlı iki çalışma zamanı bağımlılığı var:
+# yapay zekâ denetimi için Anthropic SDK'sı (ANTHROPIC_API_KEY yoksa yüklenmez) ve merkezi veritabanı
+# için Turso sürücüsü libsql (OVERHEARD_DB_URL yoksa yüklenmez).
 FROM node:22-alpine
 
 ENV NODE_ENV=production \
     PORT=8787 \
     OVERHEARD_DB=/data/overheard.db \
+    OVERHEARD_DB_REPLICA=/data/turso-replica.db \
     OVERHEARD_DEMO=0 \
     OVERHEARD_SECURE_COOKIES=1
 

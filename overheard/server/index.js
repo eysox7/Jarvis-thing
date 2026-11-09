@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { loadConfig } from './config.js';
-import { openDb } from './db.js';
+import { dbInfo, openDb } from './db.js';
 import { createApp } from './app.js';
 import { seedDemoContent, seedPlaces } from './seed.js';
 import { purgeExpiredSessions } from './auth.js';
@@ -8,7 +8,8 @@ import { purgeStaleData } from './domain.js';
 import { createAiModerator } from './ai-moderation.js';
 
 const config = loadConfig();
-const db = openDb(config.dbPath);
+const db = openDb(config.dbPath, config);
+if (dbInfo(db).central) console.log(`Merkezi veritabanı: ${new URL(config.dbUrl).host} (kopya: ${config.dbPath})`);
 seedPlaces(db);
 if (config.demoMode) await seedDemoContent(db);
 

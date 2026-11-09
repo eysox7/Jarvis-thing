@@ -204,7 +204,9 @@ Ortam değişkenleri:
 | Değişken | Varsayılan | Açıklama |
 | --- | --- | --- |
 | `PORT` | `8787` | |
-| `OVERHEARD_DB` | `data/overheard.db` | SQLite dosyası |
+| `OVERHEARD_DB` | `data/overheard.db` | SQLite dosyası (merkezi veritabanı yoksa) |
+| `OVERHEARD_DB_URL` | — | Merkezi veritabanı (Turso) adresi, `libsql://...`; aşağıdaki "Merkezi veritabanı" bölümü |
+| `OVERHEARD_DB_TOKEN` | — | Turso veritabanı anahtarı (gizli: yalnızca ortam değişkeni / Codespaces sırrı) |
 | `OVERHEARD_DEMO` | `1` | Demo modu: örnek sözler, misafir hesabı, haritaya uzun basınca ışınlanma. Üretimde `0`. |
 | `OVERHEARD_SECURE_COOKIES` | `0` | HTTPS arkasında `1` yap |
 | `GOOGLE_MAPS_API_KEY` | — | Tanımlıysa harita Google Maps ile çizilir (yoksa OpenStreetMap) |
@@ -242,7 +244,8 @@ sonlandıran bir ters vekil (Caddy/nginx). Konum API'si tarayıcıda yalnızca H
 
 **Yedekleme:** `npm run backup [klasör]` çalışan veritabanının tutarlı bir kopyasını alır
 (SQLite `VACUUM INTO`). Konteynerde: `docker compose exec app node server/backup.js /data/backups`.
-Bunu günlük bir zamanlayıcıya bağlayıp yedekleri sunucu dışına kopyalayın.
+Bunu günlük bir zamanlayıcıya bağlayıp yedekleri sunucu dışına kopyalayın. Merkezi veritabanında
+(Turso) yedek Turso'dadır; elde bir kopya için `turso db export overheard`.
 
 | Ek değişken | Varsayılan | Açıklama |
 | --- | --- | --- |
@@ -256,6 +259,9 @@ Bunu günlük bir zamanlayıcıya bağlayıp yedekleri sunucu dışına kopyalay
 | `OVERHEARD_AI_MODEL` | `claude-opus-5-5` | Denetim modeli. Yüksek hacimde daha ucuz: `claude-haiku-5-5` (yedek model desteği yok: `OVERHEARD_AI_FALLBACKS=0`) |
 | `OVERHEARD_AI_TIMEOUT_MS` | `8000` | Bu süreyi aşan denetim beklenmez; metin kelime listesiyle yayımlanır |
 | `OVERHEARD_AI_FALLBACKS` | `1` | Sunucu taraflı yedek model (`fallbacks: "default"`): bir istek reddedilirse Anthropic'in önerdiği modelde aynı çağrıda yeniden denenir |
+| `OVERHEARD_DB_SYNC_SECONDS` | `5` | Merkezi veritabanında kopyanın merkezle eşitlenme aralığı |
+| `OVERHEARD_DB_REPLICA` | `data/turso-replica.db` | Merkezi veritabanının bu makinedeki kopyası (yerel veritabanı dosyasından ayrı) |
+| `OVERHEARD_DB_DRIVER` | `sqlite` (adres varsa `libsql`) | Turso adresi olmadan `libsql`: aynı sürücüyle yerel dosya (testlerde kullanılır) |
 | `OVERHEARD_GOOGLE_CLIENT_IDS` | — | Google ile giriş: Google Cloud OAuth istemci kimlikleri, virgülle. İlki "Web uygulaması" türündeki istemci (web düğmesi ve Android uygulaması onu kullanır). Boşsa Google ile giriş kapalı. |
 
 ### Google ile giriş
@@ -302,6 +308,45 @@ görevler ayrıldı:
   Elle yazılan adres `connect.json`'dan önce gelir; "Otomatik adrese dön" ile bırakılır. Metrodan
   erişilebilmesi için tünel: `npx cloudflared tunnel --url http://localhost:8787`.
 
+### Merkezi veritabanı (Turso)
+
+Varsayılan olarak veri, sunucunun çalıştığı makinedeki tek bir dosyada (`data/overheard.db`) durur:
+Codespaces'te ve bilgisayarında açılan iki sunucu ayrı veri görür. Merkezi veritabanıyla bütün
+sunucular aynı veriyi kullanır:
+
+- Veri [Turso](https://turso.tech)'daki tek bir veritabanındadır (SQLite uyumlu).
+- Her sunucunun yanında gömülü bir kopya durur (`data/turso-replica.db`). Okumalar kopyadan yapılır
+  (hızlı), yazmalar merkeze gider ve hemen kopyaya da yansır. Başka sunucuların yazdıkları
+  `OVERHEARD_DB_SYNC_SECONDS` saniyede (varsayılan 5) görünür.
+- Şema güncellemeleri merkezde bir kez uygulanır; sürüm `_schema_version` tablosunda tutulur
+  (Turso'da `PRAGMA user_version` salt okunurdur).
+
+Kurulum (bir kez):
+
+1. [turso.tech](https://turso.tech)'te hesap aç, Turso CLI'yi kur ve giriş yap: `turso auth login`.
+2. Veritabanını oluştur:
+   - Sıfırdan: `turso db create overheard`. Sunucu ilk açılışta tabloları kurar, mekânları yükler.
+   - Bugünkü verinle: sunucuyu durdur, `turso db import data/overheard.db` (veritabanı adını
+     dosyadan alır: `overheard`).
+3. Adresi ve anahtarı al: `turso db show overheard --url` ve `turso db tokens create overheard`.
+4. Sunucuya ver:
+   - Codespaces: depo → Settings → Secrets and variables → Codespaces → `OVERHEARD_DB_URL` ve
+     `OVERHEARD_DB_TOKEN` (yeni açılan codespace'lerde geçerli olur).
+   - Yerel: `OVERHEARD_DB_URL=libsql://... OVERHEARD_DB_TOKEN=... npm start`.
+   - Docker: aynı iki değişken; kopya `/data/turso-replica.db`'de durur.
+5. Denetle: `npm run db:check`. Merkeze bağlanır, şemayı günceller, kullanıcı ve söz sayılarını ve
+   merkeze yazma süresini yazar. Çalışan sunucunun `/healthz` yanıtında `"db": "central"` görünür.
+
+Notlar:
+
+- Anahtar gizlidir: depoya, `connect.json`'a ya da koda yazılmaz; yalnızca ortam değişkeni ya da
+  Codespaces sırrı.
+- Hesap silme ve öteki zincirleme silmeler yabancı anahtar denetimine güvenmez (Turso'da bu
+  denetim bağlantı başına açılır). Bağlı satırlar uygulama içinde silinir; bunu, denetim kapalıyken
+  hesap silindiğinde geriye tek satır kalmadığını doğrulayan bir test korur.
+- Canlı mesaj bildirimleri ve hız sınırları her sunucunun kendi belleğindedir. İki sunucu aynı anda
+  açıksa, birine bağlı kişi ötekinden gelen yeni mesajı sayfayı yenileyince görür.
+
 ## Mimari
 
 ```
@@ -312,7 +357,7 @@ overheard/
     app.js          istek işleyici: statik dosyalar, güvenlik başlıkları, API yönlendirme
     api.js          API uçları
     domain.js       kurallar: yerel/herkese açık görünürlük, check-in, sözler, mesajlaşma
-    db.js           SQLite şeması ve göçler (PRAGMA user_version)
+    db.js           SQLite şeması ve göçler; yerel dosya ya da merkezi Turso veritabanı
     auth.js         scrypt parolalar, oturumlar
     moderation.js   kişisel veri ve küfür maskesi, nefret söylemi reddi
     events.js       Server-Sent Events (canlı mesaj)
@@ -375,9 +420,9 @@ tabidir; başlamış bir konuşma ise mekândan ayrıldıktan sonra da sürer. "
 
 | Komut | Kapsam |
 | --- | --- |
-| `npm test` | 118 API/birim testi: Google kimlik belgesi doğrulama ve Google ile giriş, ters vekil arkasında köken denetimi, yerel/herkese açık görünürlük ve anlık mekân kuralı, check-in, söz, tepki, tanıklar, anonimlik, mesajlaşma, rozetler, moderasyon, konum denetimleri, QR, kafe, hatlar, çevrimdışı ve kulaktan kulağa söz, ölçek, göçler, yedekleme |
+| `npm test` | 124 API/birim testi (CI'da merkezi veritabanının sürücüsüyle de koşar: `OVERHEARD_DB_DRIVER=libsql npm test`): Google kimlik belgesi doğrulama ve Google ile giriş, ters vekil arkasında köken denetimi, yerel/herkese açık görünürlük ve anlık mekân kuralı, check-in, söz, tepki, tanıklar, anonimlik, mesajlaşma, rozetler, moderasyon, konum denetimleri, QR, kafe, hatlar, çevrimdışı ve kulaktan kulağa söz, ölçek, göçler, yabancı anahtar denetimi kapalıyken hesap silme, yedekleme |
 | `npm run test:e2e` | 23 tarayıcı senaryosu (Playwright + Chromium): iki kullanıcıyla uçtan uca akış, ayrılınca yeniden kilitlenme ve herkese açık söz, tanık ve anonim sohbet, keşif kartı, rozetler, tanıtım, dil değişimi, moderasyon paneli, yoğun bölge, Google Maps uyarlayıcısı (taklit API ile), QR, kafe, çevrimdışı ve kulaktan kulağa |
-| `cd mobile && flutter test` | 43 Android uygulaması testi (Google ile giriş, bağlantı dosyası, otomatik yeraltı modu ve Android katmanıyla konuşan bağlantı dahil): imza (web/sunucu biçimi), paket, telefondan telefona yayılma (bellek içi ağda zincir, üçgen, atlama ve süre sınırı, denetim), içerik denetiminin Node sürümüyle eşliği, ekranlar ve gerçek sunucuyla uçtan uca (Dart'ta imzalanan sözün Node'da doğrulanması, tepki, mesajlaşma, şikâyet/engelleme, hesap silme) |
+| `cd mobile && flutter test` | 48 Android uygulaması testi (Google ile giriş, bağlantı dosyası, otomatik yeraltı modu ve Android katmanıyla konuşan bağlantı dahil): imza (web/sunucu biçimi), paket, telefondan telefona yayılma (bellek içi ağda zincir, üçgen, atlama ve süre sınırı, denetim), içerik denetiminin Node sürümüyle eşliği, ekranlar ve gerçek sunucuyla uçtan uca (Dart'ta imzalanan sözün Node'da doğrulanması, tepki, mesajlaşma, şikâyet/engelleme, hesap silme) |
 
 Testler bellek içi veritabanıyla gerçek bir HTTP sunucusu açar; dış ağa çıkmaz (harita karoları
 ve Google Maps API'si testte taklit edilir).
@@ -412,8 +457,8 @@ denetimler açıktır (`OVERHEARD_ANTI_SPOOF` ile değiştirilebilir):
   BLE) henüz yok. Sunucu
   tarafı (imzalı paket, aktarma ucu) buna hazırdır. Kodu telefonun kamera uygulamasıyla okutan
   kişinin tarayıcısı Overheard'ü daha önce açmış olmalı (çevrimdışı kabuk önbellekte).
-- Hız sınırları ve canlı bağlantılar tek süreç içindedir; yatay ölçeklemede paylaşılan bir depo
-  (ör. Redis) gerekir.
+- Veri merkezi veritabanında paylaşılabilir (Turso), ama hız sınırları ve canlı bağlantılar tek
+  süreç içindedir; yatay ölçeklemede bunlar için de paylaşılan bir depo (ör. Redis) gerekir.
 - Harita karoları CARTO/OpenStreetMap'ten gelir; yoğun kullanımda kendi karo sunucunuz ya da
   ücretli bir sağlayıcı gerekir.
 
