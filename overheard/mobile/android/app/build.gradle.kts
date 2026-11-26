@@ -7,10 +7,19 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Play Store imzası: android/key.properties (storeFile, storePassword, keyAlias, keyPassword). Dosya
-// yoksa sürüm derlemesi depodaki pilot anahtarıyla imzalanır. Yükleme anahtarı depoya eklenmez.
+// İmza anahtarları depoda durmaz.
+// - Play Store: android/key.properties (storeFile, storePassword, keyAlias, keyPassword).
+// - Pilot (CI'daki ve elle dağıtılan derlemeler): OVERHEARD_PILOT_KEYSTORE (dosya yolu) ve
+//   OVERHEARD_PILOT_PASSWORD ortam değişkenleri. CI bunları depo sırlarından (PILOT_KEYSTORE_B64,
+//   PILOT_KEYSTORE_PASSWORD) kurar. Her pilot derlemesi aynı imzayı (ve Google girişi için aynı
+//   SHA-1'i) taşır.
+// İkisi de yoksa derleme bu makinenin hata ayıklama anahtarıyla imzalanır: yalnızca o makinede
+// deneme içindir, başka yerde derlenmiş sürümün üstüne kurulmaz.
 val keystoreFile = rootProject.file("key.properties")
 val keystore = Properties().apply { if (keystoreFile.exists()) FileInputStream(keystoreFile).use { load(it) } }
+val pilotKeystore = System.getenv("OVERHEARD_PILOT_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+val pilotPassword = System.getenv("OVERHEARD_PILOT_PASSWORD").orEmpty()
+val hasPilot = pilotKeystore != null && pilotPassword.isNotEmpty()
 
 android {
     namespace = "app.overheard.overheard"
@@ -37,12 +46,13 @@ android {
     }
 
     signingConfigs {
-        // Pilot anahtarı (depoda; şifresi gizli değil): hata ayıklama ve pilot derlemeleri.
-        create("pilot") {
-            storeFile = file("pilot.keystore")
-            storePassword = "overheard-pilot"
-            keyAlias = "pilot"
-            keyPassword = "overheard-pilot"
+        if (hasPilot) {
+            create("pilot") {
+                storeFile = pilotKeystore
+                storePassword = pilotPassword
+                keyAlias = "pilot"
+                keyPassword = pilotPassword
+            }
         }
         if (keystoreFile.exists()) {
             create("upload") {
@@ -56,11 +66,17 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("pilot")
+            if (hasPilot) signingConfig = signingConfigs.getByName("pilot")
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
         release {
-            signingConfig = signingConfigs.getByName(if (keystoreFile.exists()) "upload" else "pilot")
+            signingConfig = signingConfigs.getByName(
+                when {
+                    keystoreFile.exists() -> "upload"
+                    hasPilot -> "pilot"
+                    else -> "debug"
+                },
+            )
             // Cihazda denenmemiş eklentilerde (Nearby) R8'in bir şeyi silmesi riskine girilmez.
             isMinifyEnabled = false
             isShrinkResources = false

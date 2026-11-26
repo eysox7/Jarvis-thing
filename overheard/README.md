@@ -280,7 +280,7 @@ açılan hesabın parolası yoktur: silme işlemi taze bir Google girişiyle ona
    uygulamasının HTTPS adresi (ör. `https://overheard.ornek.com`; Codespaces adresi her codespace'te
    farklıdır). Çıkan **istemci kimliği** `OVERHEARD_GOOGLE_CLIENT_IDS` değeridir.
 4. **Create client → Android**: paket adı `app.overheard`, SHA-1 parmak izi pilot anahtarınınki:
-   `9F:62:D0:01:FC:11:3D:9C:62:AD:F4:4B:50:70:78:96:70:41:77:89`. Play Store'a geçince yükleme
+   `BF:3C:EA:12:4E:AA:18:27:C7:09:4B:FC:FB:D5:6B:C6:B8:61:F2:B9`. Play Store'a geçince yükleme
    anahtarının ve Play App Signing anahtarının SHA-1'leri için de birer Android istemcisi eklenir.
 5. Sunucuyu `OVERHEARD_GOOGLE_CLIENT_IDS=<web istemci kimliği>` ile yeniden başlat. Uygulama istemci
    kimliğini sunucudan (`/api/config`) öğrenir; APK'yı yeniden derlemek gerekmez.
@@ -295,9 +295,11 @@ görevler ayrıldı:
   **`connect.json`**. Uygulama sunucunun adresini bu dosyadan öğrenir; sunucu taşınınca yalnızca bu
   dosya güncellenir (`npm run connect -- https://yeni-adres`, commit, push), APK yeniden kurulmaz.
   Site her push'ta GitHub Actions ile yeniden kurulur (`.github/workflows/overheard.yml`): testler,
-  pilot anahtarıyla APK, site. Gizli depoda Pages, GitHub Pro ister; ücretsiz hesapta site ayrı ve
-  herkese açık bir depoda (ör. `eysox7/overheard`) yayımlanır, kaynak kod gizli kalır (iş akışının
-  başındaki açıklama).
+  pilot anahtarıyla APK (anahtar depo sırlarındadır; `mobile/README.md`), site. Herkese açık depoda
+  Pages ücretsizdir (Settings → Pages → Source: GitHub Actions ve depo değişkeni
+  `OVERHEARD_PAGES=this-repo`; adres `https://eysox7.github.io/Jarvis-thing/`). Gizli depoda Pages
+  GitHub Pro ister; o durumda site ayrı ve herkese açık bir depoda (ör. `eysox7/overheard`)
+  yayımlanır (iş akışının başındaki açıklama).
 - **Sunucu, GitHub Codespaces'te**: depo → Code → Codespaces → "New with options" → yapılandırma
   "Overheard sunucusu". Codespace açılınca sunucu başlar, genel adresi
   (`https://<codespace>-8787.app.github.dev`) terminale yazar. Ports sekmesinden 8787'yi "Public"

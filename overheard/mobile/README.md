@@ -83,12 +83,17 @@ flutter build apk --release --split-per-abi --target-platform android-arm64
 - Bağlantı dosyasının adresi derlemede değiştirilebilir:
   `--dart-define=OVERHEARD_CONNECT=https://.../connect.json` (virgülle birden çok). Sabit bir sunucu
   için `--dart-define=OVERHEARD_URL=https://...` da verilebilir.
-- **İmza**: hata ayıklama ve pilot derlemeleri depodaki `android/app/pilot.keystore` ile imzalanır
-  (şifresi `overheard-pilot`; gizli değildir). Böylece her derleme, her bilgisayar ve GitHub Actions
-  aynı imzayı üretir: güncellemeler eski sürümün üzerine kurulur ve Google girişi için verilen SHA-1
-  (`9F:62:D0:01:FC:11:3D:9C:62:AD:F4:4B:50:70:78:96:70:41:77:89`) değişmez. 0.2.0 ve öncesi başka bir
-  anahtarla imzalıydı: bir kez kaldırıp yeniden kurmak gerekir. Play Store yükleme anahtarı bu
-  değildir (aşağıda).
+- **İmza (pilot anahtarı)**: anahtar depoda durmaz. Pilot derlemeleri, yolunu ve parolasını ortam
+  değişkenlerinden okuduğu anahtarla imzalanır:
+  `OVERHEARD_PILOT_KEYSTORE=/yol/pilot.keystore OVERHEARD_PILOT_PASSWORD=... flutter build apk ...`.
+  GitHub Actions aynı anahtarı depo sırlarından kurar (Settings → Secrets and variables → Actions):
+  `PILOT_KEYSTORE_B64` (anahtar dosyasının base64'ü) ve `PILOT_KEYSTORE_PASSWORD`. Böylece her pilot
+  derlemesi aynı imzayı taşır: güncellemeler eskinin üzerine kurulur, Google girişi için verilen
+  SHA-1 (`BF:3C:EA:12:4E:AA:18:27:C7:09:4B:FC:FB:D5:6B:C6:B8:61:F2:B9`) değişmez. Sır yoksa CI APK'yı
+  geçici anahtarla imzalar ve siteye koymaz; anahtar yoksa yerel derleme o makinenin hata ayıklama
+  anahtarıyla imzalanır. 0.5.0 ve öncesi, depoda duran eski anahtarla imzalıydı (depo herkese
+  açılınca o anahtar geçersiz sayıldı): bir kez kaldırıp yeniden kurmak gerekir. Play Store yükleme
+  anahtarı bu değildir (aşağıda).
 - Sürüm derlemesi yalnızca `https://` sunucuya bağlanır. Yerel ağdaki `http://` bir sunucuyla
   denemek için derlemeden önce `export ORG_GRADLE_PROJECT_overheardCleartext=true` (hata ayıklama
   derlemesinde zaten açık).
@@ -109,7 +114,7 @@ flutter build apk --release --split-per-abi --target-platform android-arm64
    keyAlias=upload
    keyPassword=...
    ```
-   Dosya varsa sürüm derlemesi bu anahtarla, yoksa pilot anahtarıyla imzalanır.
+   Dosya varsa sürüm derlemesi bu anahtarla, yoksa (verildiyse) pilot anahtarıyla imzalanır.
 3. Play Store `.aab` ister:
    `flutter build appbundle --release`
    → `build/app/outputs/bundle/release/app-release.aab`. Play App Signing'i aç (Google dağıtım

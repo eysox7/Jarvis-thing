@@ -70,12 +70,26 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      # Pilot imza anahtarı depoda durmaz: depo sırlarından kurulur (mobile/README.md, "Pilot anahtarı").
+      # Sır yoksa APK yine derlenir ama geçici anahtarla imzalanır; siteye konmaz.
+      - name: Pilot anahtarı
+        env:
+          PILOT_KEYSTORE_B64: ${{ secrets.PILOT_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$PILOT_KEYSTORE_B64" ]; then
+            printf '%s' "$PILOT_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/pilot.keystore"
+            echo "OVERHEARD_PILOT_KEYSTORE=$RUNNER_TEMP/pilot.keystore" >> "$GITHUB_ENV"
+          else
+            echo "::warning::PILOT_KEYSTORE_B64 sırrı yok: APK geçici anahtarla imzalanır ve siteye konmaz."
+          fi
       - name: APK
         env:
           # Pilot: yerel ağdaki http:// sunucuyla da denenebilsin.
           ORG_GRADLE_PROJECT_overheardCleartext: 'true'
+          OVERHEARD_PILOT_PASSWORD: ${{ secrets.PILOT_KEYSTORE_PASSWORD }}
         run: flutter build apk --release --split-per-abi --target-platform android-arm64
-      - uses: actions/upload-artifact@v4
+      - if: env.OVERHEARD_PILOT_KEYSTORE != ''
+        uses: actions/upload-artifact@v4
         with:
           name: overheard-apk
           path: overheard/mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
@@ -90,11 +104,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # Pilot anahtarıyla imzalı APK yoksa (sır eklenmemiş) site APK'sız kurulur.
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: overheard-apk
           path: apk
-      - run: node overheard/site/build.mjs --apk apk/app-arm64-v8a-release.apk
+      - run: node overheard/site/build.mjs $([ -f apk/app-arm64-v8a-release.apk ] && echo --apk apk/app-arm64-v8a-release.apk)
       - uses: actions/upload-pages-artifact@v3
         with:
           path: overheard/site/dist
