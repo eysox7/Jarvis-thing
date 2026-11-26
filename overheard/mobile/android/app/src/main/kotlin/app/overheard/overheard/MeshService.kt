@@ -45,10 +45,10 @@ class MeshService : Service() {
             return START_NOT_STICKY
         }
         val notification = notification(
-            intent?.getStringExtra(EXTRA_TITLE) ?: "Overheard",
+            intent?.getStringExtra(EXTRA_TITLE) ?: "Dedikoydu",
             intent?.getStringExtra(EXTRA_TEXT) ?: "",
             intent?.getStringExtra(EXTRA_STOP) ?: "Stop",
-            intent?.getStringExtra(EXTRA_CHANNEL) ?: "Overheard",
+            intent?.getStringExtra(EXTRA_CHANNEL) ?: "Dedikoydu",
         )
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else 0
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)

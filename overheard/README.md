@@ -1,8 +1,11 @@
-# overheard
+# Dedikoydu
 
 > Duyduğunu bırak. Yerel sözleri yalnızca o an orada olanlar okur.
 
-Overheard, insanların sokakta, vapurda, kampüste, kafede **kulak misafiri oldukları sözleri**
+Uygulamanın adı **Dedikoydu**; kodda, paket kimliğinde (`app.overheard`), klasörlerde ve ortam
+değişkenlerinde (`OVERHEARD_*`) eski çalışma adı overheard kalır.
+
+Dedikoydu, insanların sokakta, vapurda, kampüste, kafede **kulak misafiri oldukları sözleri**
 haritaya bıraktığı bir uygulama. Her söz, duyulduğu mekânda bir konuşma balonu olarak durur.
 
 Fark yaratan kural: **iki tür söz var.**

@@ -43,7 +43,7 @@ class OverheardApp extends StatelessWidget {
   Widget build(BuildContext context) => AppScope(
     controller: controller,
     child: MaterialApp(
-      title: 'Overheard',
+      title: 'Dedikoydu',
       debugShowCheckedModeBanner: false,
       theme: _theme(Brightness.light),
       darkTheme: _theme(Brightness.dark),

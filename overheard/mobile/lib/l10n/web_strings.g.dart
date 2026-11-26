@@ -183,7 +183,7 @@ const webStrings = <String, Map<String, String>>{
     'errors.google_token_invalid': 'Google girişi doğrulanamadı; yeniden dene.',
     'errors.google_unavailable': 'Google\'a şu an ulaşılamıyor; birazdan dene.',
     'errors.google_disabled': 'Google ile giriş bu sunucuda kapalı.',
-    'errors.google_linked_elsewhere': 'Bu Google hesabı başka bir Overheard hesabına bağlı.',
+    'errors.google_linked_elsewhere': 'Bu Google hesabı başka bir Dedikoydu hesabına bağlı.',
     'profile.deleteConfirm': 'Hesabın, sözlerin, mesajların ve konum geçmişin kalıcı olarak silinecek. Emin misin?',
     'profile.deletePassword': 'Onaylamak için parolanı yaz:',
     'profile.deleteHandle': 'Onaylamak için kullanıcı adını yaz:',
@@ -373,7 +373,7 @@ const webStrings = <String, Map<String, String>>{
     'errors.google_token_invalid': 'Couldn\'t verify the Google sign-in; try again.',
     'errors.google_unavailable': 'Google can\'t be reached right now; try again shortly.',
     'errors.google_disabled': 'Google sign-in is turned off on this server.',
-    'errors.google_linked_elsewhere': 'This Google account is linked to another Overheard account.',
+    'errors.google_linked_elsewhere': 'This Google account is linked to another Dedikoydu account.',
     'profile.deleteConfirm':
         'Your account, overheards, messages and location history will be permanently deleted. Are you sure?',
     'profile.deletePassword': 'Type your password to confirm:',

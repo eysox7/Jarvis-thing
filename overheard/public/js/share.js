@@ -90,7 +90,7 @@ export function renderShareCard(o, cityName) {
   ctx.fillText('“', W / 2 - 250, 150);
   ctx.fillStyle = '#1d1a22';
   ctx.font = `800 96px ${sans}`;
-  ctx.fillText('overheard', W / 2 + 40, 170);
+  ctx.fillText('dedikoydu', W / 2 + 40, 170);
 
   ctx.fillStyle = '#6d6676';
   ctx.font = `500 40px ${sans}`;
@@ -112,16 +112,16 @@ export function downloadBlob(blob, name) {
 // Telefonda sistem paylaşım menüsünü açar; desteklenmiyorsa görseli indirir.
 export async function shareOverheard(o, cityName) {
   const blob = await toBlob(renderShareCard(o, cityName));
-  const file = new File([blob], 'overheard.png', { type: 'image/png' });
+  const file = new File([blob], 'dedikoydu.png', { type: 'image/png' });
   if (navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], text: `“${o.text}” — ${o.placeName} #overheard` });
+      await navigator.share({ files: [file], text: `“${o.text}” — ${o.placeName} #dedikoydu` });
       return 'shared';
     } catch (err) {
       if (err?.name === 'AbortError') return 'cancelled';
     }
   }
-  downloadBlob(blob, 'overheard.png');
+  downloadBlob(blob, 'dedikoydu.png');
   return 'downloaded';
 }
 
@@ -147,7 +147,7 @@ export function renderQrPoster(place, cityName, matrix, url) {
   ctx.fillText('“', PW / 2 - 250, 70);
   ctx.fillStyle = '#1d1a22';
   ctx.font = `800 92px ${sans}`;
-  ctx.fillText('overheard', PW / 2 + 40, 90);
+  ctx.fillText('dedikoydu', PW / 2 + 40, 90);
 
   ctx.font = `italic 700 64px ${serif}`;
   ctx.fillText(t('qr.posterTitle'), PW / 2, 250);
@@ -190,5 +190,5 @@ export function renderQrPoster(place, cityName, matrix, url) {
 }
 
 export async function downloadQrPoster(place, cityName, matrix, url) {
-  downloadBlob(await toBlob(renderQrPoster(place, cityName, matrix, url)), `overheard-qr-${place.id}.png`);
+  downloadBlob(await toBlob(renderQrPoster(place, cityName, matrix, url)), `dedikoydu-qr-${place.id}.png`);
 }

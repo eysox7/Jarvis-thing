@@ -1,6 +1,6 @@
-# Overheard Android uygulaması (Flutter)
+# Dedikoydu Android uygulaması (Flutter)
 
-Overheard'ün yerli mobil uygulaması. Asıl farkı **yeraltı modu**: metroda internet yokken yazılan
+Dedikoydu'nun yerli mobil uygulaması (paket kimliği `app.overheard`). Asıl farkı **yeraltı modu**: metroda internet yokken yazılan
 söz Bluetooth/Wi-Fi ile yanındaki Overheard'lü telefonlara kendiliğinden geçer, içlerinden biri
 sinyal bulunca sunucuya ulaşır. Sunucu aynıdır (`../server`); uygulama web uygulamasının API'sini
 kullanır.

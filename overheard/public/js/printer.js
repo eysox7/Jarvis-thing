@@ -2,7 +2,7 @@ import { api } from './api.js';
 import { t, errorText } from './i18n.js';
 import { h, clear, formatDistance } from './util.js';
 
-// Overheard Kafe yazıcı ekranı: kafedeki bir cihazda personel hesabıyla açık durur. Garson masa
+// Dedikoydu Kafe yazıcı ekranı: kafedeki bir cihazda personel hesabıyla açık durur. Garson masa
 // açtıkça ya da masa açık kaldıkça sunucu fiş kuyruğa ekler; bu ekran canlı haber alıp fişleri
 // fiş yazıcısına basar ve "basıldı" diye işaretler. Chrome --kiosk-printing ile açılırsa yazdırma
 // penceresi çıkmadan basar.
@@ -54,7 +54,7 @@ function slip(job) {
     : t('slip.heardNear', { place: job.placeName, distance: formatDistance(job.distanceM), when: when(job.heardAt) });
   return h('article', { class: 'slip' },
     h('p', { class: 'slip-table' }, t('slip.table', { n: job.tableNo })),
-    h('p', { class: 'slip-brand' }, h('span', { class: 'slip-mark', 'aria-hidden': 'true' }, '“'), 'overheard'),
+    h('p', { class: 'slip-brand' }, h('span', { class: 'slip-mark', 'aria-hidden': 'true' }, '“'), 'dedikoydu'),
     h('blockquote', { class: 'slip-quote' }, `“${job.text}”`),
     h('p', { class: 'slip-meta' }, meta),
     qr ? h('img', { class: 'slip-qr', src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qr.svg)}`, alt: '', width: 113, height: 113 }) : null,

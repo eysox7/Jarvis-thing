@@ -8,7 +8,7 @@
 
 export const AI_CATEGORIES = ['hate', 'harassment', 'personal_info', 'threat', 'sexual', 'spam'];
 
-const SYSTEM = `You review short texts for Overheard, an app where people share funny, odd or touching things they overheard in public places (ferries, cafés, campuses, streets) in Istanbul, Ankara, Izmir, Austin, New York and Los Angeles. Texts are usually Turkish or English. Approved texts are shown on a public map to strangers.
+const SYSTEM = `You review short texts for Dedikoydu, an app where people share funny, odd or touching things they overheard in public places (ferries, cafés, campuses, streets) in Istanbul, Ankara, Izmir, Austin, New York and Los Angeles. Texts are usually Turkish or English. Approved texts are shown on a public map to strangers.
 
 The app already masks phone numbers, e-mail addresses, links, licence plates, @handles and common swear words, and rejects listed slurs. Your job is what word lists miss.
 

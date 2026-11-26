@@ -92,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('👂 Overheard', style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800)),
+                    Text('👂 Dedikoydu', style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
                     Text(t('app.tagline'), style: theme.textTheme.titleMedium),
                     if (app.serverMessage != null) ...[

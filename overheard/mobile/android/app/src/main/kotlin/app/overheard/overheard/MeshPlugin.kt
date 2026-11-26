@@ -89,10 +89,10 @@ class MeshPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChannel.
             "keepAlive" -> {
                 val started = MeshService.start(
                     context,
-                    call.argument<String>("title") ?: "Overheard",
+                    call.argument<String>("title") ?: "Dedikoydu",
                     call.argument<String>("text") ?: "",
                     call.argument<String>("stop") ?: "Stop",
-                    call.argument<String>("channel") ?: "Overheard",
+                    call.argument<String>("channel") ?: "Dedikoydu",
                 )
                 result.success(started)
             }

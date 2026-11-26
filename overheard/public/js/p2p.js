@@ -80,7 +80,7 @@ export function createP2P(app) {
       ? h('button', {
         class: 'btn btn-block',
         type: 'button',
-        onclick: () => navigator.share({ title: 'Overheard', text: t('p2p.shareText'), url: link }).catch(() => {}),
+        onclick: () => navigator.share({ title: 'Dedikoydu', text: t('p2p.shareText'), url: link }).catch(() => {}),
       }, `📲 ${t('p2p.share')}`)
       : null;
     openSheet({

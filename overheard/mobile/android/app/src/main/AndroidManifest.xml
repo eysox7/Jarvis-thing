@@ -23,7 +23,7 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
     <application
-        android:label="Overheard"
+        android:label="Dedikoydu"
         android:name="${applicationName}"
         android:usesCleartextTraffic="${usesCleartextTraffic}"
         android:icon="@mipmap/ic_launcher">

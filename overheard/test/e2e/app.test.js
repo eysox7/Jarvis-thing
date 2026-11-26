@@ -302,7 +302,7 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
 
     test('ilk açılışta tanıtım gösterilir ve misafir olarak başlatır', async () => {
       const u = await newUser(browser, srv.base, KADIKOY, { intro: true });
-      await sheet(u.page).getByText('Overheard\'e hoş geldin').waitFor();
+      await sheet(u.page).getByText('Dedikoydu\'ya hoş geldin').waitFor();
       await sheet(u.page).getByText('Yerel sözler için oraya git').waitFor();
       await sheet(u.page).getByRole('button', { name: /misafir/ }).click();
       await u.page.waitForFunction(() => window.overheard.app.state.user?.isGuest);
@@ -384,7 +384,7 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
         u.page.waitForEvent('download'),
         u.page.locator('.leaflet-popup').last().getByRole('button', { name: /Paylaş/ }).click(),
       ]);
-      assert.equal(download.suggestedFilename(), 'overheard.png');
+      assert.equal(download.suggestedFilename(), 'dedikoydu.png');
       const png = await (await import('node:fs/promises')).readFile(await download.path());
       assert.equal(png.subarray(1, 4).toString(), 'PNG');
       assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1080, 1920]);
@@ -492,7 +492,7 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
         mod.page.waitForEvent('download'),
         item.getByRole('button', { name: /Posteri indir/ }).click(),
       ]);
-      assert.equal(download.suggestedFilename(), 'overheard-qr-ist-galata.png');
+      assert.equal(download.suggestedFilename(), 'dedikoydu-qr-ist-galata.png');
       assert.deepEqual(mod.errors, []);
       await mod.context.close();
 
@@ -511,7 +511,7 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
     });
   });
 
-  describe('Overheard Kafe', () => {
+  describe('Dedikoydu Kafe', () => {
     let srv;
     before(async () => { srv = await startTestServer({ demo: true }); });
     after(async () => { await srv.close(); });
@@ -575,7 +575,7 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
     let srv;
     before(async () => {
       srv = await startTestServer({ demo: true });
-      // Sentetik bir hat (test verisi) ve bir Overheard Kafe.
+      // Sentetik bir hat (test verisi) ve bir Dedikoydu Kafe.
       const json = JSON.parse(await readFile(new URL('../fixtures/overpass-lines.json', import.meta.url), 'utf8'));
       importLines(srv.db, parseLines(json, { cityId: 'istanbul' }));
       srv.db.prepare("INSERT INTO places (id, city_id, name, kind, lat, lng, radius_m, created_at) VALUES ('ist-test-kafe', 'istanbul', 'Test Semt Kafesi', 'spot', 40.9750, 29.2550, 60, ?)").run(Date.now());
@@ -591,7 +591,7 @@ describe('Uçtan uca', { skip: !chromium && 'playwright kurulu değil' }, () => 
       await u.page.locator('.toast', { hasText: 'T9 Test A–Test D: hattasın' }).waitFor();
       const nudge = u.page.locator('#nudge');
       await nudge.getByText('Bu civarda henüz söz yok').waitFor();
-      await nudge.getByText(/En yakın Overheard Kafe: Test Semt Kafesi/).waitFor();
+      await nudge.getByText(/En yakın Dedikoydu Kafe: Test Semt Kafesi/).waitFor();
       // Hat güzergâhı haritada; hattasın, bu yüzden dolu çizgi.
       await u.page.locator('path.oh-line.is-open').first().waitFor({ state: 'attached' });
 

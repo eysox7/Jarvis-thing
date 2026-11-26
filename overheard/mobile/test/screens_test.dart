@@ -50,7 +50,7 @@ void main() {
     await tester.runAsync(app.boot);
     await tester.pumpWidget(OverheardApp(controller: app));
     await tester.pump();
-    expect(find.text('👂 Overheard'), findsOneWidget);
+    expect(find.text('👂 Dedikoydu'), findsOneWidget);
     await tester.enterText(find.byType(TextField).first, 'overheard.local');
     await tester.tap(find.byType(FilledButton));
     await tester.pump();

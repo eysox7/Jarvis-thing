@@ -1,6 +1,6 @@
 {
-  "name": "Overheard",
-  "short_name": "Overheard",
+  "name": "Dedikoydu",
+  "short_name": "Dedikoydu",
   "description": "Duyduğun sözü haritaya bırak. Yalnızca orada bulunanlar okur.",
   "start_url": "/",
   "scope": "/",
